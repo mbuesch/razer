@@ -26,6 +26,15 @@ mouseTypeString = { RAZER_MOUSETYPE_DEATHADDER : "DeathAdder",
 		    RAZER_MOUSETYPE_LACHESIS : "Lachesis", }
 
 
+def printList(title, list):
+	sys.stdout.write(title + ": ")
+	for i in range(0, len(list)):
+		if i == 0:
+			sys.stdout.write(str(list[i]))
+		else:
+			sys.stdout.write(", " + str(list[i]))
+	print ""
+
 class OpSetRes:
 	def __init__(self, value):
 		self.value = value
@@ -37,11 +46,11 @@ class OpSetRes:
 class OpGetRes:
 	def run(self, device):
 		curRes = device.getResolution()
-		if curRes == 0:
+		if curRes == RAZER_MOUSE_RES_UNKNOWN:
 			curRes = "<unknown>"
 		suppRes = device.supportedResolutions()
 		print "Current resolution:", curRes, "DPI"
-		print "Supported resolutions:", suppRes
+		printList("Supported resolutions", suppRes)
 
 class OpSetFreq:
 	def __init__(self, value):
@@ -54,11 +63,43 @@ class OpSetFreq:
 class OpGetFreq:
 	def run(self, device):
 		curFreq = device.getFreq()
-		if curFreq == 0:
+		if curFreq == RAZER_MOUSE_FREQ_UNKNOWN:
 			curFreq = "<unknown>"
 		suppFreq = device.supportedFreqs()
 		print "Current frequency:", curFreq, "Hz"
-		print "Supported frequencies:", suppFreq
+		printList("Supported frequencies", suppFreq)
+
+class OpPrintLeds:
+	def run(self, device):
+		leds = device.getLeds()
+		names = []
+		for led in leds:
+			names.append(led.getName())
+		printList("Available LEDs", names)
+
+class OpSetLed:
+	def __init__(self, value):
+		self.value = value
+	def run(self, device):
+		# parse the LED:X argument
+		args = self.value.split(":")
+		if len(args) != 2:
+			print "-l|--setled argument error. Format LED:X"
+			exit(1)
+		ledname = args[0]
+		on = 0
+		if args[1] in ("1", "on", "ON", "true", "TRUE"):
+			on = 1
+		# Find the led and apply the setting
+		leds = device.getLeds()
+		for led in leds:
+			if led.getName().lower() == ledname.lower():
+				device.claim()
+				led.toggleState(on)
+				device.release()
+				return
+		print "LED \"%s\" not found on device \"%s\"" % (
+			ledname, device.getBusId())
 
 def mapBusIdToDevice(busid):
 	mice = scanMice()
@@ -129,6 +170,8 @@ def usage():
 	print "-R|--getres          Prints the current and supported resolutions"
 	print "-f|--freq FREQ       Changes the scan frequency to FREQ"
 	print "-F|--getfreq         Prints the current and supported frequencies"
+	print "-L|--leds            Print the identifiers of the LEDs on the device"
+	print "-l|--setled LED:off  Toggle the LED with the identifier \"LED\" ON or OFF"
 
 def parse_args():
 	devOpsList = []
@@ -136,9 +179,9 @@ def parse_args():
 
 	try:
 		(opts, args) = getopt.getopt(sys.argv[1:],
-			"hvsd:r:Rf:F",
+			"hvsd:r:Rf:FLl:",
 			[ "help", "version", "scan", "device=", "res=",
-			  "getres", "freq=", "getfreq" ])
+			  "getres", "freq=", "getfreq", "leds", "setled=" ])
 	except getopt.GetoptError:
 		usage()
 		exit(1)
@@ -157,26 +200,43 @@ def parse_args():
 			if currentDevOps and currentDevOps.ops:
 				devOpsList.append(currentDevOps)
 			currentDevOps = DevOps(v)
+			continue
 		if o in ("-r", "--res"):
 			if not currentDevOps:
 				print "Must specify a device (-d) before -r|--res"
 				exit(1)
 			currentDevOps.add(OpSetRes(v))
+			continue
 		if o in ("-R", "--getres"):
 			if not currentDevOps:
 				print "Must specify a device (-d) before -R|--getres"
 				exit(1)
 			currentDevOps.add(OpGetRes())
+			continue
 		if o in ("-f", "--freq"):
 			if not currentDevOps:
 				print "Must specify a device (-d) before -f|--freq"
 				exit(1)
 			currentDevOps.add(OpSetFreq(v))
+			continue
 		if o in ("-F", "--getfreq"):
 			if not currentDevOps:
 				print "Must specify a device (-d) before -F|--getfreq"
 				exit(1)
 			currentDevOps.add(OpGetFreq())
+			continue
+		if o in ("-L", "--leds"):
+			if not currentDevOps:
+				print "Must specify a device (-d) before -L|--leds"
+				exit(1)
+			currentDevOps.add(OpPrintLeds())
+			continue
+		if o in ("-l", "--setled"):
+			if not currentDevOps:
+				print "Must specify a device (-d) before -l|--setled"
+				exit(1)
+			currentDevOps.add(OpSetLed(v))
+			continue
 	if currentDevOps and currentDevOps.ops:
 		devOpsList.append(currentDevOps)
 	return devOpsList
@@ -186,10 +246,12 @@ def main():
 		razerInit()
 	except RazerException, e:
 		print "Failed to initialize Razer device access library:", e
+		sys.exit(1)
 	devOpsList = parse_args()
 	if not devOpsList:
 		exit(1)
 	for devOps in devOpsList:
 		devOps.runAll()
+	exit(0)
 
 main()

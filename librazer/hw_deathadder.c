@@ -105,9 +105,6 @@ static int deathadder_get_leds(struct razer_mouse *m,
 	struct deathadder_private *priv = m->internal;
 	struct razer_led *scroll, *logo;
 
-	if (!priv->claimed)
-		return -EBUSY;
-
 	scroll = malloc(sizeof(struct razer_led));
 	if (!scroll)
 		return -ENOMEM;
@@ -117,13 +114,13 @@ static int deathadder_get_leds(struct razer_mouse *m,
 		return -ENOMEM;
 	}
 
-	scroll->name = "scrollwheel";
+	scroll->name = "Scrollwheel";
 	scroll->id = DEATHADDER_LED_SCROLL;
 	scroll->state = RAZER_LED_UNKNOWN;
 	scroll->toggle_state = deathadder_led_toggle;
 	scroll->u.mouse = m;
 
-	logo->name = "glowing logo";
+	logo->name = "GlowingLogo";
 	logo->id = DEATHADDER_LED_LOGO;
 	logo->state = RAZER_LED_UNKNOWN;
 	logo->toggle_state = deathadder_led_toggle;
