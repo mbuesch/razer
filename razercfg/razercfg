@@ -1,0 +1,195 @@
+#!/usr/bin/env python
+#
+#   Razer device commandline configuration tool
+#
+#   Copyright (C) 2007 Michael Buesch <mb@bu3sch.de>
+#
+#   This program is free software; you can redistribute it and/or
+#   modify it under the terms of the GNU General Public License
+#   as published by the Free Software Foundation; either version 2
+#   of the License, or (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+
+RAZERCFG_VERSION	= "001"
+
+import sys
+import getopt
+from pyrazer import *
+
+
+mouseTypeString = { RAZER_MOUSETYPE_DEATHADDER : "DeathAdder",
+		    RAZER_MOUSETYPE_KRAIT : "Krait",
+		    RAZER_MOUSETYPE_LACHESIS : "Lachesis", }
+
+
+class OpSetRes:
+	def __init__(self, value):
+		self.value = value
+	def run(self, device):
+		device.claim()
+		device.setResolution(int(self.value))
+		device.release()
+
+class OpGetRes:
+	def run(self, device):
+		curRes = device.getResolution()
+		if curRes == 0:
+			curRes = "<unknown>"
+		suppRes = device.supportedResolutions()
+		print "Current resolution:", curRes, "DPI"
+		print "Supported resolutions:", suppRes
+
+class OpSetFreq:
+	def __init__(self, value):
+		self.value = value
+	def run(self, device):
+		device.claim()
+		device.setFreq(int(self.value))
+		device.release()
+
+class OpGetFreq:
+	def run(self, device):
+		curFreq = device.getFreq()
+		if curFreq == 0:
+			curFreq = "<unknown>"
+		suppFreq = device.supportedFreqs()
+		print "Current frequency:", curFreq, "Hz"
+		print "Supported frequencies:", suppFreq
+
+def mapBusIdToDevice(busid):
+	mice = scanMice()
+	for mouse in mice:
+		if busid == "mouse":
+			# Return the first found mouse
+			return mouse
+		if mouse.getBusId() == busid:
+			return mouse
+	return None
+
+# Operations on a device
+class DevOps:
+	def __init__(self, busid):
+		self.busid = busid
+		self.ops = []
+	def add(self, op):
+		self.ops.append(op)
+	def runAll(self):
+		try:
+			device = mapBusIdToDevice(self.busid)
+			if not device:
+				print "Did not find device with ID \"%s\"" % self.busid
+				exit(1)
+			for op in self.ops:
+				op.run(device)
+		except RazerException, e:
+			print "Razer device access exception:", e
+
+
+def exit(exitcode):
+	razerExit()
+	sys.exit(exitcode)
+
+def scanDevices():
+	try:
+		mice = scanMice()
+		for mouse in mice:
+			print "Found mouse type \"%s\" on bus \"%s\"" % (
+				mouseTypeString[mouse.getType()],
+				mouse.getBusId())
+	except RazerException, e:
+		print "Failed to scan for devices:", e.args
+		exit(1)
+
+def prVersion():
+	print "Razer device configuration tool"
+	print "Version", RAZERCFG_VERSION
+
+def usage():
+	prVersion()
+	print ""
+	print "Usage: razercfg [OPTIONS] [-d DEV DEVOPS] [-d DEV DEVOPS]..."
+	print ""
+	print "-h|--help            Print this help text"
+	print "-v|--version         Print the program version number"
+	print "-s|--scan            Scan for devices and print the bus IDs"
+	print ""
+	print "-d|--device DEV      Selects the device with the bus ID \"DEV\""
+	print "    Use the special value \"mouse\" for DEV to select"
+	print "    the first found razer mouse device in the system."
+	print ""
+	print "Device operations (DEVOPS):"
+	print "These options apply to the device that is specified with -d"
+	print ""
+	print "Options for mice:"
+	print "-r|--res DPI         Changes the scan resolution to DPI"
+	print "-R|--getres          Prints the current and supported resolutions"
+	print "-f|--freq FREQ       Changes the scan frequency to FREQ"
+	print "-F|--getfreq         Prints the current and supported frequencies"
+
+def parse_args():
+	devOpsList = []
+	currentDevOps = None
+
+	try:
+		(opts, args) = getopt.getopt(sys.argv[1:],
+			"hvsd:r:Rf:F",
+			[ "help", "version", "scan", "device=", "res=",
+			  "getres", "freq=", "getfreq" ])
+	except getopt.GetoptError:
+		usage()
+		exit(1)
+
+	for (o, v) in opts:
+		if o in ("-h", "--help"):
+			usage()
+			exit(0)
+		if o in ("-v", "--version"):
+			prVersion()
+			exit(0)
+		if o in ("-s", "--scan"):
+			scanDevices()
+			exit(0)
+		if o in ("-d", "--device"):
+			if currentDevOps and currentDevOps.ops:
+				devOpsList.append(currentDevOps)
+			currentDevOps = DevOps(v)
+		if o in ("-r", "--res"):
+			if not currentDevOps:
+				print "Must specify a device (-d) before -r|--res"
+				exit(1)
+			currentDevOps.add(OpSetRes(v))
+		if o in ("-R", "--getres"):
+			if not currentDevOps:
+				print "Must specify a device (-d) before -R|--getres"
+				exit(1)
+			currentDevOps.add(OpGetRes())
+		if o in ("-f", "--freq"):
+			if not currentDevOps:
+				print "Must specify a device (-d) before -f|--freq"
+				exit(1)
+			currentDevOps.add(OpSetFreq(v))
+		if o in ("-F", "--getfreq"):
+			if not currentDevOps:
+				print "Must specify a device (-d) before -F|--getfreq"
+				exit(1)
+			currentDevOps.add(OpGetFreq())
+	if currentDevOps and currentDevOps.ops:
+		devOpsList.append(currentDevOps)
+	return devOpsList
+
+def main():
+	try:
+		razerInit()
+	except RazerException, e:
+		print "Failed to initialize Razer device access library:", e
+	devOpsList = parse_args()
+	if not devOpsList:
+		exit(1)
+	for devOps in devOpsList:
+		devOps.runAll()
+
+main()

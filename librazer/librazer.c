@@ -25,6 +25,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
+#include <sys/ioctl.h>
 
 
 enum razer_devtype {
@@ -89,21 +90,6 @@ static const struct razer_usb_device * usbdev_lookup(const struct usb_device_des
 	}
 	return NULL;
 }
-
-#if 0
-static void * razer_realloc(void *p, size_t newsize)
-{
-	void *ret;
-
-	ret = realloc(p, newsize);
-	if (!ret) {
-		free(p);
-		return NULL;
-	}
-
-	return ret;
-}
-#endif
 
 int razer_scan_mice(struct razer_mouse **mice_list)
 {
@@ -171,28 +157,22 @@ void razer_free_mice(struct razer_mouse *mouse_list)
 
 	for (mouse = mouse_list; mouse; ) {
 		next = mouse->next;
-		razer_free_mouse(mouse);
+
+		switch (mouse->type) {
+		case RAZER_MOUSETYPE_DEATHADDER:
+			razer_deathadder_release(mouse);
+			break;
+		case RAZER_MOUSETYPE_KRAIT:
+			//TODO
+			break;
+		case RAZER_MOUSETYPE_LACHESIS:
+			//TODO
+			break;
+		}
+		free(mouse);
+
 		mouse = next;
 	}
-}
-
-void razer_free_mouse(struct razer_mouse *mouse)
-{
-	if (!mouse)
-		return;
-
-	switch (mouse->type) {
-	case RAZER_MOUSETYPE_DEATHADDER:
-		razer_deathadder_release(mouse);
-		break;
-	case RAZER_MOUSETYPE_KRAIT:
-		//TODO
-		break;
-	case RAZER_MOUSETYPE_LACHESIS:
-		//TODO
-		break;
-	}
-	free(mouse);
 }
 
 void razer_free_freq_list(enum razer_mouse_freq *freq_list, int count)
@@ -213,15 +193,9 @@ void razer_free_leds(struct razer_led *led_list)
 
 	for (led = led_list; led; ) {
 		next = led->next;
-		razer_free_led(led);
+		free(led);
 		led = next;
 	}
-}
-
-void razer_free_led(struct razer_led *led)
-{
-	if (led)
-		free(led);
 }
 
 int razer_init(void)
@@ -241,17 +215,15 @@ void razer_exit(void)
 	librazer_initialized = 0;
 }
 
-struct fake_usb_dev_handle {
-	int fd;
-	/* ... there's more */
-};
-#include <sys/ioctl.h>
+static int reconnect_kdrv_hack(usb_dev_handle *_h, int interf)
+{
 #define IOCTL_USB_IOCTL		_IOWR('U', 18, struct usb_ioctl)
 #define IOCTL_USB_CONNECT	_IO('U', 23)
 
-static int reconnect_kdrv_hack(usb_dev_handle *_h, int interf)
-{
-	struct fake_usb_dev_handle *h = (struct fake_usb_dev_handle *)_h;
+	struct fake_usb_dev_handle {
+		int fd;
+		/* ... there's more */
+	} *h = (struct fake_usb_dev_handle *)_h;
 	struct usb_ioctl {
 		int ifno;
 		int ioctl_code;

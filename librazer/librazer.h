@@ -22,15 +22,38 @@ extern "C" {
 #endif
 
 
-enum razer_led_state {
-	RAZER_LED_OFF,
-	RAZER_LED_ON,
-	RAZER_LED_UNKNOWN,
-};
+#define RAZER_BUSID_MAX_SIZE	128
 
 struct razer_mouse;
 
+
+/** enum razer_led_state - The LED state value
+  * @RAZER_LED_OFF: The LED is turned off
+  * @RAZER_LED_ON: The LED is turned on
+  * @RAZER_LED_UNKNOWN: The LED is in an unknown state (on or off)
+  */
+enum razer_led_state {
+	RAZER_LED_OFF		= 0,
+	RAZER_LED_ON		= 1,
+	RAZER_LED_UNKNOWN,
+};
+
+/** struct razer_led - A LED on a razer device.
+  *
+  * @next: The next LED device in the linked list.
+  *
+  * @name: The human readable name string for the LED.
+  * @id: A unique ID cookie
+  * @state: The state of the LED (on, off, unknown)
+  *
+  * @toggle_state: Toggle the state. Note that a new_state of
+  * 	RAZER_LED_UNKNOWN won't do anything, obviously.
+  *
+  * @u: This union contains a pointer to the parent device.
+  */
 struct razer_led {
+	struct razer_led *next;
+
 	const char *name;
 	int id;
 	enum razer_led_state state;
@@ -41,11 +64,14 @@ struct razer_led {
 	union {
 		struct razer_mouse *mouse;
 	} u;
-	struct razer_led *next;
 };
 
 /** enum razer_mouse_freq - Mouse scan frequency
- */
+  * @RAZER_MOUSE_FREQ_UNKNOWN: Unknown scan frequency
+  * @RAZER_MOUSE_FREQ_125HZ: 100Hz scan frequency
+  * @RAZER_MOUSE_FREQ_500HZ: 500Hz scan frequency
+  * @RAZER_MOUSE_FREQ_1000HZ: 1000Hz scan frequency
+  */
 enum razer_mouse_freq {
 	RAZER_MOUSE_FREQ_UNKNOWN	= 0,
 	RAZER_MOUSE_FREQ_125HZ		= 125,
@@ -54,6 +80,12 @@ enum razer_mouse_freq {
 };
 
 /** enum razer_mouse_res - Mouse scan resolutions
+  * @RAZER_MOUSE_RES_UNKNOWN: Unknown scan resolution
+  * @RAZER_MOUSE_RES_400DPI: 400DPI scan resolution
+  * @RAZER_MOUSE_RES_450DPI: 450DPI scan resolution
+  * @RAZER_MOUSE_RES_900DPI: 900DPI scan resolution
+  * @RAZER_MOUSE_RES_1600DPI: 1600DPI scan resolution
+  * @RAZER_MOUSE_RES_1800DPI: 1800DPI scan resolution
   */
 enum razer_mouse_res {
 	RAZER_MOUSE_RES_UNKNOWN		= 0,
@@ -78,6 +110,8 @@ enum razer_mouse_type {
 /** struct razer_mouse - Representation of a mouse device
   *
   * @next: Linked list to the next mouse.
+  *
+  * @busid: The ID of the bus location this mouse is connected to.
   *
   * @type: The mouse type
   *
@@ -112,6 +146,8 @@ enum razer_mouse_type {
 struct razer_mouse {
 	struct razer_mouse *next;
 
+	char busid[RAZER_BUSID_MAX_SIZE];
+
 	enum razer_mouse_type type;
 
 	int (*claim)(struct razer_mouse *m);
@@ -133,12 +169,25 @@ struct razer_mouse {
 	void *internal; /* Do not touch this pointer. */
 };
 
-//XXX docs
+/** razer_free_freq_list - Free an array of frequencies.
+  * This function frees a whole array of frequencies as returned
+  * by the device methods.
+  */
 void razer_free_freq_list(enum razer_mouse_freq *freq_list, int count);
+
+/** razer_free_resolution_list - Free an array of resolutions.
+  * This function frees a whole array of resolutions as returned
+  * by the device methods.
+  */
 void razer_free_resolution_list(enum razer_mouse_res *res_list, int count);
 
+/** razer_free_leds - Free a linked list of struct razer_led.
+  * This function frees a whole linked list of struct razer_led,
+  * as returned by the device methods. Note that you can
+  * also free a single struct razer_led with this function, if
+  * you assign a NULL pointer to led_list->next before calling this.
+  */
 void razer_free_leds(struct razer_led *led_list);
-void razer_free_led(struct razer_led *led);
 
 /** razer_scan_mice - Scan the system for connected razer mice.
   * Returns the number of detected mice or a negative error code.
@@ -148,12 +197,13 @@ void razer_free_led(struct razer_led *led);
   */
 int razer_scan_mice(struct razer_mouse **mice_list);
 
-/* razer_free_mice - Free the list of mice from razer_scan_mice
+/* razer_free_mice - Free the list of mice from razer_scan_mice().
+ * This function frees a whole linked list of struct razer_mouse,
+ * as returned from razer_scan_mice. Note that you can also free
+ * a single struct razer_mouse with this function, if you assign
+ * a NULL pointer to mouse_list->next before calling this.
  */
 void razer_free_mice(struct razer_mouse *mouse_list);
-/* razer_free_mouse - Free a single mouse
- */
-void razer_free_mouse(struct razer_mouse *mouse);
 
 /** razer_init - LibRazer initialization
   * Call this before any other library function.

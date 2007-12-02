@@ -21,6 +21,7 @@
 #include <usb.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <usb.h>
 
@@ -214,6 +215,9 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 
 	m->internal = priv;
 	m->type = RAZER_MOUSETYPE_DEATHADDER;
+	snprintf(m->busid, sizeof(m->busid), "usb:%s-%s",
+		 usbdev->bus->dirname,
+		 usbdev->filename);
 
 	m->claim = deathadder_claim;
 	m->release = deathadder_release;

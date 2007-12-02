@@ -20,6 +20,8 @@
 #include "librazer.h"
 
 
+static PyObject *pyrazer_except;
+
 static void raise_errno_exception(int err)
 {
 	int old_errno;
@@ -28,7 +30,7 @@ static void raise_errno_exception(int err)
 		err = -err;
 	old_errno = errno;
 	errno = err;
-	PyErr_SetFromErrno(PyExc_Exception);
+	PyErr_SetFromErrno(pyrazer_except);
 	errno = old_errno;
 }
 
@@ -100,7 +102,8 @@ static void pyrazer_led_free(PyObject *obj)
 {
 	struct pyrazer_led *l = (struct pyrazer_led *)obj;
 
-	razer_free_led(l->d);
+	l->d->next = NULL; /* Only free this LED. */
+	razer_free_leds(l->d);
 	obj->ob_type->tp_free(obj);
 }
 
@@ -123,6 +126,13 @@ struct pyrazer_mouse {
 	PyObject_HEAD
 	struct razer_mouse *d;
 };
+
+static PyObject * method_mouse_get_busid(PyObject *self, PyObject *args)
+{
+	struct pyrazer_mouse *m = (struct pyrazer_mouse *)self;
+
+	return PyString_FromString(m->d->busid);
+}
 
 static PyObject * method_mouse_get_type(PyObject *self, PyObject *args)
 {
@@ -176,8 +186,9 @@ static PyObject * method_mouse_get_leds(PyObject *self, PyObject *args)
 		pyled = (struct pyrazer_led *)PyType_GenericAlloc(&pyrazer_led_type, 1);
 		if (!pyled) {
 			Py_DECREF(tuple);
-			for ( ; led; led = led->next)
-				razer_free_led(led);
+			/* Free the leds that are not yet inserted into
+			 * the tuple. */
+			razer_free_leds(led);
 			return NULL;
 		}
 		pyled->d = led;
@@ -300,6 +311,8 @@ static PyObject * method_mouse_set_res(PyObject *self, PyObject *args)
 }
 
 static PyMethodDef pyrazer_mouse_methods[] = {
+	{ "getBusId", method_mouse_get_busid, METH_NOARGS,
+	  "Get the bus ID string" },
 	{ "getType", method_mouse_get_type, METH_NOARGS,
 	  "Get the mouse type identifier" },
 	{ "claim", method_mouse_claim, METH_NOARGS,
@@ -333,7 +346,8 @@ static void pyrazer_mouse_free(PyObject *obj)
 {
 	struct pyrazer_mouse *m = (struct pyrazer_mouse *)obj;
 
-	razer_free_mouse(m->d);
+	m->d->next = NULL; /* Only free this mouse. */
+	razer_free_mice(m->d);
 	obj->ob_type->tp_free(obj);
 }
 
@@ -391,8 +405,9 @@ static PyObject * pyrazer_scan_mice(PyObject *self, PyObject *args)
 		pymouse = (struct pyrazer_mouse *)PyType_GenericAlloc(&pyrazer_mouse_type, 1);
 		if (!pymouse) {
 			Py_DECREF(tuple);
-			for ( ; mouse; mouse = mouse->next)
-				razer_free_mouse(mouse);
+			/* Free the mice that are not yet inserted into
+			 * the tuple. */
+			razer_free_mice(mouse);
 			return NULL;
 		}
 		pymouse->d = mouse;
@@ -427,9 +442,17 @@ PyMODINIT_FUNC initpyrazer(void)
 	if (PyType_Ready(&pyrazer_mouse_type) < 0)
 		return;
 
-	m = Py_InitModule("pyrazer", pyrazer_methods);
-	if (!m)
+	pyrazer_except = PyErr_NewException("pyrazer.RazerException",
+					    PyExc_Exception, NULL);
+	if (!pyrazer_except)
 		return;
+	Py_INCREF(pyrazer_except);
+
+	m = Py_InitModule("pyrazer", pyrazer_methods);
+	if (!m) {
+		Py_DECREF(pyrazer_except);
+		return;
+	}
 
 	/* LED states */
 	def_const(m, RAZER_LED_OFF);
@@ -456,8 +479,11 @@ PyMODINIT_FUNC initpyrazer(void)
 	def_const(m, RAZER_MOUSETYPE_LACHESIS);
 
 	/* Objects */
+	PyModule_AddObject(m, "RazerException", pyrazer_except);
+
 	Py_INCREF(&pyrazer_led_type);
 	PyModule_AddObject(m, "Led", (PyObject *)&pyrazer_led_type);
+
 	Py_INCREF(&pyrazer_mouse_type);
 	PyModule_AddObject(m, "Mouse", (PyObject *)&pyrazer_mouse_type);
 }
