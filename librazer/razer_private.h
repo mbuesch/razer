@@ -20,6 +20,4 @@ int razer_generic_usb_claim(struct usb_device *dev,
 void razer_generic_usb_release(struct usb_device *dev,
 			       struct razer_usb_context *ctx);
 
-int razer_usb_controlmsg(struct razer_usb_context *ctx);
-
 #endif /* RAZER_PRIVATE_H_ */
