@@ -1,0 +1,178 @@
+#!/usr/bin/env python
+#
+#   Razer device QT configuration tool
+#
+#   Copyright (C) 2007 Michael Buesch <mb@bu3sch.de>
+#
+#   This program is free software; you can redistribute it and/or
+#   modify it under the terms of the GNU General Public License
+#   as published by the Free Software Foundation; either version 2
+#   of the License, or (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+
+QRAZERCFG_VERSION	= "001"
+
+import sys
+from PyQt4.QtCore import *
+from PyQt4.QtGui import *
+from pyrazer import *
+
+
+mouseTypeString = { RAZER_MOUSETYPE_DEATHADDER : "DeathAdder",
+		    RAZER_MOUSETYPE_KRAIT : "Krait",
+		    RAZER_MOUSETYPE_LACHESIS : "Lachesis", }
+
+
+class MouseWidget(QWidget):
+	def __init__(self, parent=None):
+		QWidget.__init__(self, parent)
+
+		self.mainwnd = parent
+		layout = QVBoxLayout(self)
+		self.mousesel = QComboBox(self)
+		self.connect(self.mousesel, SIGNAL("currentIndexChanged(int)"), self.mouseChanged)
+		layout.addWidget(self.mousesel)
+		layout.addSpacing(15)
+		layout.addStretch()
+		layout.addWidget(QLabel(self.tr("Mouse scan frequency:"), self))
+		self.hzsel = QComboBox(self)
+		self.connect(self.hzsel, SIGNAL("currentIndexChanged(int)"), self.freqChanged)
+		layout.addWidget(self.hzsel)
+		layout.addWidget(QLabel(self.tr("Mouse scan resolution:"), self))
+		self.ressel = QComboBox(self)
+		self.connect(self.ressel, SIGNAL("currentIndexChanged(int)"), self.resChanged)
+		layout.addWidget(self.ressel)
+		layout.addStretch()
+		self.fwVer = QLabel(self)
+		layout.addWidget(self.fwVer)
+
+	def update(self, mice):
+		self.mice = mice
+		self.mousesel.clear()
+		for mouse in mice:
+			name = mouseTypeString[mouse.getType()]
+			name += self.tr(" on ") + mouse.getBusId()
+			self.mousesel.addItem(name)
+
+	def freqChanged(self, index):
+		if index == -1:
+			return
+		if index == 0: # "Unknown"
+			return
+		index -= 1
+		freq = self.freqList[index]
+		try:
+			self.mouse.claim()
+			self.mouse.setFreq(freq)
+			self.mouse.release()
+		except RazerException, e:
+			msg = "Device access exception: %s" % e[1]
+			self.mainwnd.statusBar().showMessage(msg)
+
+	def resChanged(self, index):
+		if index == -1:
+			return
+		if index == 0: # "Unknown"
+			return
+		index -= 1
+		res = self.resList[index]
+		try:
+			self.mouse.claim()
+			self.mouse.setResolution(res)
+			self.mouse.release()
+		except RazerException, e:
+			msg = "Device access exception: %s" % e[1]
+			self.mainwnd.statusBar().showMessage(msg)
+
+	def mouseChanged(self, index):
+		self.hzsel.clear()
+		self.ressel.clear()
+		if index == -1:
+			self.hzsel.setEnabled(0)
+			self.ressel.setEnabled(0)
+			return
+		self.hzsel.setEnabled(1)
+		self.ressel.setEnabled(1)
+		self.mouse = self.mice[index]
+		self.hzsel.addItem(self.tr("Unknown"))
+		self.freqList = self.mouse.supportedFreqs()
+		for freq in self.freqList:
+			self.hzsel.addItem(self.tr("%d Hz" % freq))
+		self.ressel.addItem(self.tr("Unknown"))
+		self.resList = self.mouse.supportedResolutions()
+		for res in self.resList:
+			self.ressel.addItem(self.tr("%d DPI" % res))
+		try:
+			self.mouse.claim()
+			ver = self.mouse.getFwVersion()
+			self.fwVer.setText(self.tr("Firmware version: %u.%u" % (
+					   (ver & 0xFF00) >> 8, ver & 0x00FF)))
+			self.mouse.release()
+		except RazerException:
+			self.fwVer.setText(self.tr("Firmware version: Unknown"))
+
+class StatusBar(QStatusBar):
+	def showMessage(self, msg):
+		QStatusBar.showMessage(self, msg, 10000)
+
+class MainWindow(QMainWindow):
+	def __init__(self, parent=None):
+		QMainWindow.__init__(self, parent)
+		self.setWindowTitle(self.tr("Razer device configuration"))
+		mice = scanMice()
+
+		mb = QMenuBar(self)
+		rzrmen = QMenu(self.tr("Razer"), mb)
+		rzrmen.addAction(self.tr("Rescan devices"), self.scan)
+		rzrmen.addSeparator()
+		rzrmen.addAction(self.tr("Exit"), self.close)
+		mb.addMenu(rzrmen)
+		helpmen = QMenu(self.tr("Help"), mb)
+		helpmen.addAction(self.tr("About"), self.about)
+		mb.addMenu(helpmen)
+		self.setMenuBar(mb)
+
+		tab = QTabWidget(self)
+		self.mousewidget = MouseWidget(self)
+		tab.addTab(self.mousewidget, self.tr("Mice"))
+		self.setCentralWidget(tab)
+
+		self.setStatusBar(StatusBar())
+
+		self.scan()
+
+	# Rescan for new devices
+	def scan(self):
+		self.mice = scanMice()
+		self.mousewidget.update(self.mice)
+		self.statusBar().showMessage(self.tr("Found %d Razer mice" % len(self.mice)))
+		pass
+
+	def about(self):
+		QMessageBox.information(self, self.tr("About"),
+					self.tr("Razer device configuration tool\n"
+						"Version %s\n"
+						"Copyright (c) 2007 Michael Buesch"
+						% QRAZERCFG_VERSION))
+
+def exit(exitcode):
+	razerExit()
+	sys.exit(exitcode)
+
+def main():
+	try:
+		razerInit()
+	except RazerException, e:
+		print "Failed to initialize Razer device access library:", e
+		sys.exit(1)
+
+	app = QApplication(sys.argv)
+	mainwnd = MainWindow()
+	mainwnd.show()
+	exit(app.exec_())
+
+main()
