@@ -387,8 +387,10 @@ static PyObject * pyrazer_init(PyObject *self, PyObject *args)
 	int err;
 
 	err = razer_init();
-	if (err)
+	if (err) {
 		raise_errno_exception(err);
+		return NULL;
+	}
 
 	return Py_None;
 }
