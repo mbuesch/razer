@@ -47,7 +47,7 @@ enum razer_led_state {
   * @state: The state of the LED (on, off, unknown)
   *
   * @toggle_state: Toggle the state. Note that a new_state of
-  * 	RAZER_LED_UNKNOWN won't do anything, obviously.
+  * 	RAZER_LED_UNKNOWN result in an error.
   *
   * @u: This union contains a pointer to the parent device.
   */
@@ -55,7 +55,7 @@ struct razer_led {
 	struct razer_led *next;
 
 	const char *name;
-	int id;
+	unsigned int id;
 	enum razer_led_state state;
 
 	int (*toggle_state)(struct razer_led *led,
@@ -120,6 +120,9 @@ enum razer_mouse_type {
   *
   * @release: Release a claimed backend device.
   *
+  * @get_fw_version: Read the firmware version from the device.
+  *     Returns the firmware version or a negative error code.
+  *
   * @get_leds: Get a linked list of available LEDs.
   * 	Returns the number of LEDs or a negative error code.
   * 	leds_list points to the first LED in the list.
@@ -152,6 +155,8 @@ struct razer_mouse {
 
 	int (*claim)(struct razer_mouse *m);
 	void (*release)(struct razer_mouse *m);
+
+	int (*get_fw_version)(struct razer_mouse *m);
 
 	int (*get_leds)(struct razer_mouse *m,
 			struct razer_led **leds_list);

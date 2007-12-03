@@ -91,8 +91,7 @@ class OpSetLed:
 		if args[1] in ("1", "on", "ON", "true", "TRUE"):
 			on = 1
 		# Find the led and apply the setting
-		leds = device.getLeds()
-		for led in leds:
+		for led in device.getLeds():
 			if led.getName().lower() == ledname.lower():
 				device.claim()
 				led.toggleState(on)
@@ -100,6 +99,14 @@ class OpSetLed:
 				return
 		print "LED \"%s\" not found on device \"%s\"" % (
 			ledname, device.getBusId())
+
+class OpGetFwVer:
+	def run(self, device):
+		device.claim()
+		ver = device.getFwVersion()
+		print "Firmware version: %u.%u" % (
+			(ver & 0xFF00) >> 8, ver & 0x00FF)
+		device.release()
 
 def mapBusIdToDevice(busid):
 	mice = scanMice()
@@ -166,6 +173,7 @@ def usage():
 	print "These options apply to the device that is specified with -d"
 	print ""
 	print "Options for mice:"
+	print "-V|--fwver           Print the firmware version number"
 	print "-r|--res DPI         Changes the scan resolution to DPI"
 	print "-R|--getres          Prints the current and supported resolutions"
 	print "-f|--freq FREQ       Changes the scan frequency to FREQ"
@@ -179,9 +187,10 @@ def parse_args():
 
 	try:
 		(opts, args) = getopt.getopt(sys.argv[1:],
-			"hvsd:r:Rf:FLl:",
+			"hvsd:r:Rf:FLl:V",
 			[ "help", "version", "scan", "device=", "res=",
-			  "getres", "freq=", "getfreq", "leds", "setled=" ])
+			  "getres", "freq=", "getfreq", "leds", "setled=",
+			  "fwver" ])
 	except getopt.GetoptError:
 		usage()
 		exit(1)
@@ -236,6 +245,12 @@ def parse_args():
 				print "Must specify a device (-d) before -l|--setled"
 				exit(1)
 			currentDevOps.add(OpSetLed(v))
+			continue
+		if o in ("-V", "--fwver"):
+			if not currentDevOps:
+				print "Must specify a device (-d) before -V|--fwver"
+				exit(1)
+			currentDevOps.add(OpGetFwVer())
 			continue
 	if currentDevOps and currentDevOps.ops:
 		devOpsList.append(currentDevOps)

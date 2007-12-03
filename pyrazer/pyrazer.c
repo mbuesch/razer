@@ -164,6 +164,20 @@ static PyObject * method_mouse_release(PyObject *self, PyObject *args)
 	return Py_None;
 }
 
+static PyObject * method_mouse_get_fw_version(PyObject *self, PyObject *args)
+{
+	struct pyrazer_mouse *m = (struct pyrazer_mouse *)self;
+	int ver;
+
+	ver = m->d->get_fw_version(m->d);
+	if (ver < 0) {
+		raise_errno_exception(ver);
+		return NULL;
+	}
+
+	return PyInt_FromLong(ver);
+}
+
 static PyObject * method_mouse_get_leds(PyObject *self, PyObject *args)
 {
 	struct pyrazer_mouse *m = (struct pyrazer_mouse *)self;
@@ -319,6 +333,8 @@ static PyMethodDef pyrazer_mouse_methods[] = {
 	  "Claim the mouse" },
 	{ "release", method_mouse_release, METH_NOARGS,
 	  "Release the mouse" },
+	{ "getFwVersion", method_mouse_get_fw_version, METH_NOARGS,
+	  "Read the firmware version from the device" },
 	{ "getLeds", method_mouse_get_leds, METH_NOARGS,
 	  "Get a list of LEDs" },
 	{ "supportedFreqs", method_mouse_supported_freqs, METH_NOARGS,
