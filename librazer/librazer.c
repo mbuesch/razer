@@ -15,9 +15,10 @@
  */
 
 #include "librazer.h"
+#include "razer_private.h"
 
 #include "hw_deathadder.h"
-#include "razer_private.h"
+#include "hw_krait.h"
 
 #include <usb.h>
 #include <stdint.h>
@@ -127,7 +128,9 @@ int razer_scan_mice(struct razer_mouse **mice_list)
 					goto err_unwind;
 				break;
 			case RAZER_MOUSETYPE_KRAIT:
-				//TODO
+				err = razer_krait_init_struct(mouse, dev);
+				if (err)
+					goto err_unwind;
 				break;
 			case RAZER_MOUSETYPE_LACHESIS:
 				//TODO
@@ -163,7 +166,7 @@ void razer_free_mice(struct razer_mouse *mouse_list)
 			razer_deathadder_release(mouse);
 			break;
 		case RAZER_MOUSETYPE_KRAIT:
-			//TODO
+			razer_krait_release(mouse);
 			break;
 		case RAZER_MOUSETYPE_LACHESIS:
 			//TODO
