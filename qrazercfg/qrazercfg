@@ -27,6 +27,29 @@ mouseTypeString = { RAZER_MOUSETYPE_DEATHADDER : "DeathAdder",
 		    RAZER_MOUSETYPE_LACHESIS : "Lachesis", }
 
 
+class LedCheckBox(QCheckBox):
+	def __init__(self, mouse, led, parent):
+		text = led.getName()
+		text += parent.tr(" LED")
+		QCheckBox.__init__(self, text, parent)
+
+		self.mousewidget = parent
+		self.mouse = mouse
+		self.led = led
+		self.connect(self, SIGNAL("stateChanged(int)"), self.toggled)
+
+	def toggled(self, state):
+		try:
+			self.mouse.claim()
+			if state:
+				self.led.toggleState(RAZER_LED_ON)
+			else:
+				self.led.toggleState(RAZER_LED_OFF)
+		except RazerException, e:
+			msg = "Device access exception: %s" % e[1]
+			self.mousewidget.mainwnd.statusBar().showMessage(msg)
+		self.mouse.release()
+
 class MouseWidget(QWidget):
 	def __init__(self, parent=None):
 		QWidget.__init__(self, parent)
@@ -46,6 +69,9 @@ class MouseWidget(QWidget):
 		self.ressel = QComboBox(self)
 		self.connect(self.ressel, SIGNAL("currentIndexChanged(int)"), self.resChanged)
 		layout.addWidget(self.ressel)
+		self.ledsLayout = QVBoxLayout()
+		layout.addLayout(self.ledsLayout)
+		self.ledCheckboxes = []
 		layout.addStretch()
 		self.fwVer = QLabel(self)
 		layout.addWidget(self.fwVer)
@@ -68,10 +94,10 @@ class MouseWidget(QWidget):
 		try:
 			self.mouse.claim()
 			self.mouse.setFreq(freq)
-			self.mouse.release()
 		except RazerException, e:
 			msg = "Device access exception: %s" % e[1]
 			self.mainwnd.statusBar().showMessage(msg)
+		self.mouse.release()
 
 	def resChanged(self, index):
 		if index == -1:
@@ -83,10 +109,10 @@ class MouseWidget(QWidget):
 		try:
 			self.mouse.claim()
 			self.mouse.setResolution(res)
-			self.mouse.release()
 		except RazerException, e:
 			msg = "Device access exception: %s" % e[1]
 			self.mainwnd.statusBar().showMessage(msg)
+		self.mouse.release()
 
 	def mouseChanged(self, index):
 		self.hzsel.clear()
@@ -94,6 +120,7 @@ class MouseWidget(QWidget):
 		if index == -1:
 			self.hzsel.setEnabled(0)
 			self.ressel.setEnabled(0)
+			self.fwVer.clear()
 			return
 		self.hzsel.setEnabled(1)
 		self.ressel.setEnabled(1)
@@ -106,14 +133,23 @@ class MouseWidget(QWidget):
 		self.resList = self.mouse.supportedResolutions()
 		for res in self.resList:
 			self.ressel.addItem(self.tr("%d DPI" % res))
+
+		for chk in self.ledCheckboxes:
+			self.ledsLayout.removeWidget(chk)
+		self.ledCheckboxes = []
+		for led in self.mouse.getLeds():
+			chk = LedCheckBox(self.mouse, led, self)
+			self.ledCheckboxes.append(chk)
+			self.ledsLayout.addWidget(chk)
+
 		try:
 			self.mouse.claim()
 			ver = self.mouse.getFwVersion()
 			self.fwVer.setText(self.tr("Firmware version: %u.%u" % (
 					   (ver & 0xFF00) >> 8, ver & 0x00FF)))
-			self.mouse.release()
 		except RazerException:
 			self.fwVer.setText(self.tr("Firmware version: Unknown"))
+		self.mouse.release()
 
 class StatusBar(QStatusBar):
 	def showMessage(self, msg):
@@ -123,7 +159,6 @@ class MainWindow(QMainWindow):
 	def __init__(self, parent=None):
 		QMainWindow.__init__(self, parent)
 		self.setWindowTitle(self.tr("Razer device configuration"))
-		mice = scanMice()
 
 		mb = QMenuBar(self)
 		rzrmen = QMenu(self.tr("Razer"), mb)
@@ -150,7 +185,6 @@ class MainWindow(QMainWindow):
 		self.mice = scanMice()
 		self.mousewidget.update(self.mice)
 		self.statusBar().showMessage(self.tr("Found %d Razer mice" % len(self.mice)))
-		pass
 
 	def about(self):
 		QMessageBox.information(self, self.tr("About"),
