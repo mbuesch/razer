@@ -1,0 +1,52 @@
+*************************************
+*  Razer device configuration tool  *
+* Copyright (c) 2007 Michael Buesch *
+*************************************
+
+This is a configuration utility for Razer devices on Linux systems.
+
+*** DEPENDENCIES ***
+
+ * python
+   http://www.python.org/
+
+ * libusb
+   http://libusb.sourceforge.net/
+
+ * QT4 (for the graphical qrazercfg tool only)
+   http://www.trollech.com/
+
+ * cmake (for building only)
+   http://www.cmake.org/
+
+Note that almost all distributions ship prebuilt packages of the
+above dependencies.
+
+*** BUILDING ***
+
+First invoke "cmake" to build the makefiles.
+Then invoke "make" to build the binaries.
+
+  cmake .
+  make
+
+(Note the required space and dot after the cmake command)
+
+*** INSTALLING ***
+
+  make install
+
+*** UDEV / AUTOMATIC CONFIGURATION ***
+
+The file "01-razer-udev.rules" in this package contains example rules
+on how to handle automatic configuration through udev.
+On Ubuntu Linux you need to
+   cp 01-razer-udev.rules /etc/udev/rules.d/01-razer.rules
+to install the rules. Note that you might have to adjust the RUN path in
+the .rules file, if you didn't install the stuff to /usr/local.
+
+*** DISTRIBUTIONS ***
+
+Distributions should install a proper udev autoconfig rule file
+from their rpm or deb (or whatever) install scripts.
+See 01-razer-udev.rules for example rules.
