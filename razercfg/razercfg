@@ -18,6 +18,7 @@ RAZERCFG_VERSION	= "001"
 
 import sys
 import getopt
+from ConfigParser import *
 from pyrazer import *
 
 
@@ -136,6 +137,97 @@ class DevOps:
 		except RazerException, e:
 			print "Razer device access exception:", e
 
+# The configuration file parser
+class Config(SafeConfigParser):
+	SECT_DEATHADDER		= "DEATHADDER"
+	SECT_KRAIT		= "KRAIT"
+
+	def __init__(self, filename):
+		SafeConfigParser.__init__(self)
+		if filename == ".":
+			filename = "/etc/razercfgrc"
+		res = self.read(filename)
+		if not filename in res:
+			print "Could not read configuration file \"%s\"" % filename
+			raise IOError
+
+	def getMouse(self, mouseType):
+		for mouse in self.mice:
+			if mouse.getType() == mouseType:
+				return mouse
+		return None
+
+	def getBoolean(self, section, option, raw=False, vars=None):
+		v = self.get(section, option, raw, vars).lower()
+		if v in ("1", "yes", "true", "on"):
+			return True
+		if v in ("0", "no", "false", "off"):
+			return False
+		print "Configuration: Option \"%s\" in section \"[%s]\" is not a boolean" % (
+			option, section)
+		raise IOError
+
+	def getInt(self, section, option, raw=False, vars=None):
+		v = self.get(section, option, raw, vars)
+		try:
+			v = int(v)
+		except ValueError:
+			print "Configuration: Option \"%s\" in section \"[%s]\" is not an integer" % (
+				option, section)
+			raise IOError
+		return v
+
+	def applyDeathadder(self):
+		m = self.getMouse(RAZER_MOUSETYPE_DEATHADDER)
+		if not m:
+			return
+		try:
+			m.claim()
+			for led in m.getLeds():
+				name = "led_" + led.getName().lower()
+				try:
+					v = self.getBoolean(Config.SECT_DEATHADDER, name)
+					led.toggleState(v)
+				except NoOptionError: pass
+			try:
+				v = self.getInt(Config.SECT_DEATHADDER, "resolution")
+				m.setResolution(v)
+			except NoOptionError: pass
+			try:
+				v = self.getInt(Config.SECT_DEATHADDER, "frequency")
+				m.setFreq(v)
+			except NoOptionError: pass
+			m.release()
+		except RazerException, e:
+			print "Razer DeathAdder access exception:", e
+			m.release()
+			raise IOError
+
+	def applyKrait(self):
+		m = self.getMouse(RAZER_MOUSETYPE_KRAIT)
+		if not m:
+			return
+		try:
+			m.claim()
+			try:
+				v = self.getInt(Config.SECT_KRAIT, "resolution")
+				m.setResolution(v)
+			except NoOptionError: pass
+			m.release()
+		except RazerException, e:
+			print "Razer Krait access exception:", e
+			m.release()
+			raise IOError
+
+	def apply(self):
+		try:
+			self.mice = scanMice()
+		except RazerException, e:
+			print "Failed to scan for devices:", e
+		if self.has_section(Config.SECT_DEATHADDER):
+			self.applyDeathadder()
+		if self.has_section(Config.SECT_KRAIT):
+			self.applyKrait()
 
 def exit(exitcode):
 	razerExit()
@@ -149,7 +241,7 @@ def scanDevices():
 				mouseTypeString[mouse.getType()],
 				mouse.getBusId())
 	except RazerException, e:
-		print "Failed to scan for devices:", e.args
+		print "Failed to scan for devices:", e
 		exit(1)
 
 def prVersion():
@@ -168,6 +260,8 @@ def usage():
 	print "-d|--device DEV      Selects the device with the bus ID \"DEV\""
 	print "    Use the special value \"mouse\" for DEV to select"
 	print "    the first found razer mouse device in the system."
+	print "-c|--config FILE     Read the config file and apply it."
+	print "    Use the special value \".\" for FILE to select the default file"
 	print ""
 	print "Device operations (DEVOPS):"
 	print "These options apply to the device that is specified with -d"
@@ -187,10 +281,10 @@ def parse_args():
 
 	try:
 		(opts, args) = getopt.getopt(sys.argv[1:],
-			"hvsd:r:Rf:FLl:V",
+			"hvsd:r:Rf:FLl:Vc:",
 			[ "help", "version", "scan", "device=", "res=",
 			  "getres", "freq=", "getfreq", "leds", "setled=",
-			  "fwver" ])
+			  "fwver", "config=" ])
 	except getopt.GetoptError:
 		usage()
 		exit(1)
@@ -210,6 +304,13 @@ def parse_args():
 				devOpsList.append(currentDevOps)
 			currentDevOps = DevOps(v)
 			continue
+		if o in ("-c", "--config"):
+			try:
+				c = Config(v)
+				c.apply()
+			except IOError:
+				exit(1)
+			exit(0)
 		if o in ("-r", "--res"):
 			if not currentDevOps:
 				print "Must specify a device (-d) before -r|--res"
