@@ -1,4 +1,9 @@
 include(FindPythonLibs)
+include(FindPythonInterp)
+
+if (NOT PYTHONINTERP_FOUND)
+	message(FATAL_ERROR "Python scripting language not found.")
+endif (NOT PYTHONINTERP_FOUND)
 
 include_directories(${PYTHON_INCLUDE_PATH})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../librazer)
@@ -10,10 +15,16 @@ macro(ADD_PYTHON_MODULE _NAME _STATIC_SRCS)
 		add_library(${_NAME} MODULE ${ARGN})
 		# Remove the "lib" prefix
 		set_target_properties(${_NAME} PROPERTIES PREFIX "")
+
+		install(CODE "exec_program(${PYTHON_EXECUTABLE}
+			      ARGS ${CMAKE_CURRENT_SOURCE_DIR}/install.py ${CMAKE_CURRENT_BINARY_DIR}
+			      RETURN_VALUE err)
+			      if (NOT err EQUAL 0)
+				message(FATAL_ERROR \"Failed to install python module ${_NAME}\")
+			      endif (NOT err EQUAL 0)")
 	endif (MODULE_${_NAME}_ENABLE)
 endmacro (ADD_PYTHON_MODULE)
 
 add_python_module(pyrazer MOD_SRCS pyrazer.c)
 target_link_libraries(pyrazer razer usb)
 
-#TODO install

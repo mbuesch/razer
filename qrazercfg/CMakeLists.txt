@@ -1,2 +1,2 @@
-install(FILES qrazercfg DESTINATION bin)
+install(PROGRAMS qrazercfg DESTINATION bin)
 

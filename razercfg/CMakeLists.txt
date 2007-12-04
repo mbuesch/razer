@@ -1,2 +1,2 @@
-install(FILES razercfg DESTINATION bin)
+install(PROGRAMS razercfg DESTINATION bin)
 
