@@ -1,7 +1,7 @@
 # UDEV rules for razer mice
 
 # Configure the Razer DeathAdder mouse
-ACTION=="add", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="0007", RUN+="/usr/local/bin/razercfg -c."
+ACTION=="add", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="0007", RUN+="/usr/local/bin/razercfg -S3 -c."
 
 # Configure the Razer Krait mouse
-ACTION=="add", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="0003", RUN+="/usr/local/bin/razercfg -c."
+ACTION=="add", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="0003", RUN+="/usr/local/bin/razercfg -S3 -c."
