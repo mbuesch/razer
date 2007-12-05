@@ -18,6 +18,7 @@ RAZERCFG_VERSION	= "001"
 
 import sys
 import getopt
+import time
 from ConfigParser import *
 from pyrazer import *
 
@@ -26,116 +27,6 @@ mouseTypeString = { RAZER_MOUSETYPE_DEATHADDER : "DeathAdder",
 		    RAZER_MOUSETYPE_KRAIT : "Krait",
 		    RAZER_MOUSETYPE_LACHESIS : "Lachesis", }
 
-
-def printList(title, list):
-	sys.stdout.write(title + ": ")
-	for i in range(0, len(list)):
-		if i == 0:
-			sys.stdout.write(str(list[i]))
-		else:
-			sys.stdout.write(", " + str(list[i]))
-	print ""
-
-class OpSetRes:
-	def __init__(self, value):
-		self.value = value
-	def run(self, device):
-		device.claim()
-		device.setResolution(int(self.value))
-		device.release()
-
-class OpGetRes:
-	def run(self, device):
-		curRes = device.getResolution()
-		if curRes == RAZER_MOUSE_RES_UNKNOWN:
-			curRes = "<unknown>"
-		suppRes = device.supportedResolutions()
-		print "Current resolution:", curRes, "DPI"
-		printList("Supported resolutions", suppRes)
-
-class OpSetFreq:
-	def __init__(self, value):
-		self.value = value
-	def run(self, device):
-		device.claim()
-		device.setFreq(int(self.value))
-		device.release()
-
-class OpGetFreq:
-	def run(self, device):
-		curFreq = device.getFreq()
-		if curFreq == RAZER_MOUSE_FREQ_UNKNOWN:
-			curFreq = "<unknown>"
-		suppFreq = device.supportedFreqs()
-		print "Current frequency:", curFreq, "Hz"
-		printList("Supported frequencies", suppFreq)
-
-class OpPrintLeds:
-	def run(self, device):
-		leds = device.getLeds()
-		names = []
-		for led in leds:
-			names.append(led.getName())
-		printList("Available LEDs", names)
-
-class OpSetLed:
-	def __init__(self, value):
-		self.value = value
-	def run(self, device):
-		# parse the LED:X argument
-		args = self.value.split(":")
-		if len(args) != 2:
-			print "-l|--setled argument error. Format LED:X"
-			exit(1)
-		ledname = args[0]
-		on = 0
-		if args[1] in ("1", "on", "ON", "true", "TRUE"):
-			on = 1
-		# Find the led and apply the setting
-		for led in device.getLeds():
-			if led.getName().lower() == ledname.lower():
-				device.claim()
-				led.toggleState(on)
-				device.release()
-				return
-		print "LED \"%s\" not found on device \"%s\"" % (
-			ledname, device.getBusId())
-
-class OpGetFwVer:
-	def run(self, device):
-		device.claim()
-		ver = device.getFwVersion()
-		print "Firmware version: %u.%u" % (
-			(ver & 0xFF00) >> 8, ver & 0x00FF)
-		device.release()
-
-def mapBusIdToDevice(busid):
-	mice = scanMice()
-	for mouse in mice:
-		if busid == "mouse":
-			# Return the first found mouse
-			return mouse
-		if mouse.getBusId() == busid:
-			return mouse
-	return None
-
-# Operations on a device
-class DevOps:
-	def __init__(self, busid):
-		self.busid = busid
-		self.ops = []
-	def add(self, op):
-		self.ops.append(op)
-	def runAll(self):
-		try:
-			device = mapBusIdToDevice(self.busid)
-			if not device:
-				print "Did not find device with ID \"%s\"" % self.busid
-				exit(1)
-			for op in self.ops:
-				op.run(device)
-		except RazerException, e:
-			print "Razer device access exception:", e
 
 # The configuration file parser
 class Config(SafeConfigParser):
@@ -229,6 +120,133 @@ class Config(SafeConfigParser):
 		if self.has_section(Config.SECT_KRAIT):
 			self.applyKrait()
 
+def printList(title, list):
+	sys.stdout.write(title + ": ")
+	for i in range(0, len(list)):
+		if i == 0:
+			sys.stdout.write(str(list[i]))
+		else:
+			sys.stdout.write(", " + str(list[i]))
+	print ""
+
+class OpApplyConfig:
+	def __init__(self, configInstance):
+		self.configInstance = configInstance
+	def run(self, unused):
+		try:
+			self.configInstance.apply()
+		except IOError:
+			exit(1)
+
+class OpSleep:
+	def __init__(self, msecs):
+		self.msecs = msecs
+	def run(self, unused):
+		time.sleep(self.msecs)
+
+class OpSetRes:
+	def __init__(self, value):
+		self.value = value
+	def run(self, device):
+		device.claim()
+		device.setResolution(int(self.value))
+		device.release()
+
+class OpGetRes:
+	def run(self, device):
+		curRes = device.getResolution()
+		if curRes == RAZER_MOUSE_RES_UNKNOWN:
+			curRes = "<unknown>"
+		suppRes = device.supportedResolutions()
+		print "Current resolution:", curRes, "DPI"
+		printList("Supported resolutions", suppRes)
+
+class OpSetFreq:
+	def __init__(self, value):
+		self.value = value
+	def run(self, device):
+		device.claim()
+		device.setFreq(int(self.value))
+		device.release()
+
+class OpGetFreq:
+	def run(self, device):
+		curFreq = device.getFreq()
+		if curFreq == RAZER_MOUSE_FREQ_UNKNOWN:
+			curFreq = "<unknown>"
+		suppFreq = device.supportedFreqs()
+		print "Current frequency:", curFreq, "Hz"
+		printList("Supported frequencies", suppFreq)
+
+class OpPrintLeds:
+	def run(self, device):
+		leds = device.getLeds()
+		names = []
+		for led in leds:
+			names.append(led.getName())
+		printList("Available LEDs", names)
+
+class OpSetLed:
+	def __init__(self, value):
+		self.value = value
+	def run(self, device):
+		# parse the LED:X argument
+		args = self.value.split(":")
+		if len(args) != 2:
+			print "-l|--setled argument error. Format LED:X"
+			exit(1)
+		ledname = args[0]
+		on = 0
+		if args[1] in ("1", "on", "ON", "true", "TRUE"):
+			on = 1
+		# Find the led and apply the setting
+		for led in device.getLeds():
+			if led.getName().lower() == ledname.lower():
+				device.claim()
+				led.toggleState(on)
+				device.release()
+				return
+		print "LED \"%s\" not found on device \"%s\"" % (
+			ledname, device.getBusId())
+
+class OpGetFwVer:
+	def run(self, device):
+		device.claim()
+		ver = device.getFwVersion()
+		print "Firmware version: %u.%u" % (
+			(ver & 0xFF00) >> 8, ver & 0x00FF)
+		device.release()
+
+def mapBusIdToDevice(busid):
+	mice = scanMice()
+	for mouse in mice:
+		if busid == "mouse":
+			# Return the first found mouse
+			return mouse
+		if mouse.getBusId() == busid:
+			return mouse
+	return None
+
+# Operations on a device
+class DevOps:
+	def __init__(self, busid):
+		self.busid = busid
+		self.ops = []
+	def add(self, op):
+		self.ops.append(op)
+	def runAll(self):
+		try:
+			device = None
+			if self.busid:
+				device = mapBusIdToDevice(self.busid)
+				if not device:
+					print "Did not find device with ID \"%s\"" % self.busid
+					exit(1)
+			for op in self.ops:
+				op.run(device)
+		except RazerException, e:
+			print "Razer device access exception:", e
+
 def exit(exitcode):
 	razerExit()
 	sys.exit(exitcode)
@@ -263,6 +281,8 @@ def usage():
 	print "-c|--config FILE     Read the config file and apply it."
 	print "    Use the special value \".\" for FILE to select the default file"
 	print ""
+	print "-S|--sleep SECS      Sleep SECS seconds."
+	print ""
 	print "Device operations (DEVOPS):"
 	print "These options apply to the device that is specified with -d"
 	print ""
@@ -281,10 +301,10 @@ def parse_args():
 
 	try:
 		(opts, args) = getopt.getopt(sys.argv[1:],
-			"hvsd:r:Rf:FLl:Vc:",
+			"hvsd:r:Rf:FLl:Vc:S:",
 			[ "help", "version", "scan", "device=", "res=",
 			  "getres", "freq=", "getfreq", "leds", "setled=",
-			  "fwver", "config=" ])
+			  "fwver", "config=", "sleep=" ])
 	except getopt.GetoptError:
 		usage()
 		exit(1)
@@ -307,10 +327,14 @@ def parse_args():
 		if o in ("-c", "--config"):
 			try:
 				c = Config(v)
-				c.apply()
 			except IOError:
 				exit(1)
-			exit(0)
+			ops = currentDevOps
+			if not currentDevOps:
+				ops = DevOps(None)
+			ops.add(OpApplyConfig(c))
+			if not currentDevOps:
+				devOpsList.append(ops)
 		if o in ("-r", "--res"):
 			if not currentDevOps:
 				print "Must specify a device (-d) before -r|--res"
@@ -352,6 +376,19 @@ def parse_args():
 				print "Must specify a device (-d) before -V|--fwver"
 				exit(1)
 			currentDevOps.add(OpGetFwVer())
+			continue
+		if o in ("-S", "--sleep"):
+			ops = currentDevOps
+			if not currentDevOps:
+				ops = DevOps(None)
+			try:
+				v = float(v)
+			except ValueError:
+				print "Value for -S|--sleep must be a floating point value"
+				exit(1)
+			ops.add(OpSleep(v))
+			if not currentDevOps:
+				devOpsList.append(ops)
 			continue
 	if currentDevOps and currentDevOps.ops:
 		devOpsList.append(currentDevOps)
