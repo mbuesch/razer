@@ -1,0 +1,16 @@
+# razercfg configuration file
+
+# define parameters for all detected DeathAdder mice
+[DEATHADDER]
+led_scrollwheel:	false
+led_glowinglogo:	false
+# Resolution in DPI
+resolution:		900
+# Frequency in Hz
+frequency:		1000
+
+# define parameters for all detected Krait mice
+[KRAIT]
+# Resolution in DPI
+resolution:		1600
+
