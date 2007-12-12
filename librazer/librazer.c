@@ -20,13 +20,13 @@
 #include "hw_deathadder.h"
 #include "hw_krait.h"
 
-#include <usb.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
+#include <usb.h>
 
 
 enum razer_devtype {

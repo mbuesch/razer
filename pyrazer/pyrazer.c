@@ -89,7 +89,7 @@ static PyMethodDef pyrazer_led_methods[] = {
 	  "Get the currently set LED state" },
 	{ "toggleState", method_led_toggle_state, METH_VARARGS,
 	  "Toggle the state" },
-	{ },
+	{ NULL, },
 };
 
 static PyObject * pyrazer_led_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -349,7 +349,7 @@ static PyMethodDef pyrazer_mouse_methods[] = {
 	  "Get the currently set resulution" },
 	{ "setResolution", method_mouse_set_res, METH_VARARGS,
 	  "Change the resolution" },
-	{ },
+	{ NULL, },
 };
 
 static PyObject * pyrazer_mouse_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -439,7 +439,7 @@ static PyMethodDef pyrazer_methods[] = {
 	{ "razerInit", pyrazer_init, METH_NOARGS, "Initialize the library" },
 	{ "razerExit", pyrazer_exit, METH_NOARGS, "Free the library" },
 	{ "scanMice", pyrazer_scan_mice, METH_NOARGS, "Scan for mice" },
-	{ },
+	{ NULL, },
 };
 
 /*****************************************************************************

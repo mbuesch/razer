@@ -18,12 +18,12 @@
 #include "hw_deathadder.h"
 #include "razer_private.h"
 
-#include <usb.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <usb.h>
 
 
 enum {
@@ -53,13 +53,17 @@ static int deathadder_usb_write(struct deathadder_private *priv,
 				int request, int command,
 				char *buf, size_t size)
 {
-	int err;
+	int i, err;
 
-	err = usb_control_msg(priv->usb.h,
-			      USB_ENDPOINT_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			      request, command, 0,
-			      buf, size,
-			      DEATHADDER_USB_TIMEOUT);
+	/* Send a command a few times. Otherwise it might get lost somehow.
+	 * FIXME: Check why. */
+	for (i = 0; i < 5; i++) {
+		err = usb_control_msg(priv->usb.h,
+				      USB_ENDPOINT_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+				      request, command, 0,
+				      buf, size,
+				      DEATHADDER_USB_TIMEOUT);
+	}
 	if (err != size)
 		return err;
 	return 0;
@@ -168,7 +172,6 @@ static int deathadder_led_toggle(struct razer_led *led,
 static int deathadder_get_leds(struct razer_mouse *m,
 			       struct razer_led **leds_list)
 {
-	struct deathadder_private *priv = m->internal;
 	struct razer_led *scroll, *logo;
 
 	scroll = malloc(sizeof(struct razer_led));

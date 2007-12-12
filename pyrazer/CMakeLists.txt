@@ -1,10 +1,6 @@
 include(FindPythonLibs)
 include(FindPythonInterp)
 
-if (NOT PYTHONINTERP_FOUND)
-	message(FATAL_ERROR "Python scripting language not found.")
-endif (NOT PYTHONINTERP_FOUND)
-
 include_directories(${PYTHON_INCLUDE_PATH})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../librazer)
 
@@ -12,9 +8,15 @@ macro(ADD_PYTHON_MODULE _NAME _STATIC_SRCS)
 	option(MODULE_${_NAME}_ENABLE "Build Python module ${_NAME}" TRUE)
 
 	if (MODULE_${_NAME}_ENABLE)
+		if (NOT PYTHONINTERP_FOUND)
+			message(FATAL_ERROR "Python scripting language not found.")
+		endif (NOT PYTHONINTERP_FOUND)
+
 		add_library(${_NAME} MODULE ${ARGN})
-		# Remove the "lib" prefix
-		set_target_properties(${_NAME} PROPERTIES PREFIX "")
+
+		set_target_properties(${_NAME} PROPERTIES
+				      PREFIX "" # Remove the "lib" prefix
+				      COMPILE_FLAGS "-std=c99 -Wall -pedantic")
 
 		install(CODE "exec_program(${PYTHON_EXECUTABLE}
 			      ARGS ${CMAKE_CURRENT_SOURCE_DIR}/install.py ${CMAKE_CURRENT_BINARY_DIR}

@@ -18,12 +18,12 @@
 #include "hw_krait.h"
 #include "razer_private.h"
 
-#include <usb.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <usb.h>
 
 
 struct krait_private {
@@ -40,18 +40,23 @@ static int krait_usb_write(struct krait_private *priv,
 			   int request, int command,
 			   char *buf, size_t size)
 {
-	int err;
+	int i, err;
 
-	err = usb_control_msg(priv->usb.h,
-			      USB_ENDPOINT_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			      request, command, 0,
-			      buf, size,
-			      KRAIT_USB_TIMEOUT);
+	/* Send a command a few times. Otherwise it might get lost somehow.
+	 * FIXME: Check why. */
+	for (i = 0; i < 5; i++) {
+		err = usb_control_msg(priv->usb.h,
+				      USB_ENDPOINT_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+				      request, command, 0,
+				      buf, size,
+				      KRAIT_USB_TIMEOUT);
+	}
 	if (err != size)
 		return err;
 	return 0;
 }
 
+#if 0
 static int krait_usb_read(struct krait_private *priv,
 			  int request, int command,
 			  char *buf, size_t size)
@@ -67,11 +72,12 @@ static int krait_usb_read(struct krait_private *priv,
 		return err;
 	return 0;
 }
+#endif
 
 static int krait_claim(struct razer_mouse *m)
 {
 	struct krait_private *priv = m->internal;
-	int err, fwver;
+	int err;
 
 	err = razer_generic_usb_claim(priv->usbdev, &priv->usb);
 	if (err)
