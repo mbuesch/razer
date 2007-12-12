@@ -1,4 +1,4 @@
-project(razer)
+project(razer C)
 
 add_subdirectory(librazer)
 add_subdirectory(pyrazer)
