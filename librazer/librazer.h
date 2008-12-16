@@ -25,6 +25,7 @@ extern "C" {
 #define RAZER_BUSID_MAX_SIZE	128
 
 struct razer_mouse;
+struct razer_mouse_base_ops;
 
 
 /** enum razer_led_state - The LED state value
@@ -171,7 +172,9 @@ struct razer_mouse {
 	enum razer_mouse_res (*get_resolution)(struct razer_mouse *m);
 	int (*set_resolution)(struct razer_mouse *m, enum razer_mouse_res res);
 
-	void *internal; /* Do not touch this pointer. */
+	/* Do not touch these pointers. */
+	const struct razer_mouse_base_ops *base_ops;
+	void *internal;
 };
 
 /** razer_free_freq_list - Free an array of frequencies.
@@ -194,21 +197,11 @@ void razer_free_resolution_list(enum razer_mouse_res *res_list, int count);
   */
 void razer_free_leds(struct razer_led *led_list);
 
-/** razer_scan_mice - Scan the system for connected razer mice.
-  * Returns the number of detected mice or a negative error code.
-  * The function will put a linked list of mice into mice_list.
-  * The caller is responsible to free each mouse in the list
-  * after use.
+/** razer_rescan_mice - Rescan for connected razer mice.
+  * Returns a pointer to the linked list of mice, or a NULL pointer
+  * in case of an error.
   */
-int razer_scan_mice(struct razer_mouse **mice_list);
-
-/* razer_free_mice - Free the list of mice from razer_scan_mice().
- * This function frees a whole linked list of struct razer_mouse,
- * as returned from razer_scan_mice. Note that you can also free
- * a single struct razer_mouse with this function, if you assign
- * a NULL pointer to mouse_list->next before calling this.
- */
-void razer_free_mice(struct razer_mouse *mouse_list);
+struct razer_mouse * razer_rescan_mice(void);
 
 /** razer_init - LibRazer initialization
   * Call this before any other library function.

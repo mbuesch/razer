@@ -2,6 +2,10 @@
  *   Lowlevel hardware access for the
  *   Razer Deathadder mouse
  *
+ *   Important notice:
+ *   This hardware driver is based on reverse engineering and
+ *   hardware documentation provided under NDA.
+ *
  *   Copyright (C) 2007 Michael Buesch <mb@bu3sch.de>
  *
  *   This program is free software; you can redistribute it and/or
@@ -317,6 +321,14 @@ static int deathadder_set_resolution(struct razer_mouse *m,
 	return err;
 }
 
+void razer_deathadder_gen_busid(struct usb_device *udev, char *buf)
+{
+	//FIXME
+	snprintf(buf, RAZER_BUSID_MAX_SIZE, "usb:%s-%s",
+		 udev->bus->dirname,
+		 udev->filename);
+}
+
 int razer_deathadder_init_struct(struct razer_mouse *m,
 				 struct usb_device *usbdev)
 {
@@ -333,9 +345,7 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 
 	m->internal = priv;
 	m->type = RAZER_MOUSETYPE_DEATHADDER;
-	snprintf(m->busid, sizeof(m->busid), "usb:%s-%s",
-		 usbdev->bus->dirname,
-		 usbdev->filename);
+	razer_deathadder_gen_busid(usbdev, m->busid);
 
 	m->claim = deathadder_claim;
 	m->release = deathadder_release;

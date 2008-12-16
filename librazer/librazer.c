@@ -33,27 +33,59 @@ enum razer_devtype {
 	RAZER_DEVTYPE_MOUSE,
 };
 
+/** struct razer_mouse_base_ops - Basic device-init operations
+ *
+ * @type: The type ID.
+ *
+ * @gen_busid: Generate an ID string that uniquely identifies the
+ *	       device in the machine.
+ *
+ * @init: Init the private data structures.
+ *
+ * @release: Release the private data structures.
+ */
+struct razer_mouse_base_ops {
+	enum razer_mouse_type type;
+	void (*gen_busid)(struct usb_device *udev, char *buf);
+	int (*init)(struct razer_mouse *m, struct usb_device *udev);
+	void (*release)(struct razer_mouse *m);
+};
+
 struct razer_usb_device {
 	uint16_t vendor;	/* Vendor ID */
 	uint16_t product;	/* Product ID */
 	enum razer_devtype type;
 	union {
-		enum razer_mouse_type mouse_type;
+		const struct razer_mouse_base_ops *mouse_ops;
 	} u;
+};
+
+static const struct razer_mouse_base_ops razer_deathadder_base_ops = {
+	.type		= RAZER_MOUSETYPE_DEATHADDER,
+	.gen_busid	= razer_deathadder_gen_busid,
+	.init		= razer_deathadder_init_struct,
+	.release	= razer_deathadder_release,
+};
+
+static const struct razer_mouse_base_ops razer_krait_base_ops = {
+	.type		= RAZER_MOUSETYPE_KRAIT,
+	.gen_busid	= razer_krait_gen_busid,
+	.init		= razer_krait_init_struct,
+	.release	= razer_krait_release,
 };
 
 #define USBVENDOR_ANY	0xFFFF
 #define USBPRODUCT_ANY	0xFFFF
 
-#define USB_MOUSE(_vendor, _product, _mouse_type)	\
+#define USB_MOUSE(_vendor, _product, _mouse_ops)	\
 	{ .vendor = _vendor, .product = _product,	\
 	  .type = RAZER_DEVTYPE_MOUSE,			\
-	  .u = { .mouse_type = _mouse_type, }, }
+	  .u = { .mouse_ops = _mouse_ops, }, }
 
 /* Table of supported USB devices. */
 static const struct razer_usb_device razer_usbdev_table[] = {
-	USB_MOUSE(0x1532, 0x0007, RAZER_MOUSETYPE_DEATHADDER),
-	USB_MOUSE(0x1532, 0x0003, RAZER_MOUSETYPE_KRAIT),
+	USB_MOUSE(0x1532, 0x0007, &razer_deathadder_base_ops),
+	USB_MOUSE(0x1532, 0x0003, &razer_krait_base_ops),
 	{ 0, }, /* List end */
 };
 #undef USB_MOUSE
@@ -66,6 +98,7 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 
 
 static bool librazer_initialized;
+static struct razer_mouse *mice_list = NULL;
 
 
 static int match_usbdev(const struct usb_device_descriptor *desc,
@@ -92,19 +125,91 @@ static const struct razer_usb_device * usbdev_lookup(const struct usb_device_des
 	return NULL;
 }
 
-int razer_scan_mice(struct razer_mouse **mice_list)
+static void mouse_list_add(struct razer_mouse **base, struct razer_mouse *new_entry)
+{
+	struct razer_mouse *i;
+
+	new_entry->next = NULL;
+	if (!(*base)) {
+		*base = new_entry;
+		return;
+	}
+	for (i = *base; i->next; i = i->next)
+		;
+	i->next = new_entry;
+}
+
+static void mouse_list_del(struct razer_mouse **base, struct razer_mouse *del_entry)
+{
+	struct razer_mouse *i;
+
+	if (del_entry == *base) {
+		*base = (*base)->next;
+		return;
+	}
+	for (i = *base; i && (i->next != del_entry); i = i->next)
+		;
+	if (i)
+		i->next = del_entry->next;
+}
+
+static struct razer_mouse * mouse_list_find(struct razer_mouse *base, const char *busid)
+{
+	struct razer_mouse *m;
+
+	for (m = base; m; m = m->next) {
+		if (strcmp(m->busid, busid) == 0)
+			return m;
+	}
+
+	return NULL;
+}
+
+static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
+				      struct usb_device *udev)
+{
+	struct razer_mouse *m;
+
+	m = malloc(sizeof(*m));
+	if (!m)
+		return NULL;
+	memset(m, 0, sizeof(*m));
+	m->base_ops = id->u.mouse_ops;
+	m->base_ops->init(m, udev);
+
+	return m;
+}
+
+static void razer_free_mouse(struct razer_mouse *m)
+{
+	m->base_ops->release(m);
+	free(m);
+}
+
+static void razer_free_mice(struct razer_mouse *mouse_list)
+{
+	struct razer_mouse *mouse, *next;
+
+	for (mouse = mouse_list; mouse; ) {
+		next = mouse->next;
+		razer_free_mouse(mouse);
+		mouse = next;
+	}
+}
+
+struct razer_mouse * razer_rescan_mice(void)
 {
 	struct usb_bus *bus, *buslist;
 	struct usb_device *dev;
 	const struct usb_device_descriptor *desc;
 	const struct razer_usb_device *id;
-	struct razer_mouse *list = NULL, *mouse, *prev_mouse = NULL;
-	int err, count = 0;
+	char busid[RAZER_BUSID_MAX_SIZE + 1] = { 0, };
+	struct razer_mouse *mouse, *new_list = NULL;
 
 	usb_find_busses();
 	usb_find_devices();
-	buslist = usb_get_busses();
 
+	buslist = usb_get_busses();
 	for_each_usbbus(bus, buslist) {
 		for_each_usbdev(dev, bus->devices) {
 			desc = &dev->descriptor;
@@ -113,69 +218,28 @@ int razer_scan_mice(struct razer_mouse **mice_list)
 				continue;
 			if (id->type != RAZER_DEVTYPE_MOUSE)
 				continue;
-			count++;
-			err = -ENOMEM;
-			mouse = malloc(sizeof(struct razer_mouse));
-			if (!mouse)
-				goto err_unwind;
-			memset(mouse, 0, sizeof(*mouse));
-			if (!list)
-				list = mouse;
-			switch (id->u.mouse_type) {
-			case RAZER_MOUSETYPE_DEATHADDER:
-				err = razer_deathadder_init_struct(mouse, dev);
-				if (err)
-					goto err_unwind;
-				break;
-			case RAZER_MOUSETYPE_KRAIT:
-				err = razer_krait_init_struct(mouse, dev);
-				if (err)
-					goto err_unwind;
-				break;
-			case RAZER_MOUSETYPE_LACHESIS:
-				//TODO
-				break;
+			id->u.mouse_ops->gen_busid(dev, busid);
+			mouse = mouse_list_find(mice_list, busid);
+			if (mouse) {
+				/* We already have this mouse. Delete it from the global
+				 * mice list. It will be added back later. */
+				mouse_list_del(&mice_list, mouse);
+			} else {
+				/* We don't have this mouse, yet. Create a new one. */
+				mouse = mouse_new(id, dev);
+				if (!mouse)
+					continue;
 			}
-			if (prev_mouse)
-				prev_mouse->next = mouse;
-			prev_mouse = mouse;
+			mouse_list_add(&new_list, mouse);
 		}
 	}
-	*mice_list = list;
+	/* Kill the remaining entries in the old list.
+	 * They are not connected to the machine anymore. */
+	razer_free_mice(mice_list);
+	/* And finally set the pointer to the new list. */
+	mice_list = new_list;
 
-	return count;
-
-err_unwind:
-	for (mouse = list; mouse; ) {
-		struct razer_mouse *next = mouse->next;
-		free(mouse);
-		mouse = next;
-	}
-	return err;
-}
-
-void razer_free_mice(struct razer_mouse *mouse_list)
-{
-	struct razer_mouse *mouse, *next;
-
-	for (mouse = mouse_list; mouse; ) {
-		next = mouse->next;
-
-		switch (mouse->type) {
-		case RAZER_MOUSETYPE_DEATHADDER:
-			razer_deathadder_release(mouse);
-			break;
-		case RAZER_MOUSETYPE_KRAIT:
-			razer_krait_release(mouse);
-			break;
-		case RAZER_MOUSETYPE_LACHESIS:
-			//TODO
-			break;
-		}
-		free(mouse);
-
-		mouse = next;
-	}
+	return mice_list;
 }
 
 void razer_free_freq_list(enum razer_mouse_freq *freq_list, int count)
@@ -215,6 +279,7 @@ void razer_exit(void)
 {
 	if (!librazer_initialized)
 		return;
+	razer_free_mice(mice_list);
 	librazer_initialized = 0;
 }
 
