@@ -16,6 +16,23 @@
 
 #include "librazer.h"
 
+#include <stdio.h>
+
+
 int main(int argc, char **argv)
 {
+	struct razer_mouse *mice, *mouse;
+
+	razer_init();
+
+	while (1) {
+		mice = razer_rescan_mice();
+		for (mouse = mice; mouse; mouse = mouse->next) {
+			printf("Have mouse: %s\n", mouse->idstr);
+		}
+		printf("\n");
+		sleep(1);
+	}
+
+	razer_exit();
 }

@@ -321,10 +321,10 @@ static int deathadder_set_resolution(struct razer_mouse *m,
 	return err;
 }
 
-void razer_deathadder_gen_busid(struct usb_device *udev, char *buf)
+void razer_deathadder_gen_idstr(struct usb_device *udev, char *buf)
 {
 	//FIXME
-	snprintf(buf, RAZER_BUSID_MAX_SIZE, "usb:%s-%s",
+	snprintf(buf, RAZER_IDSTR_MAX_SIZE, "deathadder:usb:%s-%s",
 		 udev->bus->dirname,
 		 udev->filename);
 }
@@ -345,7 +345,7 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 
 	m->internal = priv;
 	m->type = RAZER_MOUSETYPE_DEATHADDER;
-	razer_deathadder_gen_busid(usbdev, m->busid);
+	razer_deathadder_gen_idstr(usbdev, m->idstr);
 
 	m->claim = deathadder_claim;
 	m->release = deathadder_release;

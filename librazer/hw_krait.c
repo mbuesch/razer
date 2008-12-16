@@ -193,10 +193,10 @@ static int krait_set_resolution(struct razer_mouse *m,
 	return err;
 }
 
-void razer_krait_gen_busid(struct usb_device *udev, char *buf)
+void razer_krait_gen_idstr(struct usb_device *udev, char *buf)
 {
 	//FIXME
-	snprintf(buf, RAZER_BUSID_MAX_SIZE, "usb:%s-%s",
+	snprintf(buf, RAZER_IDSTR_MAX_SIZE, "krait:usb:%s-%s",
 		 udev->bus->dirname,
 		 udev->filename);
 }
@@ -216,7 +216,7 @@ int razer_krait_init_struct(struct razer_mouse *m,
 
 	m->internal = priv;
 	m->type = RAZER_MOUSETYPE_KRAIT;
-	razer_krait_gen_busid(usbdev, m->busid);
+	razer_krait_gen_idstr(usbdev, m->idstr);
 
 	m->claim = krait_claim;
 	m->release = krait_release;

@@ -37,7 +37,7 @@ enum razer_devtype {
  *
  * @type: The type ID.
  *
- * @gen_busid: Generate an ID string that uniquely identifies the
+ * @gen_idstr: Generate an ID string that uniquely identifies the
  *	       device in the machine.
  *
  * @init: Init the private data structures.
@@ -46,7 +46,7 @@ enum razer_devtype {
  */
 struct razer_mouse_base_ops {
 	enum razer_mouse_type type;
-	void (*gen_busid)(struct usb_device *udev, char *buf);
+	void (*gen_idstr)(struct usb_device *udev, char *buf);
 	int (*init)(struct razer_mouse *m, struct usb_device *udev);
 	void (*release)(struct razer_mouse *m);
 };
@@ -62,14 +62,14 @@ struct razer_usb_device {
 
 static const struct razer_mouse_base_ops razer_deathadder_base_ops = {
 	.type		= RAZER_MOUSETYPE_DEATHADDER,
-	.gen_busid	= razer_deathadder_gen_busid,
+	.gen_idstr	= razer_deathadder_gen_idstr,
 	.init		= razer_deathadder_init_struct,
 	.release	= razer_deathadder_release,
 };
 
 static const struct razer_mouse_base_ops razer_krait_base_ops = {
 	.type		= RAZER_MOUSETYPE_KRAIT,
-	.gen_busid	= razer_krait_gen_busid,
+	.gen_idstr	= razer_krait_gen_idstr,
 	.init		= razer_krait_init_struct,
 	.release	= razer_krait_release,
 };
@@ -153,12 +153,12 @@ static void mouse_list_del(struct razer_mouse **base, struct razer_mouse *del_en
 		i->next = del_entry->next;
 }
 
-static struct razer_mouse * mouse_list_find(struct razer_mouse *base, const char *busid)
+static struct razer_mouse * mouse_list_find(struct razer_mouse *base, const char *idstr)
 {
 	struct razer_mouse *m;
 
 	for (m = base; m; m = m->next) {
-		if (strcmp(m->busid, busid) == 0)
+		if (strcmp(m->idstr, idstr) == 0)
 			return m;
 	}
 
@@ -203,7 +203,7 @@ struct razer_mouse * razer_rescan_mice(void)
 	struct usb_device *dev;
 	const struct usb_device_descriptor *desc;
 	const struct razer_usb_device *id;
-	char busid[RAZER_BUSID_MAX_SIZE + 1] = { 0, };
+	char idstr[RAZER_IDSTR_MAX_SIZE + 1] = { 0, };
 	struct razer_mouse *mouse, *new_list = NULL;
 
 	usb_find_busses();
@@ -218,8 +218,8 @@ struct razer_mouse * razer_rescan_mice(void)
 				continue;
 			if (id->type != RAZER_DEVTYPE_MOUSE)
 				continue;
-			id->u.mouse_ops->gen_busid(dev, busid);
-			mouse = mouse_list_find(mice_list, busid);
+			id->u.mouse_ops->gen_idstr(dev, idstr);
+			mouse = mouse_list_find(mice_list, idstr);
 			if (mouse) {
 				/* We already have this mouse. Delete it from the global
 				 * mice list. It will be added back later. */

@@ -22,7 +22,7 @@ extern "C" {
 #endif
 
 
-#define RAZER_BUSID_MAX_SIZE	128
+#define RAZER_IDSTR_MAX_SIZE	128
 
 struct razer_mouse;
 struct razer_mouse_base_ops;
@@ -112,7 +112,7 @@ enum razer_mouse_type {
   *
   * @next: Linked list to the next mouse.
   *
-  * @busid: The ID of the bus location this mouse is connected to.
+  * @idstr: A system wide unique ID string for the device.
   *
   * @type: The mouse type
   *
@@ -150,7 +150,7 @@ enum razer_mouse_type {
 struct razer_mouse {
 	struct razer_mouse *next;
 
-	char busid[RAZER_BUSID_MAX_SIZE];
+	char idstr[RAZER_IDSTR_MAX_SIZE];
 
 	enum razer_mouse_type type;
 
