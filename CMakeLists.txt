@@ -14,6 +14,7 @@ endmacro(CHECK_LIB)
 check_lib(usb usb.h)
 
 add_subdirectory(librazer)
+add_subdirectory(razerd)
 #add_subdirectory(pyrazer)
 add_subdirectory(razercfg)
 add_subdirectory(qrazercfg)

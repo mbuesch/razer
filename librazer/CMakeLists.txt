@@ -9,6 +9,8 @@ set_target_properties(razer PROPERTIES
 add_definitions("-Du_int8_t=uint8_t -Du_int16_t=uint16_t -Du_int32_t=uint32_t")
 add_definitions("-D_GNU_SOURCE")
 
+target_link_libraries(razer usb)
+
 install(FILES librazer.h DESTINATION include)
 install(TARGETS razer DESTINATION lib)
 
