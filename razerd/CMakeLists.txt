@@ -1,3 +1,5 @@
+include(${razer_SOURCE_DIR}/cmake.global)
+
 add_executable(razerd
 	       razerd.c)
 

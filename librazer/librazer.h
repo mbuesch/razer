@@ -108,6 +108,17 @@ enum razer_mouse_type {
 	RAZER_MOUSETYPE_LACHESIS,
 };
 
+/** enum razer_mouse_flags - Flags for a mouse
+ *
+ * @RAZER_MOUSEFLG_NEW: The device detection routine of the library
+ *                      sets this to flag on detection. So the highlevel code
+ *                      using the library can clear this flag to keep track of
+ *                      devices it already knows about.
+ */
+enum razer_mouse_flags {
+	RAZER_MOUSEFLG_NEW		= (1 << 0),
+};
+
 /** struct razer_mouse - Representation of a mouse device
   *
   * @next: Linked list to the next mouse.
@@ -115,6 +126,8 @@ enum razer_mouse_type {
   * @idstr: A system wide unique ID string for the device.
   *
   * @type: The mouse type
+  *
+  * @flags: Various ORed enum razer_mouse_flags.
   *
   * @claim: Claim and open the backend device (USB).
   * 	As long as the device is claimed, it is not operable by the user!
@@ -153,6 +166,7 @@ struct razer_mouse {
 	char idstr[RAZER_IDSTR_MAX_SIZE];
 
 	enum razer_mouse_type type;
+	unsigned int flags;
 
 	int (*claim)(struct razer_mouse *m);
 	void (*release)(struct razer_mouse *m);
@@ -212,6 +226,16 @@ int razer_init(void);
   * Call this after any operation with the library.
   */
 void razer_exit(void);
+
+/** razer_for_each_mouse - Convenience helper for traversing a mouse list
+ *
+ * @mouse: 'struct razer_mouse' pointer used as a list pointer.
+ * @mice_list: Pointer to the base of the linked list.
+ *
+ * Use razer_for_each_mouse like a normal C 'for' loop.
+ */
+#define razer_for_each_mouse(mouse, mice_list) \
+	for (mouse = mice_list; mouse; mouse = mouse->next)
 
 
 #if defined(c_plusplus) || defined(__cplusplus)

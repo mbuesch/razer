@@ -19,6 +19,7 @@
 
 #include "hw_deathadder.h"
 #include "hw_krait.h"
+#include "hw_lachesis.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -74,6 +75,14 @@ static const struct razer_mouse_base_ops razer_krait_base_ops = {
 	.release	= razer_krait_release,
 };
 
+static const struct razer_mouse_base_ops razer_lachesis_base_ops = {
+	.type		= RAZER_MOUSETYPE_LACHESIS,
+	.gen_idstr	= razer_lachesis_gen_idstr,
+	.init		= razer_lachesis_init_struct,
+	.release	= razer_lachesis_release,
+};
+
+
 #define USBVENDOR_ANY	0xFFFF
 #define USBPRODUCT_ANY	0xFFFF
 
@@ -86,6 +95,7 @@ static const struct razer_mouse_base_ops razer_krait_base_ops = {
 static const struct razer_usb_device razer_usbdev_table[] = {
 	USB_MOUSE(0x1532, 0x0007, &razer_deathadder_base_ops),
 	USB_MOUSE(0x1532, 0x0003, &razer_krait_base_ops),
+	USB_MOUSE(0x1532, 0x000C, &razer_lachesis_base_ops),
 	{ 0, }, /* List end */
 };
 #undef USB_MOUSE
@@ -157,7 +167,7 @@ static struct razer_mouse * mouse_list_find(struct razer_mouse *base, const char
 {
 	struct razer_mouse *m;
 
-	for (m = base; m; m = m->next) {
+	razer_for_each_mouse(m, base) {
 		if (strcmp(m->idstr, idstr) == 0)
 			return m;
 	}
@@ -174,6 +184,7 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 	if (!m)
 		return NULL;
 	memset(m, 0, sizeof(*m));
+	m->flags |= RAZER_MOUSEFLG_NEW;
 	m->base_ops = id->u.mouse_ops;
 	m->base_ops->init(m, udev);
 

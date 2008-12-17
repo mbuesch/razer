@@ -323,10 +323,17 @@ static int deathadder_set_resolution(struct razer_mouse *m,
 
 void razer_deathadder_gen_idstr(struct usb_device *udev, char *buf)
 {
-	//FIXME
-	snprintf(buf, RAZER_IDSTR_MAX_SIZE, "deathadder:usb:%s-%s",
+	/* We can't include the USB device number, because that changes on the
+	 * automatic reconnects the device firmware does.
+	 * The serial number is zero, so that's not very useful, too.
+	 * Basically, that means we have a pretty bad ID string due to
+	 * major design faults in the hardware. :(
+	 */
+	snprintf(buf, RAZER_IDSTR_MAX_SIZE, "deathadder:usb-%s:%04X:%04X:%02X",
 		 udev->bus->dirname,
-		 udev->filename);
+		 udev->descriptor.idVendor,
+		 udev->descriptor.idProduct,
+		 udev->descriptor.iSerialNumber);
 }
 
 int razer_deathadder_init_struct(struct razer_mouse *m,
