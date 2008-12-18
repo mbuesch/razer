@@ -1,0 +1,10 @@
+include(TestBigEndian)
+
+test_big_endian(BIGENDIAN)
+if (BIGENDIAN)
+	add_definitions(-DBIG_ENDIAN_HOST)
+else (BIGENDIAN)
+	add_definitions(-DLITTLE_ENDIAN_HOST)
+endif (BIGENDIAN)
+
+add_definitions("-D_GNU_SOURCE -D_BSD_SOURCE")

@@ -23,210 +23,6 @@ from ConfigParser import *
 from pyrazer import *
 
 
-mouseTypeString = { RAZER_MOUSETYPE_DEATHADDER : "DeathAdder",
-		    RAZER_MOUSETYPE_KRAIT : "Krait",
-		    RAZER_MOUSETYPE_LACHESIS : "Lachesis", }
-
-
-# The configuration file parser
-class Config(SafeConfigParser):
-	SECT_DEATHADDER		= "DEATHADDER"
-	SECT_KRAIT		= "KRAIT"
-
-	def __init__(self, filename):
-		SafeConfigParser.__init__(self)
-		if filename == ".":
-			filename = "/etc/razercfgrc"
-		res = self.read(filename)
-		if not filename in res:
-			print "Could not read configuration file \"%s\"" % filename
-			raise IOError
-
-	def getMouse(self, mouseType):
-		for mouse in self.mice:
-			if mouse.getType() == mouseType:
-				return mouse
-		return None
-
-	def getBoolean(self, section, option, raw=False, vars=None):
-		v = self.get(section, option, raw, vars).lower()
-		if v in ("1", "yes", "true", "on"):
-			return True
-		if v in ("0", "no", "false", "off"):
-			return False
-		print "Configuration: Option \"%s\" in section \"[%s]\" is not a boolean" % (
-			option, section)
-		raise IOError
-
-	def getInt(self, section, option, raw=False, vars=None):
-		v = self.get(section, option, raw, vars)
-		try:
-			v = int(v)
-		except ValueError:
-			print "Configuration: Option \"%s\" in section \"[%s]\" is not an integer" % (
-				option, section)
-			raise IOError
-		return v
-
-	def applyDeathadder(self):
-		m = self.getMouse(RAZER_MOUSETYPE_DEATHADDER)
-		if not m:
-			return
-		try:
-			m.claim()
-			for led in m.getLeds():
-				name = "led_" + led.getName().lower()
-				try:
-					v = self.getBoolean(Config.SECT_DEATHADDER, name)
-					led.toggleState(v)
-				except NoOptionError: pass
-			try:
-				v = self.getInt(Config.SECT_DEATHADDER, "resolution")
-				m.setResolution(v)
-			except NoOptionError: pass
-			try:
-				v = self.getInt(Config.SECT_DEATHADDER, "frequency")
-				m.setFreq(v)
-			except NoOptionError: pass
-			m.release()
-		except RazerException, e:
-			print "Razer DeathAdder access exception:", e
-			m.release()
-			raise IOError
-
-	def applyKrait(self):
-		m = self.getMouse(RAZER_MOUSETYPE_KRAIT)
-		if not m:
-			return
-		try:
-			m.claim()
-			try:
-				v = self.getInt(Config.SECT_KRAIT, "resolution")
-				m.setResolution(v)
-			except NoOptionError: pass
-			m.release()
-		except RazerException, e:
-			print "Razer Krait access exception:", e
-			m.release()
-			raise IOError
-
-	def apply(self):
-		try:
-			self.mice = scanMice()
-		except RazerException, e:
-			print "Failed to scan for devices:", e
-		if self.has_section(Config.SECT_DEATHADDER):
-			self.applyDeathadder()
-		if self.has_section(Config.SECT_KRAIT):
-			self.applyKrait()
-
-def printList(title, list):
-	sys.stdout.write(title + ": ")
-	for i in range(0, len(list)):
-		if i == 0:
-			sys.stdout.write(str(list[i]))
-		else:
-			sys.stdout.write(", " + str(list[i]))
-	print ""
-
-class OpApplyConfig:
-	def __init__(self, configInstance):
-		self.configInstance = configInstance
-	def run(self, unused):
-		try:
-			self.configInstance.apply()
-		except IOError:
-			exit(1)
-
-class OpSleep:
-	def __init__(self, msecs):
-		self.msecs = msecs
-	def run(self, unused):
-		time.sleep(self.msecs)
-
-class OpSetRes:
-	def __init__(self, value):
-		self.value = value
-	def run(self, device):
-		device.claim()
-		device.setResolution(int(self.value))
-		device.release()
-
-class OpGetRes:
-	def run(self, device):
-		curRes = device.getResolution()
-		if curRes == RAZER_MOUSE_RES_UNKNOWN:
-			curRes = "<unknown>"
-		suppRes = device.supportedResolutions()
-		print "Current resolution:", curRes, "DPI"
-		printList("Supported resolutions", suppRes)
-
-class OpSetFreq:
-	def __init__(self, value):
-		self.value = value
-	def run(self, device):
-		device.claim()
-		device.setFreq(int(self.value))
-		device.release()
-
-class OpGetFreq:
-	def run(self, device):
-		curFreq = device.getFreq()
-		if curFreq == RAZER_MOUSE_FREQ_UNKNOWN:
-			curFreq = "<unknown>"
-		suppFreq = device.supportedFreqs()
-		print "Current frequency:", curFreq, "Hz"
-		printList("Supported frequencies", suppFreq)
-
-class OpPrintLeds:
-	def run(self, device):
-		leds = device.getLeds()
-		names = []
-		for led in leds:
-			names.append(led.getName())
-		printList("Available LEDs", names)
-
-class OpSetLed:
-	def __init__(self, value):
-		self.value = value
-	def run(self, device):
-		# parse the LED:X argument
-		args = self.value.split(":")
-		if len(args) != 2:
-			print "-l|--setled argument error. Format LED:X"
-			exit(1)
-		ledname = args[0]
-		on = 0
-		if args[1] in ("1", "on", "ON", "true", "TRUE"):
-			on = 1
-		# Find the led and apply the setting
-		for led in device.getLeds():
-			if led.getName().lower() == ledname.lower():
-				device.claim()
-				led.toggleState(on)
-				device.release()
-				return
-		print "LED \"%s\" not found on device \"%s\"" % (
-			ledname, device.getBusId())
-
-class OpGetFwVer:
-	def run(self, device):
-		device.claim()
-		ver = device.getFwVersion()
-		print "Firmware version: %u.%u" % (
-			(ver & 0xFF00) >> 8, ver & 0x00FF)
-		device.release()
-
-def mapBusIdToDevice(busid):
-	mice = scanMice()
-	for mouse in mice:
-		if busid == "mouse":
-			# Return the first found mouse
-			return mouse
-		if mouse.getBusId() == busid:
-			return mouse
-	return None
-
 # Operations on a device
 class DevOps:
 	def __init__(self, busid):
@@ -248,19 +44,8 @@ class DevOps:
 			print "Razer device access exception:", e
 
 def exit(exitcode):
-	razerExit()
+	#TODO
 	sys.exit(exitcode)
-
-def scanDevices():
-	try:
-		mice = scanMice()
-		for mouse in mice:
-			print "Found mouse type \"%s\" on bus \"%s\"" % (
-				mouseTypeString[mouse.getType()],
-				mouse.getBusId())
-	except RazerException, e:
-		print "Failed to scan for devices:", e
-		exit(1)
 
 def prVersion():
 	print "Razer device configuration tool"
@@ -395,11 +180,6 @@ def parse_args():
 	return devOpsList
 
 def main():
-	try:
-		razerInit()
-	except RazerException, e:
-		print "Failed to initialize Razer device access library:", e
-		sys.exit(1)
 	devOpsList = parse_args()
 	if not devOpsList:
 		exit(1)
@@ -407,4 +187,5 @@ def main():
 		devOps.runAll()
 	exit(0)
 
-main()
+if __name__ == "__main__":
+	main()
