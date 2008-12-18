@@ -38,23 +38,45 @@
 
 #define RESCAN_INTERVAL_MSEC	1000 /* Rescan interval, in milliseconds. */
 
-#define COMMAND_MAX_SIZE	64
+#define INTERFACE_REVISION	0
+
+#define COMMAND_MAX_SIZE	512
 #define COMMAND_HDR_SIZE	sizeof(struct command_hdr)
 
 enum {
-	COMMAND_ID_GETMICE = 1,
+	COMMAND_ID_GETREV = 0,		/* Get the revision number of the socket interface. */
+	COMMAND_ID_GETMICE,		/* Get a list of detected mice. */
+	COMMAND_ID_GETFWVER,		/* Get the firmware rev of a mouse. */
+	COMMAND_ID_SUPPFREQS,		/* Get a list of supported frequencies. */
+	COMMAND_ID_SUPPRESOL,		/* Get a list of supported resolutions. */
 };
 
 struct command_hdr {
 	uint8_t id;
 } __attribute__((packed));
 
+struct command {
+	struct command_hdr hdr;
+	char idstr[RAZER_IDSTR_MAX_SIZE];
+	union {
+		struct {
+		} __attribute__((packed)) getfwver;
+		struct {
+		} __attribute__((packed)) suppfreqs;
+		struct {
+		} __attribute__((packed)) suppresol;
+	} __attribute__((packed));
+} __attribute__((packed));
+
+#define offsetof(type, member)	((size_t)&((type *)0)->member)
+#define CMD_SIZE(name)	(offsetof(struct command, name) + \
+			 sizeof(((struct command *)0)->name))
+
 struct client {
 	struct client *next;
 	struct sockaddr_un sockaddr;
 	socklen_t socklen;
 	int fd;
-	//TODO
 };
 
 typedef _Bool bool;
@@ -130,6 +152,13 @@ static int setup_var_run(void)
 	err = bind(ctlsock, (struct sockaddr *)&sockaddr, SUN_LEN(&sockaddr));
 	if (err) {
 		fprintf(stderr, "Failed to bind socket to %s: %s\n",
+			SOCKPATH, strerror(errno));
+		cleanup_var_run();
+		return err;
+	}
+	err = chmod(SOCKPATH, 0666);
+	if (err) {
+		fprintf(stderr, "Failed to set %s socket permissions: %s\n",
 			SOCKPATH, strerror(errno));
 		cleanup_var_run();
 		return err;
@@ -322,25 +351,115 @@ static int send_string(struct client *client, const char *str)
 	return send(client->fd, str, strlen(str), 0);
 }
 
-static void handle_received_command(struct client *client, const char *cmd, unsigned int len)
+static void command_getmice(struct client *client, const struct command *cmd, unsigned int len)
 {
-	const struct command_hdr *hdr = (const struct command_hdr *)cmd;
-	struct razer_mouse *mouse;
 	unsigned int count;
+	char str[RAZER_IDSTR_MAX_SIZE + 1];
+	struct razer_mouse *mouse;
+
+	count = 0;
+	razer_for_each_mouse(mouse, mice)
+		count++;
+	send_u32(client, count);
+	razer_for_each_mouse(mouse, mice) {
+		snprintf(str, sizeof(str), "%s\n", mouse->idstr);
+		send_string(client, str);
+	}
+}
+
+static void command_getfwver(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	uint32_t fwver = 0xFFFFFFFF;
+	int err;
+
+	if (len < CMD_SIZE(getfwver))
+		goto out;
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse)
+		goto out;
+	err = mouse->claim(mouse);
+	if (err)
+		goto out;
+	fwver = mouse->get_fw_version(mouse);
+	mouse->release(mouse);
+out:
+	send_u32(client, fwver);
+}
+
+static void command_suppfreqs(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	enum razer_mouse_freq *freq_list;
+	int i, count;
+
+	if (len < CMD_SIZE(suppfreqs))
+		goto error;
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse)
+		goto error;
+	count = mouse->supported_freqs(mouse, &freq_list);
+	if (count <= 0)
+		goto error;
+
+	send_u32(client, count);
+	for (i = 0; i < count; i++)
+		send_u32(client, freq_list[i]);
+	razer_free_freq_list(freq_list, count);
+
+	return;
+error:
+	count = 0;
+	send_u32(client, count);
+}
+
+static void command_suppresol(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	enum razer_mouse_res *res_list;
+	int i, count;
+
+	if (len < CMD_SIZE(suppresol))
+		goto error;
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse)
+		goto error;
+	count = mouse->supported_resolutions(mouse, &res_list);
+	if (count <= 0)
+		goto error;
+
+	send_u32(client, count);
+	for (i = 0; i < count; i++)
+		send_u32(client, res_list[i]);
+	razer_free_resolution_list(res_list, count);
+
+	return;
+error:
+	count = 0;
+	send_u32(client, count);
+}
+
+static void handle_received_command(struct client *client, const char *_cmd, unsigned int len)
+{
+	const struct command *cmd = (const struct command *)_cmd;
 
 	if (len < COMMAND_HDR_SIZE)
 		return;
-	switch (hdr->id) {
+	switch (cmd->hdr.id) {
+	case COMMAND_ID_GETREV:
+		send_u32(client, INTERFACE_REVISION);
+		break;
 	case COMMAND_ID_GETMICE:
-		count = 0;
-		razer_for_each_mouse(mouse, mice)
-			count++;
-		send_u32(client, count);
-		razer_for_each_mouse(mouse, mice) {
-			char str[RAZER_IDSTR_MAX_SIZE + 1];
-			snprintf(str, sizeof(str), "%s\n", mouse->idstr);
-			send_string(client, str);
-		}
+		command_getmice(client, cmd, len);
+		break;
+	case COMMAND_ID_GETFWVER:
+		command_getfwver(client, cmd, len);
+		break;
+	case COMMAND_ID_SUPPFREQS:
+		command_suppfreqs(client, cmd, len);
+		break;
+	case COMMAND_ID_SUPPRESOL:
+		command_suppresol(client, cmd, len);
 		break;
 	default:
 		/* Unknown command. */

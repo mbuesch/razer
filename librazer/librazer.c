@@ -163,12 +163,12 @@ static void mouse_list_del(struct razer_mouse **base, struct razer_mouse *del_en
 		i->next = del_entry->next;
 }
 
-static struct razer_mouse * mouse_list_find(struct razer_mouse *base, const char *idstr)
+struct razer_mouse * razer_mouse_list_find(struct razer_mouse *base, const char *idstr)
 {
 	struct razer_mouse *m;
 
 	razer_for_each_mouse(m, base) {
-		if (strcmp(m->idstr, idstr) == 0)
+		if (strncmp(m->idstr, idstr, RAZER_IDSTR_MAX_SIZE) == 0)
 			return m;
 	}
 
@@ -230,7 +230,7 @@ struct razer_mouse * razer_rescan_mice(void)
 			if (id->type != RAZER_DEVTYPE_MOUSE)
 				continue;
 			id->u.mouse_ops->gen_idstr(dev, idstr);
-			mouse = mouse_list_find(mice_list, idstr);
+			mouse = razer_mouse_list_find(mice_list, idstr);
 			if (mouse) {
 				/* We already have this mouse. Delete it from the global
 				 * mice list. It will be added back later. */

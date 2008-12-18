@@ -217,16 +217,6 @@ void razer_free_leds(struct razer_led *led_list);
   */
 struct razer_mouse * razer_rescan_mice(void);
 
-/** razer_init - LibRazer initialization
-  * Call this before any other library function.
-  */
-int razer_init(void);
-
-/** razer_exit - LibRazer cleanup
-  * Call this after any operation with the library.
-  */
-void razer_exit(void);
-
 /** razer_for_each_mouse - Convenience helper for traversing a mouse list
  *
  * @mouse: 'struct razer_mouse' pointer used as a list pointer.
@@ -237,6 +227,24 @@ void razer_exit(void);
 #define razer_for_each_mouse(mouse, mice_list) \
 	for (mouse = mice_list; mouse; mouse = mouse->next)
 
+/** razer_mouse_list_find - Find a mouse in a list by the 'idstr' string.
+ *
+ * @base: The list to search in.
+ * @idstr: The ID-string of the mouse to find.
+ *
+ * Returns a NULL pointer, if not found.
+ */
+struct razer_mouse * razer_mouse_list_find(struct razer_mouse *base, const char *idstr);
+
+/** razer_init - LibRazer initialization
+  * Call this before any other library function.
+  */
+int razer_init(void);
+
+/** razer_exit - LibRazer cleanup
+  * Call this after any operation with the library.
+  */
+void razer_exit(void);
 
 #if defined(c_plusplus) || defined(__cplusplus)
 } /* extern "C" */
