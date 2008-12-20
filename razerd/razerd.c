@@ -348,7 +348,7 @@ static int send_u32(struct client *client, uint32_t v)
 
 static int send_string(struct client *client, const char *str)
 {
-	return send(client->fd, str, strlen(str), 0);
+	return send(client->fd, str, strlen(str) + 1, 0);
 }
 
 static void command_getmice(struct client *client, const struct command *cmd, unsigned int len)
@@ -362,7 +362,7 @@ static void command_getmice(struct client *client, const struct command *cmd, un
 		count++;
 	send_u32(client, count);
 	razer_for_each_mouse(mouse, mice) {
-		snprintf(str, sizeof(str), "%s\n", mouse->idstr);
+		snprintf(str, sizeof(str), "%s", mouse->idstr);
 		send_string(client, str);
 	}
 }
@@ -506,7 +506,7 @@ static void mainloop(void)
 select_timeout.tv_sec = 1000;
 		select_timeout.tv_usec = ((RESCAN_INTERVAL_MSEC + 100) % 1000) * 1000;
 		err = select(FD_SETSIZE, &wait_fdset, NULL, NULL, &select_timeout);
-		if (err && errno != ENOTTY && errno != EAGAIN) {
+		if (err && errno != ENOTTY && errno != EAGAIN) {//FIXME don't abort.
 			fprintf(stderr, "select() failed with: %d %s\n", errno, strerror(errno));
 			goto term;
 		}

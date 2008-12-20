@@ -43,6 +43,11 @@ class DevOps:
 		except RazerException, e:
 			print "Razer device access exception:", e
 
+def scanDevices():
+	mice = razer.getMice()
+	for mouse in mice:
+		print mouse
+
 def exit(exitcode):
 	#TODO
 	sys.exit(exitcode)
@@ -180,11 +185,19 @@ def parse_args():
 	return devOpsList
 
 def main():
-	devOpsList = parse_args()
-	if not devOpsList:
-		exit(1)
-	for devOps in devOpsList:
-		devOps.runAll()
+	try:
+		global razer
+
+		razer = Razer()
+		
+
+		devOpsList = parse_args()
+		if not devOpsList:
+			exit(1)
+		for devOps in devOpsList:
+			devOps.runAll()
+	except RazerEx, e:
+		print e
 	exit(0)
 
 if __name__ == "__main__":
