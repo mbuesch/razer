@@ -77,6 +77,36 @@ class OpSetLed:
 		if error:
 			print "Failed to set LED state. Error code is %d" % error
 
+class OpSetRes:
+	def __init__(self, resolution):
+		self.resolution = resolution
+
+	def run(self, idstr):
+		try:
+			resolution = int(self.resolution)
+		except ValueError:
+			print "Invalid parameter to --res option"
+			exit(1)
+		error = razer.setResolution(idstr, resolution)
+		if error:
+			print "Failed to set resolution to %d DPI (error=%d)" %\
+				(resolution, error)
+
+class OpSetFreq:
+	def __init__(self, frequency):
+		self.frequency = frequency
+
+	def run(self, idstr):
+		try:
+			frequency = int(self.frequency)
+		except ValueError:
+			print "Invalid parameter to --freq option"
+			exit(1)
+		error = razer.setFrequency(idstr, frequency)
+		if error:
+			print "Failed to set frequency to %d Hz (error=%d)" %\
+				(frequency, error)
+
 # Operations on a device
 class DevOps:
 	def __init__(self, idstr):

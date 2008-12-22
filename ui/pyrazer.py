@@ -42,6 +42,8 @@ class Razer:
 	COMMAND_ID_SUPPRESOL = 5	# Get a list of supported resolutions.
 	COMMAND_ID_GETLEDS = 6		# Get a list of LEDs on the device.
 	COMMAND_ID_SETLED = 7		# Set the state of a LED.
+	COMMAND_ID_SETRES = 8		# Set the resolution.
+	COMMAND_ID_SETFREQ = 9		# Set the frequency.
 
 	def __init__(self):
 		self.__connect()
@@ -59,6 +61,12 @@ class Razer:
 		        (ord(be32Str[1]) << 16) | \
 		        (ord(be32Str[2]) << 8)  | \
 		        (ord(be32Str[3])))
+
+	def __int_to_be32(self, integer):
+		return "%c%c%c%c" % ((integer >> 24) & 0xFF,\
+				     (integer >> 16) & 0xFF,\
+				     (integer >> 8) & 0xFF,\
+				     (integer & 0xFF))
 
 	def __doSendCommand(self, rawCommand):
 		self.sock.sendall(rawCommand)
@@ -141,4 +149,16 @@ class Razer:
 		else:
 			payload += "%c" % 0
 		self.__sendCommand(self.COMMAND_ID_SETLED, idstr, payload)
+		return self.__recvU32()
+
+	def setFrequency(self, idstr, newFrequency):
+		"Set a new scan frequency (in Hz)."
+		payload = self.__int_to_be32(newFrequency)
+		self.__sendCommand(self.COMMAND_ID_SETFREQ, idstr, payload)
+		return self.__recvU32()
+
+	def setResolution(self, idstr, newResolution):
+		"Set a new scan resolution (in DPI)."
+		payload = self.__int_to_be32(newResolution)
+		self.__sendCommand(self.COMMAND_ID_SETRES, idstr, payload)
 		return self.__recvU32()

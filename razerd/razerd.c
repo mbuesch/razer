@@ -52,6 +52,8 @@ enum {
 	COMMAND_ID_SUPPRESOL,		/* Get a list of supported resolutions. */
 	COMMAND_ID_GETLEDS,		/* Get a list of LEDs on the device. */
 	COMMAND_ID_SETLED,		/* Set the state of a LED. */
+	COMMAND_ID_SETRES,		/* Set the resolution. */
+	COMMAND_ID_SETFREQ,		/* Set the frequency. */
 };
 
 enum {
@@ -84,6 +86,12 @@ struct command {
 			char led_name[RAZER_LEDNAME_MAX_SIZE];
 			uint8_t new_state;
 		} __attribute__((packed)) setled;
+		struct {
+			uint32_t new_resolution;
+		} __attribute__((packed)) setres;
+		struct {
+			uint32_t new_frequency;
+		} __attribute__((packed)) setfreq;
 	} __attribute__((packed));
 } __attribute__((packed));
 
@@ -356,6 +364,11 @@ static inline uint32_t cpu_to_be32(uint32_t v)
 #endif
 }
 
+static inline uint32_t be32_to_cpu(uint32_t v)
+{
+	return cpu_to_be32(v);
+}
+
 static int send_u32(struct client *client, uint32_t v)
 {
 	v = cpu_to_be32(v);
@@ -541,6 +554,68 @@ error:
 	send_u32(client, errorcode);
 }
 
+static void command_setres(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	int err;
+	uint32_t errorcode = ERR_NONE;
+
+	if (len < CMD_SIZE(setres)) {
+		errorcode = ERR_CMDSIZE;
+		goto error;
+	}
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse) {
+		errorcode = ERR_NOMOUSE;
+		goto error;
+	}
+	err = mouse->claim(mouse);
+	if (err) {
+		errorcode = ERR_CLAIM;
+		goto error;
+	}
+	err = mouse->set_resolution(mouse, be32_to_cpu(cmd->setres.new_resolution));
+	mouse->release(mouse);
+	if (err) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+
+error:
+	send_u32(client, errorcode);
+}
+
+static void command_setfreq(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	int err;
+	uint32_t errorcode = ERR_NONE;
+
+	if (len < CMD_SIZE(setfreq)) {
+		errorcode = ERR_CMDSIZE;
+		goto error;
+	}
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse) {
+		errorcode = ERR_NOMOUSE;
+		goto error;
+	}
+	err = mouse->claim(mouse);
+	if (err) {
+		errorcode = ERR_CLAIM;
+		goto error;
+	}
+	err = mouse->set_freq(mouse, be32_to_cpu(cmd->setfreq.new_frequency));
+	mouse->release(mouse);
+	if (err) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+
+error:
+	send_u32(client, errorcode);
+}
+
 static void handle_received_command(struct client *client, const char *_cmd, unsigned int len)
 {
 	const struct command *cmd = (const struct command *)_cmd;
@@ -571,6 +646,12 @@ static void handle_received_command(struct client *client, const char *_cmd, uns
 		break;
 	case COMMAND_ID_SETLED:
 		command_setled(client, cmd, len);
+		break;
+	case COMMAND_ID_SETRES:
+		command_setres(client, cmd, len);
+		break;
+	case COMMAND_ID_SETFREQ:
+		command_setfreq(client, cmd, len);
 		break;
 	default:
 		/* Unknown command. */
