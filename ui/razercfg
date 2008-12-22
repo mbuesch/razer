@@ -23,24 +23,42 @@ from ConfigParser import *
 from pyrazer import *
 
 
+class OpGetFwVer:
+	def run(self, idstr):
+		verTuple = razer.getFwVer(idstr)
+		print "The firmware version for the mouse %s is: %d.%d" %\
+			(idstr, verTuple[0], verTuple[1])
+
+class OpGetFreq:
+	def run(self, idstr):
+		freqs = razer.getSupportedFreqs(idstr)
+		print "Supported scan frequencies for mouse %s:" % idstr
+		for freq in freqs:
+			sys.stdout.write("%d Hz, " % freq)
+		print ""
+
+class OpGetRes:
+	def run(self, idstr):
+		resList = razer.getSupportedRes(idstr)
+		print "Supported scan resolutions for mouse %s:" % idstr
+		for res in resList:
+			sys.stdout.write("%d DPI, " % res)
+		print ""
+
 # Operations on a device
 class DevOps:
-	def __init__(self, busid):
-		self.busid = busid
+	def __init__(self, idstr):
+		self.idstr = idstr
 		self.ops = []
+
 	def add(self, op):
 		self.ops.append(op)
+
 	def runAll(self):
 		try:
-			device = None
-			if self.busid:
-				device = mapBusIdToDevice(self.busid)
-				if not device:
-					print "Did not find device with ID \"%s\"" % self.busid
-					exit(1)
 			for op in self.ops:
-				op.run(device)
-		except RazerException, e:
+				op.run(self.idstr)
+		except RazerEx, e:
 			print "Razer device access exception:", e
 
 def scanDevices():

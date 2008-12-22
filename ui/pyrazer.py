@@ -81,9 +81,35 @@ class Razer:
 		return string
 
 	def getMice(self):
+		"Returns a list of ID-strings for the detected mice."
 		self.__sendCommand(self.COMMAND_ID_GETMICE)
 		count = self.__recvU32()
 		mice = []
 		for i in range(0, count):
 			mice.append(self.__recvString())
 		return mice
+
+	def getFwVer(self, idstr):
+		"Returns the firmware version. The returned value is a tuple (major, minor)."
+		self.__sendCommand(self.COMMAND_ID_GETFWVER, idstr)
+		rawVer = self.__recvU32()
+		return ((rawVer >> 8) & 0xFF, rawVer & 0xFF)
+
+	def getSupportedFreqs(self, idstr):
+		"Returns a list of supported frequencies for a mouse."
+		self.__sendCommand(self.COMMAND_ID_SUPPFREQS, idstr)
+		count = self.__recvU32()
+		freqs = []
+		for i in range(0, count):
+			freqs.append(self.__recvU32())
+		return freqs
+
+	def getSupportedRes(self, idstr):
+		"Returns a list of supported resolutions for a mouse."
+		self.__sendCommand(self.COMMAND_ID_SUPPRESOL, idstr)
+		count = self.__recvU32()
+		res = []
+		for i in range(0, count):
+			res.append(self.__recvU32())
+		return res
+
