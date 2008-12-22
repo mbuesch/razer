@@ -1,12 +1,13 @@
 #ifndef RAZER_PRIVATE_H_
 #define RAZER_PRIVATE_H_
 
+#include <usb.h>
+
 typedef _Bool bool;
 
-struct usb_device;
-struct usb_dev_handle;
-
 struct razer_usb_context {
+	/* Device pointer. */
+	struct usb_device *dev;
 	/* The handle for all operations. */
 	struct usb_dev_handle *h;
 	/* The interface number we use. */
@@ -15,9 +16,18 @@ struct razer_usb_context {
 	bool kdrv_detached;
 };
 
-int razer_generic_usb_claim(struct usb_device *dev,
-			    struct razer_usb_context *ctx);
-void razer_generic_usb_release(struct usb_device *dev,
-			       struct razer_usb_context *ctx);
+int razer_generic_usb_claim(struct razer_usb_context *ctx);
+void razer_generic_usb_release(struct razer_usb_context *ctx);
+
+struct razer_usb_reconnect_guard {
+	struct razer_usb_context *ctx;
+	struct usb_device_descriptor old_desc;
+	char old_dirname[PATH_MAX + 1];
+	char old_filename[PATH_MAX + 1];
+};
+
+int razer_usb_reconnect_guard_init(struct razer_usb_reconnect_guard *guard,
+				   struct razer_usb_context *ctx);
+int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard);
 
 #endif /* RAZER_PRIVATE_H_ */

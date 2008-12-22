@@ -374,13 +374,12 @@ static void razer_usb_release(struct razer_usb_context *ctx)
 	razer_reattach_usb_kdrv(ctx);
 }
 
-int razer_generic_usb_claim(struct usb_device *dev,
-			    struct razer_usb_context *ctx)
+int razer_generic_usb_claim(struct razer_usb_context *ctx)
 {
 	int err;
 
-	ctx->interf = dev->config->interface->altsetting[0].bInterfaceNumber;
-	ctx->h = usb_open(dev);
+	ctx->interf = ctx->dev->config->interface->altsetting[0].bInterfaceNumber;
+	ctx->h = usb_open(ctx->dev);
 	if (!ctx->h)
 		return -ENODEV;
 	err = razer_usb_claim(ctx);
@@ -390,9 +389,93 @@ int razer_generic_usb_claim(struct usb_device *dev,
 	return 0;
 }
 
-void razer_generic_usb_release(struct usb_device *dev,
-			       struct razer_usb_context *ctx)
+void razer_generic_usb_release(struct razer_usb_context *ctx)
 {
 	razer_usb_release(ctx);
 	usb_close(ctx->h);
+}
+
+int razer_usb_reconnect_guard_init(struct razer_usb_reconnect_guard *guard,
+				   struct razer_usb_context *ctx)
+{
+	guard->ctx = ctx;
+	memcpy(&guard->old_desc, &ctx->dev->descriptor, sizeof(guard->old_desc));
+	memcpy(guard->old_dirname, ctx->dev->bus->dirname, sizeof(guard->old_dirname));
+	memcpy(guard->old_filename, ctx->dev->filename, sizeof(guard->old_filename));
+
+	return 0;
+}
+
+static struct usb_device * guard_find_usb_dev(const struct usb_device_descriptor *desc,
+					      const char *dirname,
+					      const char *filename)
+{
+	struct usb_bus *bus, *buslist;
+	struct usb_device *dev;
+
+	usb_find_busses();
+	usb_find_devices();
+
+	buslist = usb_get_busses();
+	for_each_usbbus(bus, buslist) {
+		for_each_usbdev(dev, bus->devices) {
+			if (memcmp(desc, &dev->descriptor, sizeof(*desc)) != 0)
+				continue;
+			if (strncmp(dev->bus->dirname, dirname, PATH_MAX) != 0)
+				continue;
+			if (strncmp(dev->filename, filename, PATH_MAX) != 0)
+				continue;
+			/* found it! */
+			return dev;
+		}
+	}
+
+	return NULL;
+}
+
+int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard)
+{
+	char reconn_filename[PATH_MAX + 1];
+	unsigned int old_filename_nr;
+	int err, res;
+	struct usb_device *dev;
+
+printf("Waiting for device to vanish\n");
+	/* Wait for the device to disconnect. */
+	while (guard_find_usb_dev(&guard->old_desc,
+				  guard->old_dirname,
+				  guard->old_filename)) {
+		//TODO sleep, timeout
+	}
+
+	/* Construct the filename the device will reconnect on. */
+	res = sscanf(guard->old_filename, "%03u", &old_filename_nr);
+	if (res != 1) {
+		fprintf(stderr, "razer_usb_reconnect_guard: Could not parse filename.\n");
+		return -EINVAL;
+	}
+	snprintf(reconn_filename, sizeof(reconn_filename), "%03u",
+		 old_filename_nr + 1);
+
+printf("Waiting for reconnect\n");
+	/* Wait for the device to reconnect. */
+	while (1) {
+		dev = guard_find_usb_dev(&guard->old_desc,
+					 guard->old_dirname,
+					 reconn_filename);
+		if (dev)
+			break;
+		//TODO sleep, timeout
+	}
+
+printf("Reclaim device\n");
+	/* Reclaim the new device. */
+	guard->ctx->dev = dev;
+	err = razer_generic_usb_claim(guard->ctx);
+	if (err) {
+		fprintf(stderr, "razer_usb_reconnect_guard: Reclaim failed.\n");
+		return err;
+	}
+
+	return 0;
 }

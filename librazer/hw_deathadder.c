@@ -41,7 +41,6 @@ struct deathadder_private {
 	bool claimed;
 	/* Firmware version number. */
 	uint16_t fw_version;
-	struct usb_device *usbdev;
 	struct razer_usb_context usb;
 	/* The currently set LED states. */
 	bool led_states[DEATHADDER_NR_LEDS];
@@ -52,6 +51,7 @@ struct deathadder_private {
 };
 
 #define DEATHADDER_USB_TIMEOUT	3000
+#define DADD_FW(major, minor)	(((major) << 8) | (minor))
 
 static int deathadder_usb_write(struct deathadder_private *priv,
 				int request, int command,
@@ -89,6 +89,85 @@ static int deathadder_usb_read(struct deathadder_private *priv,
 	return 0;
 }
 
+static int deathadder_commit(struct deathadder_private *priv)
+{
+	struct razer_usb_reconnect_guard guard;
+	char freq_value, res_value;
+	char value;
+	int err;
+
+	if (priv->fw_version <= DADD_FW(1,10)) {
+		err = razer_usb_reconnect_guard_init(&guard, &priv->usb);
+		if (err)
+			return err;
+
+		/* Translate frequency setting. */
+		switch (priv->frequency) {
+		case RAZER_MOUSE_FREQ_125HZ:
+			freq_value = 3;
+			break;
+		case RAZER_MOUSE_FREQ_500HZ:
+			freq_value = 2;
+			break;
+		case RAZER_MOUSE_FREQ_1000HZ:
+		case RAZER_MOUSE_FREQ_UNKNOWN:
+			freq_value = 1;
+			break;
+		default:
+			return -EINVAL;
+		}
+
+		/* Translate resolution setting. */
+		switch (priv->resolution) {
+		case RAZER_MOUSE_RES_450DPI:
+			res_value = 3;
+			break;
+		case RAZER_MOUSE_RES_900DPI:
+			res_value = 2;
+			break;
+		case RAZER_MOUSE_RES_1800DPI:
+		case RAZER_MOUSE_RES_UNKNOWN:
+			res_value = 1;
+			break;
+		default:
+			return -EINVAL;
+		}
+
+		/* Commit LED states. */
+		if (priv->led_states[DEATHADDER_LED_LOGO])
+			value |= 0x01;
+		if (priv->led_states[DEATHADDER_LED_SCROLL])
+			value |= 0x02;
+		err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+					   0x06, &value, sizeof(value));
+		if (err)
+			return err;
+
+		/* Commit frequency setting. */
+		err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+					   0x07, &freq_value, sizeof(freq_value));
+		if (err)
+			return err;
+
+		/* Commit resolution setting. */
+		err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+					   0x09, &res_value, sizeof(res_value));
+		if (err)
+			return err;
+
+		//FIXME won't always reconnect
+#if 0
+		err = razer_usb_reconnect_guard_wait(&guard);
+		if (err)
+			return err;
+#endif
+	} else {
+		//TODO
+	}
+
+	return 0;
+}
+
 static int deathadder_read_fw_ver(struct deathadder_private *priv)
 {
 	char buf[2];
@@ -111,7 +190,7 @@ static int deathadder_claim(struct razer_mouse *m)
 	struct deathadder_private *priv = m->internal;
 	int err, fwver;
 
-	err = razer_generic_usb_claim(priv->usbdev, &priv->usb);
+	err = razer_generic_usb_claim(&priv->usb);
 	if (err)
 		return err;
 	fwver = deathadder_read_fw_ver(priv);
@@ -130,7 +209,7 @@ static void deathadder_release(struct razer_mouse *m)
 	if (!priv->claimed)
 		return;
 
-	razer_generic_usb_release(priv->usbdev, &priv->usb);
+	razer_generic_usb_release(&priv->usb);
 	priv->claimed = 0;
 }
 
@@ -149,8 +228,8 @@ static int deathadder_led_toggle(struct razer_led *led,
 {
 	struct razer_mouse *m = led->u.mouse;
 	struct deathadder_private *priv = m->internal;
-	char value = 0;
 	int err;
+	enum razer_led_state old_state;
 
 	if (led->id >= DEATHADDER_NR_LEDS)
 		return -EINVAL;
@@ -161,14 +240,14 @@ static int deathadder_led_toggle(struct razer_led *led,
 	if (!priv->claimed)
 		return -EBUSY;
 
+	old_state = priv->led_states[led->id];
 	priv->led_states[led->id] = new_state;
 
-	if (priv->led_states[DEATHADDER_LED_LOGO])
-		value |= 0x01;
-	if (priv->led_states[DEATHADDER_LED_SCROLL])
-		value |= 0x02;
-	err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
-				   0x06, &value, sizeof(value));
+	err = deathadder_commit(priv);
+	if (err) {
+		priv->led_states[led->id] = old_state;
+		return err;
+	}
 
 	return err;
 }
@@ -237,29 +316,20 @@ static int deathadder_set_freq(struct razer_mouse *m,
 			       enum razer_mouse_freq freq)
 {
 	struct deathadder_private *priv = m->internal;
-	char value;
+	enum razer_mouse_freq old_freq;
 	int err;
 
-	switch (freq) {
-	case RAZER_MOUSE_FREQ_125HZ:
-		value = 3;
-		break;
-	case RAZER_MOUSE_FREQ_500HZ:
-		value = 2;
-		break;
-	case RAZER_MOUSE_FREQ_1000HZ:
-		value = 1;
-		break;
-	default:
-		return -EINVAL;
-	}
 	if (!priv->claimed)
 		return -EBUSY;
 
-	err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
-				   0x07, &value, sizeof(value));
-	if (!err)
-		priv->frequency = freq;
+	old_freq = priv->frequency;
+	priv->frequency = freq;
+
+	err = deathadder_commit(priv);
+	if (err) {
+		priv->frequency = old_freq;
+		return err;
+	}
 
 	return err;
 }
@@ -294,29 +364,20 @@ static int deathadder_set_resolution(struct razer_mouse *m,
 				     enum razer_mouse_res res)
 {
 	struct deathadder_private *priv = m->internal;
-	char value;
+	enum razer_mouse_res old_res;
 	int err;
 
-	switch (res) {
-	case RAZER_MOUSE_RES_450DPI:
-		value = 3;
-		break;
-	case RAZER_MOUSE_RES_900DPI:
-		value = 2;
-		break;
-	case RAZER_MOUSE_RES_1800DPI:
-		value = 1;
-		break;
-	default:
-		return -EINVAL;
-	}
 	if (!priv->claimed)
 		return -EBUSY;
 
-	err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
-				   0x09, &value, sizeof(value));
-	if (!err)
+	old_res = priv->resolution;
+	priv->resolution = res;
+
+	err = deathadder_commit(priv);
+	if (err) {
 		priv->resolution = res;
+		return err;
+	}
 
 	return err;
 }
@@ -346,7 +407,7 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 		return -ENOMEM;
 	memset(priv, 0, sizeof(*priv));
 
-	priv->usbdev = usbdev;
+	priv->usb.dev = usbdev;
 	priv->frequency = RAZER_MOUSE_FREQ_UNKNOWN;
 	priv->resolution = RAZER_MOUSE_RES_UNKNOWN;
 

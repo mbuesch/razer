@@ -31,7 +31,6 @@
 
 struct lachesis_private {
 	bool claimed;
-	struct usb_device *usbdev;
 	struct razer_usb_context usb;
 	/* The currently set resolution. */
 	enum razer_mouse_res resolution;
@@ -82,7 +81,7 @@ static int lachesis_claim(struct razer_mouse *m)
 	struct lachesis_private *priv = m->internal;
 	int err;
 
-	err = razer_generic_usb_claim(priv->usbdev, &priv->usb);
+	err = razer_generic_usb_claim(&priv->usb);
 	if (err)
 		return err;
 	priv->claimed = 1;
@@ -97,7 +96,7 @@ static void lachesis_release(struct razer_mouse *m)
 	if (!priv->claimed)
 		return;
 
-	razer_generic_usb_release(priv->usbdev, &priv->usb);
+	razer_generic_usb_release(&priv->usb);
 	priv->claimed = 0;
 }
 
@@ -221,7 +220,7 @@ int razer_lachesis_init_struct(struct razer_mouse *m,
 		return -ENOMEM;
 	memset(priv, 0, sizeof(*priv));
 
-	priv->usbdev = usbdev;
+	priv->usb.dev = usbdev;
 	priv->resolution = RAZER_MOUSE_RES_UNKNOWN;
 
 	m->internal = priv;
