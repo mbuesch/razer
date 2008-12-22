@@ -30,6 +30,12 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
+#ifdef __DragonFly__
+#include <sys/endian.h>
+#else
+#include <byteswap.h>
+#endif
+
 
 #define VAR_RUN			"/var/run"
 #define VAR_RUN_RAZERD		VAR_RUN "/razerd"
@@ -334,7 +340,7 @@ static inline uint32_t cpu_to_be32(uint32_t v)
 #ifdef BIG_ENDIAN_HOST
 	return v;
 #else
-	return swap32(v);
+	return bswap_32(v);
 #endif
 }
 
