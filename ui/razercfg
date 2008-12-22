@@ -207,7 +207,6 @@ def main():
 		global razer
 
 		razer = Razer()
-		
 
 		devOpsList = parse_args()
 		if not devOpsList:

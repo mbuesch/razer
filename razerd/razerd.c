@@ -252,7 +252,6 @@ static bool timeval_after(const struct timeval *a, const struct timeval *b)
 
 static void free_client(struct client *client)
 {
-	FD_CLR(client->fd, &wait_fdset);
 	free(client);
 }
 
@@ -269,8 +268,6 @@ static struct client * new_client(const struct sockaddr_un *sockaddr,
 	memcpy(&client->sockaddr, sockaddr, sizeof(client->sockaddr));
 	client->socklen = socklen;
 	client->fd = fd;
-
-	FD_SET(fd, &wait_fdset);
 
 	return client;
 }
@@ -491,10 +488,7 @@ static void check_client_connections(void)
 static void mainloop(void)
 {
 	struct timeval now, next_rescan, select_timeout;
-	int err;
-
-	FD_ZERO(&wait_fdset);
-	FD_SET(ctlsock, &wait_fdset);
+	struct client *client;
 
 	mice = razer_rescan_mice();
 	gettimeofday(&now, NULL);
@@ -502,19 +496,17 @@ static void mainloop(void)
 	timeval_add_msec(&next_rescan, RESCAN_INTERVAL_MSEC);
 
 	while (1) {
-//		select_timeout.tv_sec = (RESCAN_INTERVAL_MSEC + 100) / 1000;
-select_timeout.tv_sec = 1000;
+		FD_ZERO(&wait_fdset);
+		FD_SET(ctlsock, &wait_fdset);
+		for (client = clients; client; client = client->next)
+			FD_SET(client->fd, &wait_fdset);
+		select_timeout.tv_sec = (RESCAN_INTERVAL_MSEC + 100) / 1000;
 		select_timeout.tv_usec = ((RESCAN_INTERVAL_MSEC + 100) % 1000) * 1000;
-		err = select(FD_SETSIZE, &wait_fdset, NULL, NULL, &select_timeout);
-		if (err && errno != ENOTTY && errno != EAGAIN) {//FIXME don't abort.
-			fprintf(stderr, "select() failed with: %d %s\n", errno, strerror(errno));
-			goto term;
-		}
+		select(FD_SETSIZE, &wait_fdset, NULL, NULL, &select_timeout);
 
 		gettimeofday(&now, NULL);
 		if (timeval_after(&now, &next_rescan)) {
 			mice = razer_rescan_mice();
-printf("Rescan\n");
 			memcpy(&next_rescan, &now, sizeof(now));
 			timeval_add_msec(&next_rescan, RESCAN_INTERVAL_MSEC);
 		}
@@ -522,8 +514,6 @@ printf("Rescan\n");
 		check_control_socket();
 		check_client_connections();
 	}
-term:
-	return;
 }
 
 int main(int argc, char **argv)
