@@ -23,6 +23,7 @@ extern "C" {
 
 
 #define RAZER_IDSTR_MAX_SIZE	128
+#define RAZER_LEDNAME_MAX_SIZE	64
 
 struct razer_mouse;
 struct razer_mouse_base_ops;

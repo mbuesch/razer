@@ -1,7 +1,12 @@
 # UDEV rules for razer mice
+#
+# We just send a rescan command to razerd.
+# It will pick up new mice and forward information to the applications.
 
-# Configure the Razer DeathAdder mouse
-ACTION=="add", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="0007", RUN+="/usr/local/bin/razercfg -S1 -c."
+# DeathAdder mouse
+ACTION=="add", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="0007", RUN+="/usr/local/bin/razercfg --scan"
+ACTION=="remove", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="0007", RUN+="/usr/local/bin/razercfg --scan"
 
-# Configure the Razer Krait mouse
-ACTION=="add", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="0003", RUN+="/usr/local/bin/razercfg -S1 -c."
+# Krait mouse
+ACTION=="add", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="0003", RUN+="/usr/local/bin/razercfg --scan"
+ACTION=="remove", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="0003", RUN+="/usr/local/bin/razercfg --scan"

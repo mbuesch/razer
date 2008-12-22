@@ -45,10 +45,13 @@
 
 enum {
 	COMMAND_ID_GETREV = 0,		/* Get the revision number of the socket interface. */
+	COMMAND_ID_RESCANMICE,		/* Rescan mice. */
 	COMMAND_ID_GETMICE,		/* Get a list of detected mice. */
 	COMMAND_ID_GETFWVER,		/* Get the firmware rev of a mouse. */
 	COMMAND_ID_SUPPFREQS,		/* Get a list of supported frequencies. */
 	COMMAND_ID_SUPPRESOL,		/* Get a list of supported resolutions. */
+	COMMAND_ID_GETLEDS,		/* Get a list of LEDs on the device. */
+	COMMAND_ID_SETLED,		/* Set the state of a LED. */
 };
 
 struct command_hdr {
@@ -65,6 +68,12 @@ struct command {
 		} __attribute__((packed)) suppfreqs;
 		struct {
 		} __attribute__((packed)) suppresol;
+		struct {
+		} __attribute__((packed)) getleds;
+		struct {
+			char led_name[RAZER_LEDNAME_MAX_SIZE];
+			uint8_t new_state;
+		} __attribute__((packed)) setled;
 	} __attribute__((packed));
 } __attribute__((packed));
 
@@ -436,6 +445,80 @@ error:
 	send_u32(client, count);
 }
 
+static void command_rescanmice(struct client *client, const struct command *cmd, unsigned int len)
+{
+	mice = razer_rescan_mice();
+}
+
+static void command_getleds(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	struct razer_led *leds_list, *led;
+	int count;
+
+	if (len < CMD_SIZE(getleds))
+		goto error;
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse)
+		goto error;
+	count = mouse->get_leds(mouse, &leds_list);
+	if (count <= 0)
+		goto error;
+
+	send_u32(client, count);
+	for (led = leds_list; led; led = led->next)
+		send_string(client, led->name);
+	razer_free_leds(leds_list);
+
+	return;
+error:
+	count = 0;
+	send_u32(client, count);
+}
+
+static struct razer_led * razer_mouse_find_led(struct razer_led *leds_list,
+					       const char *led_name)
+{
+	struct razer_led *led;
+
+	for (led = leds_list; led; led = led->next) {
+		if (strncmp(led->name, led_name, RAZER_LEDNAME_MAX_SIZE) == 0)
+			return led;
+	}
+
+	return NULL;
+}
+
+static void command_setled(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	struct razer_led *leds_list, *led;
+	int err, count;
+
+//TODO error codes
+	if (len < CMD_SIZE(setled))
+		goto error;
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse)
+		goto error;
+	count = mouse->get_leds(mouse, &leds_list);
+	if (count <= 0)
+		goto error;
+	led = razer_mouse_find_led(leds_list, cmd->setled.led_name);
+	if (!led)
+		goto error;
+	err = mouse->claim(mouse);
+	if (err)
+		goto error;
+	err = led->toggle_state(led, cmd->setled.new_state ? RAZER_LED_ON : RAZER_LED_OFF);
+	mouse->release(mouse);
+	if (err)
+		goto error;
+
+error:
+	return;
+}
+
 static void handle_received_command(struct client *client, const char *_cmd, unsigned int len)
 {
 	const struct command *cmd = (const struct command *)_cmd;
@@ -445,6 +528,9 @@ static void handle_received_command(struct client *client, const char *_cmd, uns
 	switch (cmd->hdr.id) {
 	case COMMAND_ID_GETREV:
 		send_u32(client, INTERFACE_REVISION);
+		break;
+	case COMMAND_ID_RESCANMICE:
+		command_rescanmice(client, cmd, len);
 		break;
 	case COMMAND_ID_GETMICE:
 		command_getmice(client, cmd, len);
@@ -457,6 +543,12 @@ static void handle_received_command(struct client *client, const char *_cmd, uns
 		break;
 	case COMMAND_ID_SUPPRESOL:
 		command_suppresol(client, cmd, len);
+		break;
+	case COMMAND_ID_GETLEDS:
+		command_getleds(client, cmd, len);
+		break;
+	case COMMAND_ID_SETLED:
+		command_setled(client, cmd, len);
 		break;
 	default:
 		/* Unknown command. */
@@ -500,16 +592,19 @@ static void mainloop(void)
 		FD_SET(ctlsock, &wait_fdset);
 		for (client = clients; client; client = client->next)
 			FD_SET(client->fd, &wait_fdset);
-		select_timeout.tv_sec = (RESCAN_INTERVAL_MSEC + 100) / 1000;
-		select_timeout.tv_usec = ((RESCAN_INTERVAL_MSEC + 100) % 1000) * 1000;
-		select(FD_SETSIZE, &wait_fdset, NULL, NULL, &select_timeout);
+//		select_timeout.tv_sec = (RESCAN_INTERVAL_MSEC + 100) / 1000;
+//		select_timeout.tv_usec = ((RESCAN_INTERVAL_MSEC + 100) % 1000) * 1000;
+//		select(FD_SETSIZE, &wait_fdset, NULL, NULL, &select_timeout);
+		select(FD_SETSIZE, &wait_fdset, NULL, NULL, NULL);
 
+/*
 		gettimeofday(&now, NULL);
 		if (timeval_after(&now, &next_rescan)) {
 			mice = razer_rescan_mice();
 			memcpy(&next_rescan, &now, sizeof(now));
 			timeval_add_msec(&next_rescan, RESCAN_INTERVAL_MSEC);
 		}
+*/
 
 		check_control_socket();
 		check_client_connections();

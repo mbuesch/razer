@@ -32,12 +32,16 @@ class Razer:
 	COMMAND_MAX_SIZE = 512
 	COMMAND_HDR_SIZE = 1
 	RAZER_IDSTR_MAX_SIZE = 128
+	RAZER_LEDNAME_MAX_SIZE = 64
 
 	COMMAND_ID_GETREV = 0		# Get the revision number of the socket interface.
-	COMMAND_ID_GETMICE = 1		# Get a list of detected mice.
-	COMMAND_ID_GETFWVER = 2		# Get the firmware rev of a mouse.
-	COMMAND_ID_SUPPFREQS = 3	# Get a list of supported frequencies.
-	COMMAND_ID_SUPPRESOL = 4	# Get a list of supported resolutions.
+	COMMAND_ID_RESCANMICE = 1	# Rescan mice
+	COMMAND_ID_GETMICE = 2		# Get a list of detected mice.
+	COMMAND_ID_GETFWVER = 3		# Get the firmware rev of a mouse.
+	COMMAND_ID_SUPPFREQS = 4	# Get a list of supported frequencies.
+	COMMAND_ID_SUPPRESOL = 5	# Get a list of supported resolutions.
+	COMMAND_ID_GETLEDS = 6		# Get a list of LEDs on the device.
+	COMMAND_ID_SETLED = 7		# Set the state of a LED.
 
 	def __init__(self):
 		self.__connect()
@@ -80,6 +84,10 @@ class Razer:
 			string += char
 		return string
 
+	def rescanMice(self):
+		"Send the command to rescan for mice to the daemon."
+		self.__sendCommand(self.COMMAND_ID_RESCANMICE)
+
 	def getMice(self):
 		"Returns a list of ID-strings for the detected mice."
 		self.__sendCommand(self.COMMAND_ID_GETMICE)
@@ -113,3 +121,23 @@ class Razer:
 			res.append(self.__recvU32())
 		return res
 
+	def getLeds(self, idstr):
+		"Returns a list of LEDs on the mouse."
+		self.__sendCommand(self.COMMAND_ID_GETLEDS, idstr)
+		count = self.__recvU32()
+		leds = []
+		for i in range(0, count):
+			leds.append(self.__recvString())
+		return leds
+
+	def setLed(self, idstr, ledName, newState):
+		"Set a LED to a new state."
+		if len(ledName) > self.RAZER_LEDNAME_MAX_SIZE:
+			raise RazerEx("LED name string too long")
+		payload = ledName
+		payload += '\0' * (self.RAZER_LEDNAME_MAX_SIZE - len(ledName))
+		if newState:
+			payload += "%c" % 1
+		else:
+			payload += "%c" % 0
+		self.__sendCommand(self.COMMAND_ID_SETLED, idstr, payload)

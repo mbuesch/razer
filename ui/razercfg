@@ -2,7 +2,7 @@
 #
 #   Razer device commandline configuration tool
 #
-#   Copyright (C) 2007 Michael Buesch <mb@bu3sch.de>
+#   Copyright (C) 2007-2008 Michael Buesch <mb@bu3sch.de>
 #
 #   This program is free software; you can redistribute it and/or
 #   modify it under the terms of the GNU General Public License
@@ -45,6 +45,36 @@ class OpGetRes:
 			sys.stdout.write("%d DPI, " % res)
 		print ""
 
+class OpPrintLeds:
+	def run(self, idstr):
+		leds = razer.getLeds(idstr)
+		print "LEDs on mouse %s:" % idstr
+		for led in leds:
+			sys.stdout.write("%s, " % led)
+		print ""
+
+class OpSetLed:
+	def __init__(self, cfgStr):
+		self.cfgStr = cfgStr
+
+	def run(self, idstr):
+		cfgStr = self.cfgStr.split(":")
+		try:
+			newState = cfgStr[-1].lower()
+			ledName = ":".join(cfgStr[:-1])
+			if not ledName:
+				raise ValueError()
+			if newState in ["0", "off", "false"]:
+				newState = False
+			elif newState in ["1", "on", "true"]:
+				newState = True
+			else:
+				raise ValueError()
+		except (IndexError, ValueError):
+			print "Invalid parameter to --setled option"
+			exit(1)
+		razer.setLed(idstr, ledName, newState)
+
 # Operations on a device
 class DevOps:
 	def __init__(self, idstr):
@@ -62,6 +92,7 @@ class DevOps:
 			print "Razer device access exception:", e
 
 def scanDevices():
+	razer.rescanMice()
 	mice = razer.getMice()
 	for mouse in mice:
 		print mouse
