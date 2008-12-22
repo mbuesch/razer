@@ -141,3 +141,4 @@ class Razer:
 		else:
 			payload += "%c" % 0
 		self.__sendCommand(self.COMMAND_ID_SETLED, idstr, payload)
+		return self.__recvU32()

@@ -54,6 +54,16 @@ enum {
 	COMMAND_ID_SETLED,		/* Set the state of a LED. */
 };
 
+enum {
+	ERR_NONE = 0,		/* No error */
+	ERR_CMDSIZE,
+	ERR_NOMEM,
+	ERR_NOMOUSE,
+	ERR_NOLED,
+	ERR_CLAIM,
+	ERR_FAIL,
+};
+
 struct command_hdr {
 	uint8_t id;
 } __attribute__((packed));
@@ -494,29 +504,41 @@ static void command_setled(struct client *client, const struct command *cmd, uns
 	struct razer_mouse *mouse;
 	struct razer_led *leds_list, *led;
 	int err, count;
+	uint32_t errorcode = ERR_NONE;
 
-//TODO error codes
-	if (len < CMD_SIZE(setled))
+	if (len < CMD_SIZE(setled)) {
+		errorcode = ERR_CMDSIZE;
 		goto error;
+	}
 	mouse = razer_mouse_list_find(mice, cmd->idstr);
-	if (!mouse)
+	if (!mouse) {
+		errorcode = ERR_NOMOUSE;
 		goto error;
+	}
 	count = mouse->get_leds(mouse, &leds_list);
-	if (count <= 0)
+	if (count <= 0) {
+		errorcode = ERR_NOMEM;
 		goto error;
+	}
 	led = razer_mouse_find_led(leds_list, cmd->setled.led_name);
-	if (!led)
+	if (!led) {
+		errorcode = ERR_NOLED;
 		goto error;
+	}
 	err = mouse->claim(mouse);
-	if (err)
+	if (err) {
+		errorcode = ERR_CLAIM;
 		goto error;
+	}
 	err = led->toggle_state(led, cmd->setled.new_state ? RAZER_LED_ON : RAZER_LED_OFF);
 	mouse->release(mouse);
-	if (err)
+	if (err) {
+		errorcode = ERR_FAIL;
 		goto error;
+	}
 
 error:
-	return;
+	send_u32(client, errorcode);
 }
 
 static void handle_received_command(struct client *client, const char *_cmd, unsigned int len)

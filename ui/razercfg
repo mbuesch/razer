@@ -73,7 +73,9 @@ class OpSetLed:
 		except (IndexError, ValueError):
 			print "Invalid parameter to --setled option"
 			exit(1)
-		razer.setLed(idstr, ledName, newState)
+		error = razer.setLed(idstr, ledName, newState)
+		if error:
+			print "Failed to set LED state. Error code is %d" % error
 
 # Operations on a device
 class DevOps:
