@@ -251,32 +251,6 @@ static void setup_sighandler(void)
 	sigaction(SIGTERM, &act, NULL);
 }
 
-static void timeval_add_msec(struct timeval *tv, unsigned int msec)
-{
-	unsigned int seconds, usec;
-
-	seconds = msec / 1000;
-	msec = msec % 1000;
-	usec = msec * 1000;
-
-	tv->tv_usec += usec;
-	while (tv->tv_usec >= 1000000) {
-		tv->tv_sec++;
-		tv->tv_usec -= 1000000;
-	}
-	tv->tv_sec += seconds;
-}
-
-/* Returns true, if a is after b. */
-static bool timeval_after(const struct timeval *a, const struct timeval *b)
-{
-	if (a->tv_sec > b->tv_sec)
-		return 1;
-	if ((a->tv_sec == b->tv_sec) && (a->tv_usec > b->tv_usec))
-		return 1;
-	return 0;
-}
-
 static void free_client(struct client *client)
 {
 	free(client);
@@ -682,32 +656,16 @@ static void check_client_connections(void)
 
 static void mainloop(void)
 {
-	struct timeval now, next_rescan, select_timeout;
 	struct client *client;
 
 	mice = razer_rescan_mice();
-	gettimeofday(&now, NULL);
-	memcpy(&next_rescan, &now, sizeof(now));
-	timeval_add_msec(&next_rescan, RESCAN_INTERVAL_MSEC);
 
 	while (1) {
 		FD_ZERO(&wait_fdset);
 		FD_SET(ctlsock, &wait_fdset);
 		for (client = clients; client; client = client->next)
 			FD_SET(client->fd, &wait_fdset);
-//		select_timeout.tv_sec = (RESCAN_INTERVAL_MSEC + 100) / 1000;
-//		select_timeout.tv_usec = ((RESCAN_INTERVAL_MSEC + 100) % 1000) * 1000;
-//		select(FD_SETSIZE, &wait_fdset, NULL, NULL, &select_timeout);
 		select(FD_SETSIZE, &wait_fdset, NULL, NULL, NULL);
-
-/*
-		gettimeofday(&now, NULL);
-		if (timeval_after(&now, &next_rescan)) {
-			mice = razer_rescan_mice();
-			memcpy(&next_rescan, &now, sizeof(now));
-			timeval_add_msec(&next_rescan, RESCAN_INTERVAL_MSEC);
-		}
-*/
 
 		check_control_socket();
 		check_client_connections();
