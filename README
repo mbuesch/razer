@@ -1,11 +1,13 @@
-*************************************
-*  Razer device configuration tool  *
-* Copyright (c) 2007 Michael Buesch *
-*************************************
+******************************************
+*  Razer device configuration tool       *
+* Copyright (c) 2007-2008 Michael Buesch *
+******************************************
 
 This is a configuration utility for Razer devices on Linux systems.
 
-*** DEPENDENCIES ***
+
+DEPENDENCIES
+============
 
  * python
    http://www.python.org/
@@ -22,7 +24,9 @@ This is a configuration utility for Razer devices on Linux systems.
 Note that almost all distributions ship prebuilt packages of the
 above dependencies.
 
-*** BUILDING ***
+
+BUILDING
+========
 
 First invoke "cmake" to build the makefiles.
 Then invoke "make" to build the binaries.
@@ -32,21 +36,67 @@ Then invoke "make" to build the binaries.
 
 (Note the required space and dot after the cmake command)
 
-*** INSTALLING ***
+
+INSTALLING
+==========
 
   make install
 
-*** UDEV / AUTOMATIC CONFIGURATION ***
+
+UDEV NOTIFICATION
+=================
 
 The file "01-razer-udev.rules" in this package contains example rules
-on how to handle automatic configuration through udev.
-On Ubuntu Linux you need to
+on how to handle automatic device connect notification through udev.
+On Debian/Ubuntu Linux you need to
    cp 01-razer-udev.rules /etc/udev/rules.d/01-razer.rules
 to install the rules. Note that you might have to adjust the RUN path in
 the .rules file, if you didn't install the stuff to /usr/local.
 
-*** DISTRIBUTIONS ***
 
-Distributions should install a proper udev autoconfig rule file
-from their rpm or deb (or whatever) install scripts.
-See 01-razer-udev.rules for example rules.
+ARCHITECTURE
+============
+
+The architecture layout of the razer tools looks like this:
+
+
+ -------------------
+| hardware driver 0 |--v
+ -------------------   |
+                       |    ----------
+ -------------------   |   | lowlevel |     --------      ---------
+| hardware driver 1 |--x---| librazer |----| razerd |----| pyrazer |
+ -------------------   |    ----------      --------      ---------
+                       |                      ^ ^ ^         ^ ^ ^
+ -------------------   |                      | | |         | | |
+| hardware driver n |--^                      | | |         | | |
+ -------------------                          | | |         | | |
+                                              | | |         | | |
+                           ---------------    | | |         | | |
+                          | Application 0 |---^ | |         | | |
+                           ---------------      | |         | | |
+                                                | |         | | |
+                           ---------------      | |         | | |
+                          | Application 1 |-----^ |         | | |
+                           ---------------        |         | | |
+                                                  |         | | |
+                           ---------------        |         | | |
+                          | Application n |-------^         | | |
+                           ---------------                  | | |
+                                                            | | |
+                           ----------                       | | |
+                          | razercfg |----------------------^ | |
+                           ----------                         | |
+                                                              | |
+                           -----------                        | |
+                          | qrazercfg |-----------------------^ |
+                           -----------                          |
+                                                                |
+                            --------------------------          |
+                          | Other Python applications |---------^
+                           ---------------------------
+
+So in general, your application wants to access the razer device through
+pyrazer or (if it's not a python app) through the razerd socket directly.
+Applications should never poke with librazer directly, because there will
+be no instance that keeps track of the device state (razerd).

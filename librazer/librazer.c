@@ -1,7 +1,7 @@
 /*
  *   Razer device access library
  *
- *   Copyright (C) 2007 Michael Buesch <mb@bu3sch.de>
+ *   Copyright (C) 2007-2008 Michael Buesch <mb@bu3sch.de>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License

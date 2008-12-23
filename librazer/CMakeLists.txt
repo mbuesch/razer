@@ -14,6 +14,4 @@ add_definitions("-D_GNU_SOURCE")
 
 target_link_libraries(razer usb)
 
-install(FILES librazer.h DESTINATION include)
 install(TARGETS razer DESTINATION lib)
-
