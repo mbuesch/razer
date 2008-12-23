@@ -6,7 +6,7 @@
  *   This hardware driver is based on reverse engineering and
  *   hardware documentation provided under NDA.
  *
- *   Copyright (C) 2007 Michael Buesch <mb@bu3sch.de>
+ *   Copyright (C) 2007-2008 Michael Buesch <mb@bu3sch.de>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -107,11 +107,11 @@ static int deathadder_read_fw_ver(struct deathadder_private *priv)
 static int deathadder_commit(struct deathadder_private *priv)
 {
 	struct razer_usb_reconnect_guard guard;
-	char freq_value, res_value;
-	char value;
 	int i, err;
 
-	if (priv->fw_version <= DADD_FW(1,10)) {
+	if (priv->fw_version < DADD_FW(1,25)) {
+		char value, freq_value, res_value;
+
 		err = razer_usb_reconnect_guard_init(&guard, &priv->usb);
 		if (err)
 			return err;
@@ -191,7 +191,55 @@ static int deathadder_commit(struct deathadder_private *priv)
 		if (err)
 			return err;
 	} else {
+		char config[4] = { 0, };
+
+		/* Translate frequency setting. */
+		switch (priv->frequency) {
+		case RAZER_MOUSE_FREQ_125HZ:
+			config[0] = 3;
+			break;
+		case RAZER_MOUSE_FREQ_500HZ:
+			config[0] = 2;
+			break;
+		case RAZER_MOUSE_FREQ_1000HZ:
+		case RAZER_MOUSE_FREQ_UNKNOWN:
+			config[0] = 1;
+			break;
+		default:
+			return -EINVAL;
+		}
+
+		/* Translate resolution setting. */
+		switch (priv->resolution) {
+		case RAZER_MOUSE_RES_450DPI:
+			config[1] = 3;
+			break;
+		case RAZER_MOUSE_RES_900DPI:
+			config[1] = 2;
+			break;
+		case RAZER_MOUSE_RES_1800DPI:
+		case RAZER_MOUSE_RES_UNKNOWN:
+			config[1] = 1;
+			break;
+		default:
+			return -EINVAL;
+		}
+
+		/* Translate the profile ID. */
 		//TODO
+		config[2] = 1;
+
+		/* Translate the LED states. */
+		if (priv->led_states[DEATHADDER_LED_LOGO])
+			config[3] |= 0x02;
+		if (priv->led_states[DEATHADDER_LED_SCROLL])
+			config[3] |= 0x01;
+
+		/* Commit the settings. */
+		err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+					   0x10, config, sizeof(config));
+		if (err)
+			return err;
 	}
 
 	return 0;
