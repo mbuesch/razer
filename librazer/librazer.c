@@ -426,7 +426,7 @@ static bool timeval_after(const struct timeval *a, const struct timeval *b)
 	return 0;
 }
 
-static void razer_msleep(unsigned int msecs)
+void razer_msleep(unsigned int msecs)
 {
 	int err;
 	struct timespec time;

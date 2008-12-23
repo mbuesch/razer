@@ -30,4 +30,6 @@ int razer_usb_reconnect_guard_init(struct razer_usb_reconnect_guard *guard,
 				   struct razer_usb_context *ctx);
 int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard);
 
+void razer_msleep(unsigned int msecs);
+
 #endif /* RAZER_PRIVATE_H_ */

@@ -87,12 +87,29 @@ static int deathadder_usb_read(struct deathadder_private *priv,
 	return 0;
 }
 
+static int deathadder_read_fw_ver(struct deathadder_private *priv)
+{
+	char buf[2];
+	uint16_t ver;
+	int err;
+
+	err = deathadder_usb_read(priv, USB_REQ_CLEAR_FEATURE,
+				  0x05, buf, sizeof(buf));
+	if (err)
+		return err;
+	ver = buf[0];
+	ver <<= 8;
+	ver |= buf[1];
+
+	return ver;
+}
+
 static int deathadder_commit(struct deathadder_private *priv)
 {
 	struct razer_usb_reconnect_guard guard;
 	char freq_value, res_value;
 	char value;
-	int err;
+	int i, err;
 
 	if (priv->fw_version <= DADD_FW(1,10)) {
 		err = razer_usb_reconnect_guard_init(&guard, &priv->usb);
@@ -145,6 +162,17 @@ static int deathadder_commit(struct deathadder_private *priv)
 			err = razer_usb_reconnect_guard_wait(&guard);
 			if (err)
 				return err;
+			/* The device needs a bit of punching in the face after reconnect. */
+			for (i = 0; i < 5; i++) {
+				int ver = deathadder_read_fw_ver(priv);
+				if ((ver > 0) && ((ver & 0xFFFF) == priv->fw_version))
+					break;
+				razer_msleep(100);
+			}
+			if (i >= 5) {
+				fprintf(stderr, "razer-deathadder: The device didn't wake up "
+					"after a frequency change. Try to replug it.\n");
+			}
 		}
 
 		/* Commit LED states. */
@@ -167,23 +195,6 @@ static int deathadder_commit(struct deathadder_private *priv)
 	}
 
 	return 0;
-}
-
-static int deathadder_read_fw_ver(struct deathadder_private *priv)
-{
-	char buf[2];
-	uint16_t ver;
-	int err;
-
-	err = deathadder_usb_read(priv, USB_REQ_CLEAR_FEATURE,
-				  0x05, buf, sizeof(buf));
-	if (err)
-		return err;
-	ver = buf[0];
-	ver <<= 8;
-	ver |= buf[1];
-
-	return ver;
 }
 
 static int deathadder_claim(struct razer_mouse *m)
