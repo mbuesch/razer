@@ -29,9 +29,17 @@
 #include <usb.h>
 
 
+enum {
+	LACHESIS_LED_SCROLL = 0,
+	LACHESIS_LED_LOGO,
+	LACHESIS_NR_LEDS,
+};
+
 struct lachesis_private {
 	bool claimed;
 	struct razer_usb_context usb;
+	/* The currently set LED states. */
+	enum razer_led_state led_states[LACHESIS_NR_LEDS];
 	/* The currently set resolution. */
 	enum razer_mouse_res resolution;
 };
@@ -42,17 +50,13 @@ static int lachesis_usb_write(struct lachesis_private *priv,
 			      int request, int command,
 			      char *buf, size_t size)
 {
-	int i, err;
+	int err;
 
-	/* Send a command a few times. Otherwise it might get lost somehow.
-	 * FIXME: Check why. */
-	for (i = 0; i < 5; i++) {
-		err = usb_control_msg(priv->usb.h,
-				      USB_ENDPOINT_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-				      request, command, 0,
-				      buf, size,
-				      LACHESIS_USB_TIMEOUT);
-	}
+	err = usb_control_msg(priv->usb.h,
+			      USB_ENDPOINT_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+			      request, command, 0,
+			      buf, size,
+			      LACHESIS_USB_TIMEOUT);
 	if (err != size)
 		return err;
 	return 0;
@@ -75,6 +79,26 @@ static int lachesis_usb_read(struct lachesis_private *priv,
 	return 0;
 }
 #endif
+
+static int lachesis_commit(struct lachesis_private *priv)
+{
+	int err;
+	char value;
+
+	/* Commit LED states. */
+	value = 0;
+	if (priv->led_states[LACHESIS_LED_LOGO])
+		value |= 0x01;
+	if (priv->led_states[LACHESIS_LED_SCROLL])
+		value |= 0x02;
+	err = lachesis_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+				 0x04, &value, sizeof(value));
+	if (err)
+		return err;
+	//TODO
+
+	return 0;
+}
 
 static int lachesis_claim(struct razer_mouse *m)
 {
@@ -105,10 +129,68 @@ static int lachesis_get_fw_version(struct razer_mouse *m)
 	return -EOPNOTSUPP;
 }
 
+static int lachesis_led_toggle(struct razer_led *led,
+			       enum razer_led_state new_state)
+{
+	struct razer_mouse *m = led->u.mouse;
+	struct lachesis_private *priv = m->internal;
+	int err;
+	enum razer_led_state old_state;
+
+	if (led->id >= LACHESIS_NR_LEDS)
+		return -EINVAL;
+	if ((new_state != RAZER_LED_OFF) &&
+	    (new_state != RAZER_LED_ON))
+		return -EINVAL;
+
+	if (!priv->claimed)
+		return -EBUSY;
+
+	old_state = priv->led_states[led->id];
+	priv->led_states[led->id] = new_state;
+
+	err = lachesis_commit(priv);
+	if (err) {
+		priv->led_states[led->id] = old_state;
+		return err;
+	}
+
+	return err;
+}
+
 static int lachesis_get_leds(struct razer_mouse *m,
 			     struct razer_led **leds_list)
 {
-	return 0; //TODO
+	struct lachesis_private *priv = m->internal;
+	struct razer_led *scroll, *logo;
+
+	scroll = malloc(sizeof(struct razer_led));
+	if (!scroll)
+		return -ENOMEM;
+	logo = malloc(sizeof(struct razer_led));
+	if (!logo) {
+		free(scroll);
+		return -ENOMEM;
+	}
+
+	scroll->name = "Scrollwheel";
+	scroll->id = LACHESIS_LED_SCROLL;
+	scroll->state = priv->led_states[LACHESIS_LED_SCROLL];
+	scroll->toggle_state = lachesis_led_toggle;
+	scroll->u.mouse = m;
+
+	logo->name = "GlowingLogo";
+	logo->id = LACHESIS_LED_LOGO;
+	logo->state = priv->led_states[LACHESIS_LED_LOGO];
+	logo->toggle_state = lachesis_led_toggle;
+	logo->u.mouse = m;
+
+	/* Link the list */
+	*leds_list = scroll;
+	scroll->next = logo;
+	logo->next = NULL;
+
+	return LACHESIS_NR_LEDS;
 }
 
 static int lachesis_supported_freqs(struct razer_mouse *m,
@@ -214,6 +296,7 @@ int razer_lachesis_init_struct(struct razer_mouse *m,
 				 struct usb_device *usbdev)
 {
 	struct lachesis_private *priv;
+	unsigned int i;
 
 	priv = malloc(sizeof(struct lachesis_private));
 	if (!priv)
@@ -222,6 +305,8 @@ int razer_lachesis_init_struct(struct razer_mouse *m,
 
 	priv->usb.dev = usbdev;
 	priv->resolution = RAZER_MOUSE_RES_UNKNOWN;
+	for (i = 0; i < LACHESIS_NR_LEDS; i++)
+		priv->led_states[i] = RAZER_LED_UNKNOWN;
 
 	m->internal = priv;
 	m->type = RAZER_MOUSETYPE_LACHESIS;

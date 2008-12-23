@@ -176,6 +176,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 		}
 
 		/* Commit LED states. */
+		value = 0;
 		if (priv->led_states[DEATHADDER_LED_LOGO])
 			value |= 0x01;
 		if (priv->led_states[DEATHADDER_LED_SCROLL])
@@ -328,13 +329,13 @@ static int deathadder_get_leds(struct razer_mouse *m,
 
 	scroll->name = "Scrollwheel";
 	scroll->id = DEATHADDER_LED_SCROLL;
-	scroll->state = RAZER_LED_UNKNOWN;
+	scroll->state = RAZER_LED_UNKNOWN;//FIXME
 	scroll->toggle_state = deathadder_led_toggle;
 	scroll->u.mouse = m;
 
 	logo->name = "GlowingLogo";
 	logo->id = DEATHADDER_LED_LOGO;
-	logo->state = RAZER_LED_UNKNOWN;
+	logo->state = RAZER_LED_UNKNOWN;//FIXME
 	logo->toggle_state = deathadder_led_toggle;
 	logo->u.mouse = m;
 
