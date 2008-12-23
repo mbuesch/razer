@@ -26,7 +26,10 @@
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <time.h>
 #include <sys/ioctl.h>
+#include <sys/time.h>
 #include <usb.h>
 
 
@@ -315,6 +318,8 @@ static int reconnect_kdrv_hack(usb_dev_handle *_h, int interf)
 	cmd.data = NULL;
 
 	err = ioctl(h->fd, IOCTL_USB_IOCTL, &cmd);
+	if (err > 0)
+		err = 0;
 
 	return err;
 }
@@ -395,6 +400,58 @@ void razer_generic_usb_release(struct razer_usb_context *ctx)
 	usb_close(ctx->h);
 }
 
+static void timeval_add_msec(struct timeval *tv, unsigned int msec)
+{
+	unsigned int seconds, usec;
+
+	seconds = msec / 1000;
+	msec = msec % 1000;
+	usec = msec * 1000;
+
+	tv->tv_usec += usec;
+	while (tv->tv_usec >= 1000000) {
+		tv->tv_sec++;
+		tv->tv_usec -= 1000000;
+	}
+	tv->tv_sec += seconds;
+}
+
+/* Returns true, if a is after b. */
+static bool timeval_after(const struct timeval *a, const struct timeval *b)
+{
+	if (a->tv_sec > b->tv_sec)
+		return 1;
+	if ((a->tv_sec == b->tv_sec) && (a->tv_usec > b->tv_usec))
+		return 1;
+	return 0;
+}
+
+static void razer_msleep(unsigned int msecs)
+{
+	int err;
+	struct timespec time;
+
+	time.tv_sec = 0;
+	while (msecs >= 1000) {
+		time.tv_sec++;
+		msecs -= 1000;
+	}
+	time.tv_nsec = msecs;
+	time.tv_nsec *= 1000000;
+	do {
+		err = nanosleep(&time, &time);
+	} while (err && errno == EINTR);
+	if (err) {
+		fprintf(stderr, "nanosleep() failed with: %s\n",
+			strerror(errno));
+	}
+}
+
+/** razer_usb_reconnect_guard_init - Init the reconnect-guard context
+ *
+ * Call this _before_ triggering any device operations that might
+ * reset the device.
+ */
 int razer_usb_reconnect_guard_init(struct razer_usb_reconnect_guard *guard,
 				   struct razer_usb_context *ctx)
 {
@@ -433,49 +490,79 @@ static struct usb_device * guard_find_usb_dev(const struct usb_device_descriptor
 	return NULL;
 }
 
+/** razer_usb_reconnect_guard_wait - Protect against a firmware reconnect.
+ *
+ * If the firmware does a reconnect of the device on the USB bus, this
+ * function tries to keep track of the device and it will update the
+ * usb context information.
+ * Of course, this is not completely race-free, but we try to do our best.
+ */
 int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard)
 {
 	char reconn_filename[PATH_MAX + 1];
 	unsigned int old_filename_nr;
-	int err, res;
+	int res, errorcode = 0;
 	struct usb_device *dev;
+	struct timeval now, timeout;
 
-printf("Waiting for device to vanish\n");
+	/* Release the device, so the kernel can detect the bus reconnect. */
+	razer_generic_usb_release(guard->ctx);
+
 	/* Wait for the device to disconnect. */
+	gettimeofday(&now, NULL);
+	memcpy(&timeout, &now, sizeof(timeout));
+	timeval_add_msec(&timeout, 800);
 	while (guard_find_usb_dev(&guard->old_desc,
 				  guard->old_dirname,
 				  guard->old_filename)) {
-		//TODO sleep, timeout
+		gettimeofday(&now, NULL);
+		if (timeval_after(&now, &timeout)) {
+			/* Timeout. Hm. It seems the device won't reconnect.
+			 * That's OK. We can reclaim the device now. */
+			goto reclaim;
+		}
+		razer_msleep(1);
 	}
 
 	/* Construct the filename the device will reconnect on. */
 	res = sscanf(guard->old_filename, "%03u", &old_filename_nr);
 	if (res != 1) {
 		fprintf(stderr, "razer_usb_reconnect_guard: Could not parse filename.\n");
-		return -EINVAL;
+		errorcode = -EINVAL;
+		goto reclaim;
 	}
 	snprintf(reconn_filename, sizeof(reconn_filename), "%03u",
 		 old_filename_nr + 1);
 
-printf("Waiting for reconnect\n");
 	/* Wait for the device to reconnect. */
+	gettimeofday(&now, NULL);
+	memcpy(&timeout, &now, sizeof(timeout));
+	timeval_add_msec(&timeout, 1000);
 	while (1) {
 		dev = guard_find_usb_dev(&guard->old_desc,
 					 guard->old_dirname,
 					 reconn_filename);
 		if (dev)
 			break;
-		//TODO sleep, timeout
+		gettimeofday(&now, NULL);
+		if (timeval_after(&now, &timeout)) {
+			fprintf(stderr, "razer_usb_reconnect_guard: The device did not "
+				"reconnect! It might not work anymore. Try to replug it.\n");
+			errorcode = -EBUSY;
+			goto out;
+		}
+		razer_msleep(1);
 	}
-
-printf("Reclaim device\n");
-	/* Reclaim the new device. */
+	/* Update the USB context. */
 	guard->ctx->dev = dev;
-	err = razer_generic_usb_claim(guard->ctx);
-	if (err) {
-		fprintf(stderr, "razer_usb_reconnect_guard: Reclaim failed.\n");
-		return err;
-	}
 
-	return 0;
+reclaim:
+	/* Reclaim the new device. */
+	res = razer_generic_usb_claim(guard->ctx);
+	if (res) {
+		fprintf(stderr, "razer_usb_reconnect_guard: Reclaim failed.\n");
+		return res;
+	}
+out:
+	return errorcode;
 }

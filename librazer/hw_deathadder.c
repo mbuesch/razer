@@ -46,6 +46,8 @@ struct deathadder_private {
 	bool led_states[DEATHADDER_NR_LEDS];
 	/* The currently set frequency. */
 	enum razer_mouse_freq frequency;
+	/* Previous freq. For predicting reconnect events only. */
+	enum razer_mouse_freq old_frequency;
 	/* The currently set resolution. */
 	enum razer_mouse_res resolution;
 };
@@ -57,17 +59,13 @@ static int deathadder_usb_write(struct deathadder_private *priv,
 				int request, int command,
 				char *buf, size_t size)
 {
-	int i, err;
+	int err;
 
-	/* Send a command a few times. Otherwise it might get lost somehow.
-	 * FIXME: Check why. */
-	for (i = 0; i < 5; i++) {
-		err = usb_control_msg(priv->usb.h,
-				      USB_ENDPOINT_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-				      request, command, 0,
-				      buf, size,
-				      DEATHADDER_USB_TIMEOUT);
-	}
+	err = usb_control_msg(priv->usb.h,
+			      USB_ENDPOINT_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+			      request, command, 0,
+			      buf, size,
+			      DEATHADDER_USB_TIMEOUT);
 	if (err != size)
 		return err;
 	return 0;
@@ -133,6 +131,22 @@ static int deathadder_commit(struct deathadder_private *priv)
 			return -EINVAL;
 		}
 
+		if (priv->old_frequency != priv->frequency) {
+			priv->old_frequency = priv->frequency;
+			/* Commit frequency setting. */
+			err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+						   0x07, &freq_value, sizeof(freq_value));
+			if (err)
+				return err;
+
+			/* The frequency setting changed. The device firmware
+			 * will reboot the mouse now. This will cause a reconnect
+			 * on the USB bus. Call the guard... */
+			err = razer_usb_reconnect_guard_wait(&guard);
+			if (err)
+				return err;
+		}
+
 		/* Commit LED states. */
 		if (priv->led_states[DEATHADDER_LED_LOGO])
 			value |= 0x01;
@@ -143,24 +157,11 @@ static int deathadder_commit(struct deathadder_private *priv)
 		if (err)
 			return err;
 
-		/* Commit frequency setting. */
-		err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
-					   0x07, &freq_value, sizeof(freq_value));
-		if (err)
-			return err;
-
 		/* Commit resolution setting. */
 		err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
 					   0x09, &res_value, sizeof(res_value));
 		if (err)
 			return err;
-
-		//FIXME won't always reconnect
-#if 0
-		err = razer_usb_reconnect_guard_wait(&guard);
-		if (err)
-			return err;
-#endif
 	} else {
 		//TODO
 	}
@@ -408,7 +409,8 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 	memset(priv, 0, sizeof(*priv));
 
 	priv->usb.dev = usbdev;
-	priv->frequency = RAZER_MOUSE_FREQ_UNKNOWN;
+	priv->frequency = RAZER_MOUSE_FREQ_1000HZ; /* random guess */
+	priv->old_frequency = priv->frequency;
 	priv->resolution = RAZER_MOUSE_RES_UNKNOWN;
 
 	m->internal = priv;
