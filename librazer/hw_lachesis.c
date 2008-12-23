@@ -197,14 +197,15 @@ static int lachesis_supported_freqs(struct razer_mouse *m,
 				    enum razer_mouse_freq **freq_list)
 {
 	enum razer_mouse_freq *list;
-	const int count = 1;
+	const int count = 3;
 
 	list = malloc(sizeof(*list) * count);
 	if (!list)
 		return -ENOMEM;
 
-//FIXME
-	list[0] = RAZER_MOUSE_FREQ_UNKNOWN;
+	list[0] = RAZER_MOUSE_FREQ_1000HZ;
+	list[1] = RAZER_MOUSE_FREQ_500HZ;
+	list[2] = RAZER_MOUSE_FREQ_125HZ;
 
 	*freq_list = list;
 
