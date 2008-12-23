@@ -109,12 +109,12 @@ static int deathadder_commit(struct deathadder_private *priv)
 	struct razer_usb_reconnect_guard guard;
 	int i, err;
 
+	err = razer_usb_reconnect_guard_init(&guard, &priv->usb);
+	if (err)
+		return err;
+
 	if (priv->fw_version < DADD_FW(1,25)) {
 		char value, freq_value, res_value;
-
-		err = razer_usb_reconnect_guard_init(&guard, &priv->usb);
-		if (err)
-			return err;
 
 		/* Translate frequency setting. */
 		switch (priv->frequency) {
@@ -236,11 +236,38 @@ static int deathadder_commit(struct deathadder_private *priv)
 		if (priv->led_states[DEATHADDER_LED_SCROLL])
 			config[3] |= 0x01;
 
+
 		/* Commit the settings. */
 		err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
 					   0x10, config, sizeof(config));
 		if (err)
 			return err;
+		//FIXME
+		/* The frequency setting changed. The device firmware
+		 * will reboot the mouse now. This will cause a reconnect
+		 * on the USB bus. Call the guard... */
+		err = razer_usb_reconnect_guard_wait(&guard);
+		if (err)
+			return err;
+		/* The device might have reconnected, so write the config
+		 * another time to ensure all settings are active.
+		 */
+		err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+					   0x10, config, sizeof(config));
+		if (err)
+			return err;
+		/* The device needs a bit of punching in the face.
+		 * Ensure it properly responds to read accesses. */
+		for (i = 0; i < 5; i++) {
+			int ver = deathadder_read_fw_ver(priv);
+			if ((ver > 0) && ((ver & 0xFFFF) == priv->fw_version))
+				break;
+			razer_msleep(100);
+		}
+		if (i >= 5) {
+			fprintf(stderr, "razer-deathadder: The device didn't wake up "
+				"after a config change. Try to replug it.\n");
+		}
 	}
 
 	return 0;
