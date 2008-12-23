@@ -66,8 +66,12 @@ static int deathadder_usb_write(struct deathadder_private *priv,
 			      request, command, 0,
 			      buf, size,
 			      DEATHADDER_USB_TIMEOUT);
-	if (err != size)
+	if (err != size) {
+		fprintf(stderr, "razer-deathadder: "
+			"USB write 0x%02X 0x%02X failed: %d\n",
+			request, command, err);
 		return err;
+	}
 	return 0;
 }
 
@@ -82,8 +86,12 @@ static int deathadder_usb_read(struct deathadder_private *priv,
 			      request, command, 0,
 			      buf, size,
 			      DEATHADDER_USB_TIMEOUT);
-	if (err != size)
+	if (err != size) {
+		fprintf(stderr, "razer-deathadder: "
+			"USB read 0x%02X 0x%02X failed: %d\n",
+			request, command, err);
 		return err;
+	}
 	return 0;
 }
 
