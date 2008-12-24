@@ -241,9 +241,9 @@ static int deathadder_commit(struct deathadder_private *priv)
 
 		/* Translate the LED states. */
 		if (priv->led_states[DEATHADDER_LED_LOGO])
-			config[3] |= 0x02;
-		if (priv->led_states[DEATHADDER_LED_SCROLL])
 			config[3] |= 0x01;
+		if (priv->led_states[DEATHADDER_LED_SCROLL])
+			config[3] |= 0x02;
 
 
 		/* Commit the settings. */
