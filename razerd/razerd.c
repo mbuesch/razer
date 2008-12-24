@@ -679,6 +679,20 @@ static void handle_received_command(struct client *client, const char *_cmd, uns
 	}
 }
 
+static void handle_received_privileged_command(struct client *client,
+					       const char *_cmd, unsigned int len)
+{
+	const struct command *cmd = (const struct command *)_cmd;
+
+	if (len < COMMAND_HDR_SIZE)
+		return;
+	switch (cmd->hdr.id) {
+	default:
+		/* Unknown command. */
+		break;
+	}
+}
+
 static void check_client_connections(void)
 {
 	char command[COMMAND_MAX_SIZE + 1] = { 0, };
@@ -715,7 +729,7 @@ static void check_privileged_connections(void)
 			disconnect_client(&privileged_clients, client);
 			goto next_client;
 		}
-		handle_received_command(client, command, nr);
+		handle_received_privileged_command(client, command, nr);
   next_client:
 		client = next;
 	}
