@@ -52,19 +52,20 @@ struct deathadder_private {
 	enum razer_mouse_res resolution;
 };
 
-#define DEATHADDER_USB_TIMEOUT	3000
-#define DADD_FW(major, minor)	(((major) << 8) | (minor))
+#define DEATHADDER_USB_TIMEOUT		3000
+#define DADD_FW(major, minor)		(((major) << 8) | (minor))
+#define DEATHADDER_FW_IMAGE_SIZE	0x200000//FIXME
 
 static int deathadder_usb_write(struct deathadder_private *priv,
 				int request, int command,
-				char *buf, size_t size)
+				const char *buf, size_t size)
 {
 	int err;
 
 	err = usb_control_msg(priv->usb.h,
 			      USB_ENDPOINT_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
 			      request, command, 0,
-			      buf, size,
+			      (char *)buf, size,
 			      DEATHADDER_USB_TIMEOUT);
 	if (err != size) {
 		fprintf(stderr, "razer-deathadder: "
@@ -483,15 +484,44 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 				     unsigned int magic_number)
 {
 	struct deathadder_private *priv = m->internal;
+	int err;
+	uint16_t checksum, expected_checksum;
+	unsigned int i;
 
 	if (magic_number != RAZER_FW_FLASH_MAGIC)
 		return -EINVAL;
 	if (!priv->claimed)
 		return -EBUSY;
 
-	//TODO
+	/* Firmware needs to be image plus 2 bytes checksum. */
+	if (len != DEATHADDER_FW_IMAGE_SIZE + 2) {
+		fprintf(stderr, "razer-deathadder: "
+			"Firmware image has wrong size.\n");
+		return -EINVAL;
+	}
+	/* Verify the checksum. */
+	checksum = 0;
+	for (i = 0; i < DEATHADDER_FW_IMAGE_SIZE; i += 2) {
+		checksum ^= (((uint16_t)(data[i + 0])) << 8) |
+			     ((uint16_t)(data[i + 1]));
+	}
+	expected_checksum = (((uint16_t)(data[DEATHADDER_FW_IMAGE_SIZE + 0])) << 8) |
+			     ((uint16_t)(data[DEATHADDER_FW_IMAGE_SIZE + 1]));
+	if (checksum != expected_checksum) {
+		fprintf(stderr, "razer-deathadder: "
+			"Firmware image has invalid checksum.\n");
+		return -EINVAL;
+	}
 
-	return -EOPNOTSUPP;
+	/* Enter bootloader mode */
+	razer_msleep(400);
+	err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+				   0x08, data, len);
+	if (err)
+		fprintf(stderr, "razer-deathadder: Bootloader command failed.\n");
+	razer_msleep(400);
+
+	return err;
 }
 
 void razer_deathadder_gen_idstr(struct usb_device *udev, char *buf)
