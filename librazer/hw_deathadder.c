@@ -352,6 +352,7 @@ static int deathadder_led_toggle(struct razer_led *led,
 static int deathadder_get_leds(struct razer_mouse *m,
 			       struct razer_led **leds_list)
 {
+	struct deathadder_private *priv = m->internal;
 	struct razer_led *scroll, *logo;
 
 	scroll = malloc(sizeof(struct razer_led));
@@ -365,13 +366,13 @@ static int deathadder_get_leds(struct razer_mouse *m,
 
 	scroll->name = "Scrollwheel";
 	scroll->id = DEATHADDER_LED_SCROLL;
-	scroll->state = RAZER_LED_UNKNOWN;//FIXME
+	scroll->state = priv->led_states[DEATHADDER_LED_SCROLL];
 	scroll->toggle_state = deathadder_led_toggle;
 	scroll->u.mouse = m;
 
 	logo->name = "GlowingLogo";
 	logo->id = DEATHADDER_LED_LOGO;
-	logo->state = RAZER_LED_UNKNOWN;//FIXME
+	logo->state = priv->led_states[DEATHADDER_LED_LOGO];
 	logo->toggle_state = deathadder_led_toggle;
 	logo->u.mouse = m;
 
@@ -543,6 +544,7 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 				 struct usb_device *usbdev)
 {
 	struct deathadder_private *priv;
+	unsigned int i;
 
 	priv = malloc(sizeof(struct deathadder_private));
 	if (!priv)
@@ -553,6 +555,8 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 	priv->frequency = RAZER_MOUSE_FREQ_1000HZ; /* random guess */
 	priv->old_frequency = priv->frequency;
 	priv->resolution = RAZER_MOUSE_RES_UNKNOWN;
+	for (i = 0; i < DEATHADDER_NR_LEDS; i++)
+		priv->led_states[i] = RAZER_LED_UNKNOWN;
 
 	m->internal = priv;
 	m->type = RAZER_MOUSETYPE_DEATHADDER;
