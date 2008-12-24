@@ -478,6 +478,22 @@ static int deathadder_set_resolution(struct razer_mouse *m,
 	return err;
 }
 
+static int deathadder_flash_firmware(struct razer_mouse *m,
+				     const char *data, size_t len,
+				     unsigned int magic_number)
+{
+	struct deathadder_private *priv = m->internal;
+
+	if (magic_number != RAZER_FW_FLASH_MAGIC)
+		return -EINVAL;
+	if (!priv->claimed)
+		return -EBUSY;
+
+	//TODO
+
+	return -EOPNOTSUPP;
+}
+
 void razer_deathadder_gen_idstr(struct usb_device *udev, char *buf)
 {
 	/* We can't include the USB device number, because that changes on the
@@ -522,6 +538,7 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 	m->supported_resolutions = deathadder_supported_resolutions;
 	m->get_resolution = deathadder_get_resolution;
 	m->set_resolution = deathadder_set_resolution;
+	m->flash_firmware = deathadder_flash_firmware;
 
 	return 0;
 }

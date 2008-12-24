@@ -19,6 +19,8 @@
 #ifndef LIB_RAZER_H_
 #define LIB_RAZER_H_
 
+#include <stdlib.h>
+
 #if defined(c_plusplus) || defined(__cplusplus)
 extern "C" {
 #endif
@@ -122,6 +124,10 @@ enum razer_mouse_flags {
 	RAZER_MOUSEFLG_NEW		= (1 << 0),
 };
 
+enum {
+	RAZER_FW_FLASH_MAGIC		= 0xB00B135
+};
+
 /** struct razer_mouse - Representation of a mouse device
   *
   * @next: Linked list to the next mouse.
@@ -162,6 +168,10 @@ enum razer_mouse_flags {
   * @get_resolution: Get the currently used scan resolution.
   *
   * @set_resolution: Change the mouse scan resolution.
+  *
+  * @flash_firmware: Upload a firmware image to the device and
+  *     flash it to the PROM. &magic_number is &RAZER_FW_FLASH_MAGIC.
+  *     The magic is used to project against accidental calls.
   */
 struct razer_mouse {
 	struct razer_mouse *next;
@@ -188,6 +198,10 @@ struct razer_mouse {
 				     enum razer_mouse_res **res_ptr);
 	enum razer_mouse_res (*get_resolution)(struct razer_mouse *m);
 	int (*set_resolution)(struct razer_mouse *m, enum razer_mouse_res res);
+
+	int (*flash_firmware)(struct razer_mouse *m,
+			      const char *data, size_t len,
+			      unsigned int magic_number);
 
 	/* Do not touch these pointers. */
 	const struct razer_mouse_base_ops *base_ops;
