@@ -49,8 +49,9 @@
 
 #define COMMAND_MAX_SIZE	512
 #define COMMAND_HDR_SIZE	sizeof(struct command_hdr)
+#define BULK_CHUNK_SIZE		128
 
-#define MAX_FIRMWARE_SIZE	400000
+#define MAX_FIRMWARE_SIZE	0x400000
 
 enum {
 	COMMAND_ID_GETREV = 0,		/* Get the revision number of the socket interface. */
@@ -290,6 +291,9 @@ static void signal_handler(int signum)
 		cleanup_environment();
 		exit(0);
 		break;
+	case SIGPIPE:
+		printf("Broken pipe.\n");//FIXME
+		break;
 	default:
 		fprintf(stderr, "Received unknown signal %d\n", signum);
 	}
@@ -306,6 +310,7 @@ static void setup_sighandler(void)
 
 	sigaction(SIGINT, &act, NULL);
 	sigaction(SIGTERM, &act, NULL);
+	sigaction(SIGPIPE, &act, NULL);
 }
 
 static void free_client(struct client *client)
@@ -415,6 +420,29 @@ static int send_u32(struct client *client, uint32_t v)
 static int send_string(struct client *client, const char *str)
 {
 	return send(client->fd, str, strlen(str) + 1, 0);
+}
+
+static int recv_bulk(struct client *client, char *buf, unsigned int len)
+{
+	unsigned int next_len, i;
+	int nr;
+
+	for (i = 0; i < len; i += BULK_CHUNK_SIZE) {
+		next_len = BULK_CHUNK_SIZE;
+		if (i + next_len > len)
+			next_len = len - i;
+		do {
+			nr = recv(client->fd, buf + i, next_len, 0);
+		} while (!nr);//FIXME
+//printf("recv %d %u\n", nr, next_len);
+		if (nr != next_len) {
+			send_u32(client, ERR_PAYLOAD);
+			return -1;
+		}
+		send_u32(client, ERR_NONE);
+	}
+
+	return 0;
 }
 
 static void command_getmice(struct client *client, const struct command *cmd, unsigned int len)
@@ -656,31 +684,39 @@ error:
 static void command_flashfw(struct client *client, const struct command *cmd, unsigned int len)
 {
 	struct razer_mouse *mouse;
-	int image_size, err;
+	uint32_t image_size;
+	int err;
 	uint32_t errorcode = ERR_NONE;
 	char *image = NULL;
 
+printf("flashfw 1 %u\n", len);
 	if (len < CMD_SIZE(flashfw)) {
 		errorcode = ERR_CMDSIZE;
 		goto error;
 	}
-	if (cmd->flashfw.imagesize > MAX_FIRMWARE_SIZE) {
+	image_size = be32_to_cpu(cmd->flashfw.imagesize);
+printf("flashfw 2  %u\n", image_size);
+	if (image_size > MAX_FIRMWARE_SIZE) {
+printf("2big\n");
 		errorcode = ERR_CMDSIZE;
 		goto error;
 	}
 
-	image = malloc(cmd->flashfw.imagesize);
+printf("flashfw 3\n");
+	image = malloc(image_size);
 	if (!image) {
 		errorcode = ERR_NOMEM;
 		goto error;
 	}
 
-	image_size = recv(client->fd, image, cmd->flashfw.imagesize, 0);
-	if (image_size <= 0) {
+printf("flashfw 4\n");
+	err = recv_bulk(client, image, image_size);
+	if (err) {
 		errorcode = ERR_PAYLOAD;
 		goto error;
 	}
 
+printf("flashfw 5\n");
 	mouse = razer_mouse_list_find(mice, cmd->idstr);
 	if (!mouse) {
 		errorcode = ERR_NOMOUSE;

@@ -32,6 +32,7 @@ class Razer:
 
 	COMMAND_MAX_SIZE = 512
 	COMMAND_HDR_SIZE = 1
+	BULK_CHUNK_SIZE = 128
 	RAZER_IDSTR_MAX_SIZE = 128
 	RAZER_LEDNAME_MAX_SIZE = 64
 
@@ -93,6 +94,14 @@ class Razer:
 			self.privsock.sendall(data)
 		except (socket.error, AttributeError):
 			raise RazerEx("Privileged command failed. Do you have permission?")
+
+	def __sendBulkPrivileged(self, data):
+		for i in range(0, len(data), self.BULK_CHUNK_SIZE):
+			chunk = data[i : i + self.BULK_CHUNK_SIZE]
+			self.__sendPrivileged(chunk)
+			result = self.__recvU32Privileged()
+			if result != 0:
+				raise RazerEx("Privileged bulk write failed.")
 
 	def __sendCommand(self, commandId, idstr="", payload=""):
 		cmd = self.__constructCommand(commandId, idstr, payload)
@@ -197,5 +206,5 @@ class Razer:
 		"Flash a new firmware on the device. Needs high privileges!"
 		payload = self.__int_to_be32(len(image))
 		self.__sendPrivilegedCommand(self.COMMAND_PRIV_FLASHFW, idstr, payload)
-		self.__sendPrivileged(image)
+		self.__sendBulkPrivileged(image)
 		return self.__recvU32Privileged()

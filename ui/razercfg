@@ -118,9 +118,14 @@ class OpFlashFw:
 			print "Failed to read firmware file %s: %s" %\
 				(self.filename, e.strerror)
 			exit(1)
+		print "Flashing firmware on %s ..." % idstr
+		print "!!! DO NOT DISCONNECT ANY DEVICE !!!"
+		print "Sending %d bytes..." % len(data)
 		error = razer.flashFirmware(idstr, data)
 		if error:
 			print "Failed to flash firmware (error=%d)" % error
+		else:
+			print "Firmware successfully flashed."
 
 # Operations on a device
 class DevOps:

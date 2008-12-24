@@ -497,7 +497,9 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 	/* Firmware needs to be image plus 2 bytes checksum. */
 	if (len != DEATHADDER_FW_IMAGE_SIZE + 2) {
 		fprintf(stderr, "razer-deathadder: "
-			"Firmware image has wrong size.\n");
+			"Firmware image has wrong size %u (expected %u).\n",
+			(unsigned int)len,
+			(unsigned int)(DEATHADDER_FW_IMAGE_SIZE + 2));
 		return -EINVAL;
 	}
 	/* Verify the checksum. */
@@ -510,7 +512,9 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 			     ((uint16_t)(data[DEATHADDER_FW_IMAGE_SIZE + 1]));
 	if (checksum != expected_checksum) {
 		fprintf(stderr, "razer-deathadder: "
-			"Firmware image has invalid checksum.\n");
+			"Firmware image has invalid checksum. "
+			"(was: 0x%02X, expected: 0x%02X)\n",
+			checksum, expected_checksum);
 		return -EINVAL;
 	}
 
