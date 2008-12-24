@@ -107,6 +107,21 @@ class OpSetFreq:
 			print "Failed to set frequency to %d Hz (error=%d)" %\
 				(frequency, error)
 
+class OpFlashFw:
+	def __init__(self, filename):
+		self.filename = filename
+
+	def run(self, idstr):
+		try:
+			data = file(self.filename, "rb").read()
+		except IOError, e:
+			print "Failed to read firmware file %s: %s" %\
+				(self.filename, e.strerror)
+			exit(1)
+		error = razer.flashFirmware(idstr, data)
+		if error:
+			print "Failed to flash firmware (error=%d)" % error
+
 # Operations on a device
 class DevOps:
 	def __init__(self, idstr):
@@ -165,6 +180,7 @@ def usage():
 	print "-F|--getfreq         Prints the current and supported frequencies"
 	print "-L|--leds            Print the identifiers of the LEDs on the device"
 	print "-l|--setled LED:off  Toggle the LED with the identifier \"LED\" ON or OFF"
+	print "-X|--flashfw FILE    Flash a firmware image to the device"
 
 def parse_args():
 	devOpsList = []
@@ -172,10 +188,10 @@ def parse_args():
 
 	try:
 		(opts, args) = getopt.getopt(sys.argv[1:],
-			"hvsd:r:Rf:FLl:Vc:S:",
+			"hvsd:r:Rf:FLl:Vc:S:X:",
 			[ "help", "version", "scan", "device=", "res=",
 			  "getres", "freq=", "getfreq", "leds", "setled=",
-			  "fwver", "config=", "sleep=" ])
+			  "fwver", "config=", "sleep=", "flashfw=", ])
 	except getopt.GetoptError:
 		usage()
 		exit(1)
@@ -260,6 +276,12 @@ def parse_args():
 			ops.add(OpSleep(v))
 			if not currentDevOps:
 				devOpsList.append(ops)
+			continue
+		if o in ("-X", "--flashfw"):
+			if not currentDevOps:
+				print "Must specify a device (-d) before -X|--flashfw"
+				exit(1)
+			currentDevOps.add(OpFlashFw(v))
 			continue
 	if currentDevOps and currentDevOps.ops:
 		devOpsList.append(currentDevOps)

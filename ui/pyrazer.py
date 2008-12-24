@@ -25,7 +25,8 @@ class RazerEx(Exception):
 	"Exception thrown by pyrazer code."
 
 class Razer:
-	SOCKET_PATH = "/var/run/razerd/socket"
+	SOCKET_PATH	= "/var/run/razerd/socket"
+	PRIVSOCKET_PATH	= "/var/run/razerd/socket.privileged"
 
 	INTERFACE_REVISION = 0
 
@@ -45,6 +46,9 @@ class Razer:
 	COMMAND_ID_SETRES = 8		# Set the resolution.
 	COMMAND_ID_SETFREQ = 9		# Set the frequency.
 
+	COMMAND_PRIV_FLASHFW = 128	# Upload and flash a firmware image
+
+
 	def __init__(self):
 		self.__connect()
 
@@ -55,6 +59,11 @@ class Razer:
 			self.sock.connect(self.SOCKET_PATH)
 		except socket.error, e:
 			raise RazerEx("Failed to connect to razerd socket: %s" % e)
+		try:
+			self.privsock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+			self.privsock.connect(self.PRIVSOCKET_PATH)
+		except socket.error, e:
+			self.privsock = None # No privileged access
 
 	def __be32_to_int(self, be32Str):
 		return ((ord(be32Str[0]) << 24) | \
@@ -68,19 +77,40 @@ class Razer:
 				     (integer >> 8) & 0xFF,\
 				     (integer & 0xFF))
 
-	def __doSendCommand(self, rawCommand):
-		self.sock.sendall(rawCommand)
-
-	def __sendCommand(self, commandId, idstr="", payload=""):
+	def __constructCommand(self, commandId, idstr, payload):
 		cmd = "%c" % commandId
 		idstr += '\0' * (self.RAZER_IDSTR_MAX_SIZE - len(idstr))
 		cmd += idstr
 		cmd += payload
 		cmd += '\0' * (self.COMMAND_MAX_SIZE - len(cmd))
-		self.__doSendCommand(cmd)
+		return cmd
+
+	def __send(self, data):
+		self.sock.sendall(data)
+
+	def __sendPrivileged(self, data):
+		try:
+			self.privsock.sendall(data)
+		except (socket.error, AttributeError):
+			raise RazerEx("Privileged command failed. Do you have permission?")
+
+	def __sendCommand(self, commandId, idstr="", payload=""):
+		cmd = self.__constructCommand(commandId, idstr, payload)
+		self.__send(cmd)
+
+	def __sendPrivilegedCommand(self, commandId, idstr="", payload=""):
+		cmd = self.__constructCommand(commandId, idstr, payload)
+		self.__sendPrivileged(cmd)
 
 	def __recvU32(self):
 		data = self.sock.recv(4)
+		return self.__be32_to_int(data)
+
+	def __recvU32Privileged(self):
+		try:
+			data = self.privsock.recv(4)
+		except (socket.error, AttributeError):
+			raise RazerEx("Privileged recvU32 failed. Do you have permission?")
 		return self.__be32_to_int(data)
 
 	def __recvString(self):
@@ -162,3 +192,10 @@ class Razer:
 		payload = self.__int_to_be32(newResolution)
 		self.__sendCommand(self.COMMAND_ID_SETRES, idstr, payload)
 		return self.__recvU32()
+
+	def flashFirmware(self, idstr, image):
+		"Flash a new firmware on the device. Needs high privileges!"
+		payload = self.__int_to_be32(len(image))
+		self.__sendPrivilegedCommand(self.COMMAND_PRIV_FLASHFW, idstr, payload)
+		self.__sendPrivileged(image)
+		return self.__recvU32Privileged()

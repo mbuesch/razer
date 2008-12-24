@@ -50,6 +50,8 @@
 #define COMMAND_MAX_SIZE	512
 #define COMMAND_HDR_SIZE	sizeof(struct command_hdr)
 
+#define MAX_FIRMWARE_SIZE	400000
+
 enum {
 	COMMAND_ID_GETREV = 0,		/* Get the revision number of the socket interface. */
 	COMMAND_ID_RESCANMICE,		/* Rescan mice. */
@@ -61,6 +63,9 @@ enum {
 	COMMAND_ID_SETLED,		/* Set the state of a LED. */
 	COMMAND_ID_SETRES,		/* Set the resolution. */
 	COMMAND_ID_SETFREQ,		/* Set the frequency. */
+
+	/* Privileged commands */
+	COMMAND_PRIV_FLASHFW = 128,	/* Upload and flash a firmware image */
 };
 
 enum {
@@ -71,6 +76,7 @@ enum {
 	ERR_NOLED,
 	ERR_CLAIM,
 	ERR_FAIL,
+	ERR_PAYLOAD,
 };
 
 struct command_hdr {
@@ -83,22 +89,33 @@ struct command {
 	union {
 		struct {
 		} __attribute__((packed)) getfwver;
+
 		struct {
 		} __attribute__((packed)) suppfreqs;
+
 		struct {
 		} __attribute__((packed)) suppresol;
+
 		struct {
 		} __attribute__((packed)) getleds;
+
 		struct {
 			char led_name[RAZER_LEDNAME_MAX_SIZE];
 			uint8_t new_state;
 		} __attribute__((packed)) setled;
+
 		struct {
 			uint32_t new_resolution;
 		} __attribute__((packed)) setres;
+
 		struct {
 			uint32_t new_frequency;
 		} __attribute__((packed)) setfreq;
+
+		struct {
+			uint32_t imagesize;
+		} __attribute__((packed)) flashfw;
+
 	} __attribute__((packed));
 } __attribute__((packed));
 
@@ -636,6 +653,57 @@ error:
 	send_u32(client, errorcode);
 }
 
+static void command_flashfw(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	int image_size, err;
+	uint32_t errorcode = ERR_NONE;
+	char *image = NULL;
+
+	if (len < CMD_SIZE(flashfw)) {
+		errorcode = ERR_CMDSIZE;
+		goto error;
+	}
+	if (cmd->flashfw.imagesize > MAX_FIRMWARE_SIZE) {
+		errorcode = ERR_CMDSIZE;
+		goto error;
+	}
+
+	image = malloc(cmd->flashfw.imagesize);
+	if (!image) {
+		errorcode = ERR_NOMEM;
+		goto error;
+	}
+
+	image_size = recv(client->fd, image, cmd->flashfw.imagesize, 0);
+	if (image_size <= 0) {
+		errorcode = ERR_PAYLOAD;
+		goto error;
+	}
+
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse) {
+		errorcode = ERR_NOMOUSE;
+		goto error;
+	}
+	err = mouse->claim(mouse);
+	if (err) {
+		errorcode = ERR_CLAIM;
+		goto error;
+	}
+	err = mouse->flash_firmware(mouse, image, image_size,
+				    RAZER_FW_FLASH_MAGIC);
+	mouse->release(mouse);
+	if (err) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+
+error:
+	send_u32(client, errorcode);
+	free(image);
+}
+
 static void handle_received_command(struct client *client, const char *_cmd, unsigned int len)
 {
 	const struct command *cmd = (const struct command *)_cmd;
@@ -687,6 +755,9 @@ static void handle_received_privileged_command(struct client *client,
 	if (len < COMMAND_HDR_SIZE)
 		return;
 	switch (cmd->hdr.id) {
+	case COMMAND_PRIV_FLASHFW:
+		command_flashfw(client, cmd, len);
+		break;
 	default:
 		/* Unknown command. */
 		break;
@@ -743,6 +814,7 @@ static void mainloop(void)
 
 	while (1) {
 		FD_ZERO(&wait_fdset);
+		FD_SET(privsock, &wait_fdset);
 		FD_SET(ctlsock, &wait_fdset);
 		for (client = clients; client; client = client->next)
 			FD_SET(client->fd, &wait_fdset);

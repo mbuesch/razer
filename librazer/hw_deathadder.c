@@ -516,10 +516,14 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 
 	/* Enter bootloader mode */
 	razer_msleep(400);
+printf("flash firmware dummy %u\n", (unsigned int)len);
+err=0;
+#if 0
 	err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
 				   0x08, data, len);
 	if (err)
 		fprintf(stderr, "razer-deathadder: Bootloader command failed.\n");
+#endif
 	razer_msleep(400);
 
 	return err;
