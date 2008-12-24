@@ -41,6 +41,7 @@
 #define VAR_RUN_RAZERD		VAR_RUN "/razerd"
 #define PIDFILE			VAR_RUN_RAZERD "/razerd.pid"
 #define SOCKPATH		VAR_RUN_RAZERD "/socket"
+#define PRIV_SOCKPATH		VAR_RUN_RAZERD "/socket.privileged"
 
 #define RESCAN_INTERVAL_MSEC	1000 /* Rescan interval, in milliseconds. */
 
@@ -114,12 +115,14 @@ struct client {
 
 typedef _Bool bool;
 
-/* Control socket FD. */
+/* Control socket FDs. */
 static int ctlsock = -1;
+static int privsock = -1;
 /* FD set we wait on in the main loop. */
 static fd_set wait_fdset;
 /* Linked list of connected clients. */
 static struct client *clients;
+static struct client *privileged_clients;
 /* Linked list of detected mice. */
 static struct razer_mouse *mice;
 
@@ -128,13 +131,68 @@ static void cleanup_var_run(void)
 {
 	unlink(SOCKPATH);
 	close(ctlsock);
+	ctlsock = -1;
+
+	unlink(PRIV_SOCKPATH);
+	close(privsock);
+	privsock = -1;
+
 	unlink(PIDFILE);
 	rmdir(VAR_RUN_RAZERD);
 }
 
-static int setup_var_run(void)
+static int create_socket(const char *path, unsigned int perm,
+			 unsigned int nrlisten)
 {
 	struct sockaddr_un sockaddr;
+	int err, fd;
+
+	fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (fd == -1) {
+		fprintf(stderr, "Failed to create socket %s: %s\n",
+			path, strerror(errno));
+		goto error;
+	}
+	err = fcntl(fd, F_SETFL, O_NONBLOCK);
+	if (err) {
+		fprintf(stderr, "Failed to set O_NONBLOCK on socket %s: %s\n",
+			path, strerror(errno));
+		goto error_close_sock;
+	}
+	unlink(path);
+	sockaddr.sun_family = AF_UNIX;
+	strncpy(sockaddr.sun_path, path, sizeof(sockaddr.sun_path) - 1);
+	err = bind(fd, (struct sockaddr *)&sockaddr, SUN_LEN(&sockaddr));
+	if (err) {
+		fprintf(stderr, "Failed to bind socket to %s: %s\n",
+			path, strerror(errno));
+		goto error_close_sock;
+	}
+	err = chmod(path, perm);
+	if (err) {
+		fprintf(stderr, "Failed to set %s socket permissions: %s\n",
+			path, strerror(errno));
+		goto error_unlink_sock;
+	}
+	err = listen(fd, nrlisten);
+	if (err) {
+		fprintf(stderr, "Failed to listen on socket %s: %s\n",
+			path, strerror(errno));
+		goto error_unlink_sock;
+	}
+
+	return fd;
+
+error_unlink_sock:
+	unlink(path);
+error_close_sock:
+	close(fd);
+error:
+	return -1;
+}
+
+static int setup_var_run(void)
+{
 	int fd, err;
 	ssize_t ssize;
 	char buf[32] = { 0, };
@@ -166,41 +224,17 @@ static int setup_var_run(void)
 	}
 
 	/* Create the control socket. */
-	ctlsock = socket(AF_UNIX, SOCK_STREAM, 0);
+	ctlsock = create_socket(SOCKPATH, 0666, 25);
 	if (ctlsock == -1) {
-		fprintf(stderr, "Failed to create socket %s: %s\n",
-			SOCKPATH, strerror(errno));
 		cleanup_var_run();
 		return -1;
 	}
-	err = fcntl(ctlsock, F_SETFL, O_NONBLOCK);
-	if (err) {
-		fprintf(stderr, "Failed to set O_NONBLOCK on socket %s: %s\n",
-			SOCKPATH, strerror(errno));
+
+	/* Create the socket for privileged operations. */
+	privsock = create_socket(PRIV_SOCKPATH, 0660, 15);
+	if (privsock == -1) {
 		cleanup_var_run();
-		return err;
-	}
-	sockaddr.sun_family = AF_UNIX;
-	strncpy(sockaddr.sun_path, SOCKPATH, sizeof(sockaddr.sun_path) - 1);
-	err = bind(ctlsock, (struct sockaddr *)&sockaddr, SUN_LEN(&sockaddr));
-	if (err) {
-		fprintf(stderr, "Failed to bind socket to %s: %s\n",
-			SOCKPATH, strerror(errno));
-		cleanup_var_run();
-		return err;
-	}
-	err = chmod(SOCKPATH, 0666);
-	if (err) {
-		fprintf(stderr, "Failed to set %s socket permissions: %s\n",
-			SOCKPATH, strerror(errno));
-		cleanup_var_run();
-		return err;
-	}
-	err = listen(ctlsock, 10);
-	if (err) {
-		fprintf(stderr, "Failed to listen on socket %s: %s\n",
-			SOCKPATH, strerror(errno));
-		return err;
+		return -1;
 	}
 
 	return 0;
@@ -307,7 +341,7 @@ static void client_list_del(struct client **base, struct client *del_entry)
 		i->next = del_entry->next;
 }
 
-static void check_control_socket(void)
+static void check_control_socket(int socket_fd, struct client **client_list)
 {
 	socklen_t socklen;
 	struct client *client;
@@ -315,7 +349,7 @@ static void check_control_socket(void)
 	int fd;
 
 	socklen = sizeof(remoteaddr);
-	fd = accept(ctlsock, (struct sockaddr *)&remoteaddr, &socklen);
+	fd = accept(socket_fd, (struct sockaddr *)&remoteaddr, &socklen);
 	if (fd == -1)
 		return;
 	/* Connected */
@@ -324,15 +358,21 @@ static void check_control_socket(void)
 		close(fd);
 		return;
 	}
-	client_list_add(&clients, client);
-printf("connected\n");
+	client_list_add(client_list, client);
+	if (client_list == &privileged_clients)
+		printf("Privileged client connected\n");
+	else
+		printf("Client connected\n");
 }
 
-static void disconnect_client(struct client *client)
+static void disconnect_client(struct client **client_list, struct client *client)
 {
-	client_list_del(&clients, client);
+	client_list_del(client_list, client);
 	free_client(client);
-printf("Disconnected\n");
+	if (client_list == &privileged_clients)
+		printf("Privileged client disconnected\n");
+	else
+		printf("Client disconnected\n");
 }
 
 static inline uint32_t cpu_to_be32(uint32_t v)
@@ -651,7 +691,28 @@ static void check_client_connections(void)
 		if (nr < 0)
 			goto next_client;
 		if (nr == 0) {
-			disconnect_client(client);
+			disconnect_client(&clients, client);
+			goto next_client;
+		}
+		handle_received_command(client, command, nr);
+  next_client:
+		client = next;
+	}
+}
+
+static void check_privileged_connections(void)
+{
+	char command[COMMAND_MAX_SIZE + 1] = { 0, };
+	int nr;
+	struct client *client, *next;
+
+	for (client = privileged_clients; client; ) {
+		next = client->next;
+		nr = recv(client->fd, command, COMMAND_MAX_SIZE, 0);
+		if (nr < 0)
+			goto next_client;
+		if (nr == 0) {
+			disconnect_client(&privileged_clients, client);
 			goto next_client;
 		}
 		handle_received_command(client, command, nr);
@@ -673,7 +734,10 @@ static void mainloop(void)
 			FD_SET(client->fd, &wait_fdset);
 		select(FD_SETSIZE, &wait_fdset, NULL, NULL, NULL);
 
-		check_control_socket();
+		check_control_socket(privsock, &privileged_clients);
+		check_privileged_connections();
+
+		check_control_socket(ctlsock, &clients);
 		check_client_connections();
 	}
 }
