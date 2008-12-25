@@ -104,11 +104,6 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 #undef USB_MOUSE
 
 
-#define for_each_usbbus(bus, buslist) \
-	for (bus = buslist; bus; bus = bus->next)
-#define for_each_usbdev(dev, devlist) \
-	for (dev = devlist; dev; dev = dev->next)
-
 
 static bool librazer_initialized;
 static struct razer_mouse *mice_list = NULL;

@@ -3,6 +3,13 @@
 
 #include <usb.h>
 
+
+#define for_each_usbbus(bus, buslist) \
+	for (bus = buslist; bus; bus = bus->next)
+#define for_each_usbdev(dev, devlist) \
+	for (dev = devlist; dev; dev = dev->next)
+
+
 typedef _Bool bool;
 
 struct razer_usb_context {
