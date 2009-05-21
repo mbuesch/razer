@@ -43,6 +43,17 @@ INSTALLING
   make install
 
 
+USING THE TOOLS
+===============
+
+To use the tools, the "razerd" daemon needs to be started as root, first.
+Without the background daemon, nothing will work. The daemon is responsible
+for doing the lowlevel hardware accesses and for tracking the current state
+of the device.
+While the daemon is running, the user interfaces "razercfg" (commandline) and
+"qrazercfg" (graphical user interface) can be used.
+
+
 UDEV NOTIFICATION
 =================
 
