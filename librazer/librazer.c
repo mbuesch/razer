@@ -47,12 +47,15 @@ enum razer_devtype {
  * @init: Init the private data structures.
  *
  * @release: Release the private data structures.
+ *
+ * @assign_usb_device: (re)assign a USB device to a mouse.
  */
 struct razer_mouse_base_ops {
 	enum razer_mouse_type type;
 	void (*gen_idstr)(struct usb_device *udev, char *buf);
 	int (*init)(struct razer_mouse *m, struct usb_device *udev);
 	void (*release)(struct razer_mouse *m);
+	void (*assign_usb_device)(struct razer_mouse *m, struct usb_device *udev);
 };
 
 struct razer_usb_device {
@@ -65,24 +68,27 @@ struct razer_usb_device {
 };
 
 static const struct razer_mouse_base_ops razer_deathadder_base_ops = {
-	.type		= RAZER_MOUSETYPE_DEATHADDER,
-	.gen_idstr	= razer_deathadder_gen_idstr,
-	.init		= razer_deathadder_init_struct,
-	.release	= razer_deathadder_release,
+	.type			= RAZER_MOUSETYPE_DEATHADDER,
+	.gen_idstr		= razer_deathadder_gen_idstr,
+	.init			= razer_deathadder_init_struct,
+	.release		= razer_deathadder_release,
+	.assign_usb_device	= razer_deathadder_assign_usb_device,
 };
 
 static const struct razer_mouse_base_ops razer_krait_base_ops = {
-	.type		= RAZER_MOUSETYPE_KRAIT,
-	.gen_idstr	= razer_krait_gen_idstr,
-	.init		= razer_krait_init_struct,
-	.release	= razer_krait_release,
+	.type			= RAZER_MOUSETYPE_KRAIT,
+	.gen_idstr		= razer_krait_gen_idstr,
+	.init			= razer_krait_init_struct,
+	.release		= razer_krait_release,
+	.assign_usb_device	= razer_krait_assign_usb_device,
 };
 
 static const struct razer_mouse_base_ops razer_lachesis_base_ops = {
-	.type		= RAZER_MOUSETYPE_LACHESIS,
-	.gen_idstr	= razer_lachesis_gen_idstr,
-	.init		= razer_lachesis_init_struct,
-	.release	= razer_lachesis_release,
+	.type			= RAZER_MOUSETYPE_LACHESIS,
+	.gen_idstr		= razer_lachesis_gen_idstr,
+	.init			= razer_lachesis_init_struct,
+	.release		= razer_lachesis_release,
+	.assign_usb_device	= razer_lachesis_assign_usb_device,
 };
 
 
@@ -192,6 +198,7 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 static void razer_free_mouse(struct razer_mouse *m)
 {
 	m->base_ops->release(m);
+	memset(m, 0, sizeof(*m));
 	free(m);
 }
 
@@ -233,6 +240,7 @@ struct razer_mouse * razer_rescan_mice(void)
 				/* We already have this mouse. Delete it from the global
 				 * mice list. It will be added back later. */
 				mouse_list_del(&mice_list, mouse);
+				mouse->base_ops->assign_usb_device(mouse, dev);
 			} else {
 				/* We don't have this mouse, yet. Create a new one. */
 				mouse = mouse_new(id, dev);
@@ -351,14 +359,19 @@ static int razer_usb_claim(struct razer_usb_context *ctx)
 
 	ctx->kdrv_detached = 0;
 	err = usb_claim_interface(ctx->h, ctx->interf);
+	if (err && err != -EBUSY)
+		fprintf(stderr, "razer_usb_claim: first claim failed %d\n", err);
 	if (err == -EBUSY) {
 #ifdef LIBUSB_HAS_DETACH_KERNEL_DRIVER_NP
 		err = usb_detach_kernel_driver_np(ctx->h, ctx->interf);
-		if (err)
+		if (err) {
+			fprintf(stderr, "razer_usb_claim: detach failed %d\n", err);
 			return err;
+		}
 		ctx->kdrv_detached = 1;
 		err = usb_claim_interface(ctx->h, ctx->interf);
 		if (err) {
+			fprintf(stderr, "razer_usb_claim: claim failed %d\n", err);
 			razer_reattach_usb_kdrv(ctx);
 			return err;
 		}
@@ -380,8 +393,10 @@ int razer_generic_usb_claim(struct razer_usb_context *ctx)
 
 	ctx->interf = ctx->dev->config->interface->altsetting[0].bInterfaceNumber;
 	ctx->h = usb_open(ctx->dev);
-	if (!ctx->h)
+	if (!ctx->h) {
+		fprintf(stderr, "razer_generic_usb_claim: usb_open failed\n");
 		return -ENODEV;
+	}
 	err = razer_usb_claim(ctx);
 	if (err)
 		return err;
@@ -514,6 +529,8 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard)
 		if (timeval_after(&now, &timeout)) {
 			/* Timeout. Hm. It seems the device won't reconnect.
 			 * That's OK. We can reclaim the device now. */
+			fprintf(stderr, "razer_usb_reconnect_guard: "
+				"Didn't reconnect, huh?\n");
 			goto reclaim;
 		}
 		razer_msleep(1);

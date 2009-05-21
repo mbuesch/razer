@@ -616,6 +616,14 @@ void razer_deathadder_gen_idstr(struct usb_device *udev, char *buf)
 		 udev->descriptor.iSerialNumber);
 }
 
+void razer_deathadder_assign_usb_device(struct razer_mouse *m,
+					struct usb_device *usbdev)
+{
+	struct deathadder_private *priv = m->internal;
+
+	priv->usb.dev = usbdev;
+}
+
 int razer_deathadder_init_struct(struct razer_mouse *m,
 				 struct usb_device *usbdev)
 {
@@ -626,15 +634,15 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 	if (!priv)
 		return -ENOMEM;
 	memset(priv, 0, sizeof(*priv));
+	m->internal = priv;
 
-	priv->usb.dev = usbdev;
+	razer_deathadder_assign_usb_device(m, usbdev);
 	priv->frequency = RAZER_MOUSE_FREQ_1000HZ; /* random guess */
 	priv->old_frequency = priv->frequency;
 	priv->resolution = RAZER_MOUSE_RES_UNKNOWN;
 	for (i = 0; i < DEATHADDER_NR_LEDS; i++)
 		priv->led_states[i] = RAZER_LED_UNKNOWN;
 
-	m->internal = priv;
 	m->type = RAZER_MOUSETYPE_DEATHADDER;
 	razer_deathadder_gen_idstr(usbdev, m->idstr);
 

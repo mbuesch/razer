@@ -200,6 +200,14 @@ void razer_krait_gen_idstr(struct usb_device *udev, char *buf)
 		 udev->filename);
 }
 
+void razer_krait_assign_usb_device(struct razer_mouse *m,
+				   struct usb_device *usbdev)
+{
+	struct krait_private *priv = m->internal;
+
+	priv->usb.dev = usbdev;
+}
+
 int razer_krait_init_struct(struct razer_mouse *m,
 				 struct usb_device *usbdev)
 {
@@ -209,11 +217,11 @@ int razer_krait_init_struct(struct razer_mouse *m,
 	if (!priv)
 		return -ENOMEM;
 	memset(priv, 0, sizeof(*priv));
+	m->internal = priv;
 
-	priv->usb.dev = usbdev;
+	razer_krait_assign_usb_device(m, usbdev);
 	priv->resolution = RAZER_MOUSE_RES_UNKNOWN;
 
-	m->internal = priv;
 	m->type = RAZER_MOUSETYPE_KRAIT;
 	razer_krait_gen_idstr(usbdev, m->idstr);
 

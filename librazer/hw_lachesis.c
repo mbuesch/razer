@@ -293,8 +293,16 @@ void razer_lachesis_gen_idstr(struct usb_device *udev, char *buf)
 		 udev->descriptor.iSerialNumber);
 }
 
+void razer_lachesis_assign_usb_device(struct razer_mouse *m,
+				      struct usb_device *usbdev)
+{
+	struct lachesis_private *priv = m->internal;
+
+	priv->usb.dev = usbdev;
+}
+
 int razer_lachesis_init_struct(struct razer_mouse *m,
-				 struct usb_device *usbdev)
+			       struct usb_device *usbdev)
 {
 	struct lachesis_private *priv;
 	unsigned int i;
@@ -303,13 +311,13 @@ int razer_lachesis_init_struct(struct razer_mouse *m,
 	if (!priv)
 		return -ENOMEM;
 	memset(priv, 0, sizeof(*priv));
+	m->internal = priv;
 
-	priv->usb.dev = usbdev;
+	razer_lachesis_assign_usb_device(m, usbdev);
 	priv->resolution = RAZER_MOUSE_RES_UNKNOWN;
 	for (i = 0; i < LACHESIS_NR_LEDS; i++)
 		priv->led_states[i] = RAZER_LED_UNKNOWN;
 
-	m->internal = priv;
 	m->type = RAZER_MOUSETYPE_LACHESIS;
 	razer_lachesis_gen_idstr(usbdev, m->idstr);
 
