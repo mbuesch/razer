@@ -29,7 +29,15 @@ echo "creating tarball"
 cd ..
 tar cjf "$tarball" "$release_name"
 mv "$tarball" "$origin"
-rm -Rf "$release_name"
+
+echo "running testbuild"
+cd "$release_name"
+cmake .
+make
+
+echo "removing testbuild"
+cd ..
+rm -R "$release_name"
 
 echo
-echo "built release"
+echo "built release $version"
