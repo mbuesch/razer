@@ -2,7 +2,7 @@
 #
 #   Razer device commandline configuration tool
 #
-#   Copyright (C) 2007-2008 Michael Buesch <mb@bu3sch.de>
+#   Copyright (C) 2007-2009 Michael Buesch <mb@bu3sch.de>
 #
 #   This program is free software; you can redistribute it and/or
 #   modify it under the terms of the GNU General Public License
@@ -32,17 +32,23 @@ class OpGetFwVer:
 class OpGetFreq:
 	def run(self, idstr):
 		freqs = razer.getSupportedFreqs(idstr)
-		print "Supported scan frequencies for mouse %s:" % idstr
+		curFreq = razer.getCurrentFreq(idstr)
 		for freq in freqs:
-			sys.stdout.write("%d Hz, " % freq)
+			if freq == curFreq:
+				sys.stdout.write("[%d Hz], " % freq)
+			else:
+				sys.stdout.write("%d Hz, " % freq)
 		print ""
 
 class OpGetRes:
 	def run(self, idstr):
 		resList = razer.getSupportedRes(idstr)
-		print "Supported scan resolutions for mouse %s:" % idstr
+		curRes = razer.getCurrentRes(idstr)
 		for res in resList:
-			sys.stdout.write("%d DPI, " % res)
+			if res == curRes:
+				sys.stdout.write("[%d DPI], " % res)
+			else:
+				sys.stdout.write("%d DPI, " % res)
 		print ""
 
 class OpPrintLeds:

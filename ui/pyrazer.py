@@ -46,6 +46,8 @@ class Razer:
 	COMMAND_ID_SETLED = 7		# Set the state of a LED.
 	COMMAND_ID_SETRES = 8		# Set the resolution.
 	COMMAND_ID_SETFREQ = 9		# Set the frequency.
+	COMMAND_ID_GETRES = 10		# Get the current resolution.
+	COMMAND_ID_GETFREQ = 11		# Get the current frequency.
 
 	COMMAND_PRIV_FLASHFW = 128	# Upload and flash a firmware image
 
@@ -158,6 +160,11 @@ class Razer:
 		for i in range(0, count):
 			freqs.append(self.__recvU32())
 		return freqs
+	
+	def getCurrentFreq(self, idstr):
+		"Returns the currently selected frequency for a mouse."
+		self.__sendCommand(self.COMMAND_ID_GETFREQ, idstr)
+		return self.__recvU32()
 
 	def getSupportedRes(self, idstr):
 		"Returns a list of supported resolutions for a mouse."
@@ -167,6 +174,11 @@ class Razer:
 		for i in range(0, count):
 			res.append(self.__recvU32())
 		return res
+
+	def getCurrentRes(self, idstr):
+		"Returns the currently selected resolution for a mouse."
+		self.__sendCommand(self.COMMAND_ID_GETRES, idstr)
+		return self.__recvU32()
 
 	def getLeds(self, idstr):
 		"Returns a list of LEDs on the mouse."

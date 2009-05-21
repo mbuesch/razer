@@ -2,7 +2,7 @@
  *   Razer daemon
  *   Daemon to keep track of Razer device state.
  *
- *   Copyright (C) 2008 Michael Buesch <mb@bu3sch.de>
+ *   Copyright (C) 2008-2009 Michael Buesch <mb@bu3sch.de>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -64,6 +64,8 @@ enum {
 	COMMAND_ID_SETLED,		/* Set the state of a LED. */
 	COMMAND_ID_SETRES,		/* Set the resolution. */
 	COMMAND_ID_SETFREQ,		/* Set the frequency. */
+	COMMAND_ID_GETRES,		/* Get the current resolution. */
+	COMMAND_ID_GETFREQ,		/* Get the current frequency. */
 
 	/* Privileged commands */
 	COMMAND_PRIV_FLASHFW = 128,	/* Upload and flash a firmware image */
@@ -112,6 +114,12 @@ struct command {
 		struct {
 			uint32_t new_frequency;
 		} __attribute__((packed)) setfreq;
+
+		struct {
+		} __attribute__((packed)) getfreq;
+
+		struct {
+		} __attribute__((packed)) getres;
 
 		struct {
 			uint32_t imagesize;
@@ -481,6 +489,44 @@ out:
 	send_u32(client, fwver);
 }
 
+static void command_getres(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	enum razer_mouse_res res;
+
+	if (len < CMD_SIZE(getres))
+		goto error;
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse)
+		goto error;
+	res = mouse->get_resolution(mouse);
+
+	send_u32(client, res);
+
+	return;
+error:
+	send_u32(client, RAZER_MOUSE_RES_UNKNOWN);
+}
+
+static void command_getfreq(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	enum razer_mouse_freq freq;
+
+	if (len < CMD_SIZE(getfreq))
+		goto error;
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse)
+		goto error;
+	freq = mouse->get_freq(mouse);
+
+	send_u32(client, freq);
+
+	return;
+error:
+	send_u32(client, RAZER_MOUSE_FREQ_UNKNOWN);
+}
+
 static void command_suppfreqs(struct client *client, const struct command *cmd, unsigned int len)
 {
 	struct razer_mouse *mouse;
@@ -776,6 +822,12 @@ static void handle_received_command(struct client *client, const char *_cmd, uns
 		break;
 	case COMMAND_ID_SETFREQ:
 		command_setfreq(client, cmd, len);
+		break;
+	case COMMAND_ID_GETRES:
+		command_getres(client, cmd, len);
+		break;
+	case COMMAND_ID_GETFREQ:
+		command_getfreq(client, cmd, len);
 		break;
 	default:
 		/* Unknown command. */
