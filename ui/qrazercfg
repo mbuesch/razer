@@ -22,14 +22,9 @@ from PyQt4.QtGui import *
 from pyrazer import *
 
 
-mouseTypeString = { RAZER_MOUSETYPE_DEATHADDER : "DeathAdder",
-		    RAZER_MOUSETYPE_KRAIT : "Krait",
-		    RAZER_MOUSETYPE_LACHESIS : "Lachesis", }
-
-
 class LedCheckBox(QCheckBox):
 	def __init__(self, mouse, led, parent):
-		text = led.getName()
+		text = led
 		text += parent.tr(" LED")
 		QCheckBox.__init__(self, text, parent)
 
@@ -39,16 +34,10 @@ class LedCheckBox(QCheckBox):
 		self.connect(self, SIGNAL("stateChanged(int)"), self.toggled)
 
 	def toggled(self, state):
-		try:
-			self.mouse.claim()
-			if state:
-				self.led.toggleState(RAZER_LED_ON)
-			else:
-				self.led.toggleState(RAZER_LED_OFF)
-		except RazerException, e:
-			msg = "Device access exception: %s" % e[1]
-			self.mousewidget.mainwnd.statusBar().showMessage(msg)
-		self.mouse.release()
+		if state:
+			razer.setLed(self.mouse, self.led, 1)
+		else:
+			razer.setLed(self.mouse, self.led, 0)
 
 class MouseWidget(QWidget):
 	def __init__(self, parent=None):
@@ -80,9 +69,7 @@ class MouseWidget(QWidget):
 		self.mice = mice
 		self.mousesel.clear()
 		for mouse in mice:
-			name = mouseTypeString[mouse.getType()]
-			name += self.tr(" on ") + mouse.getBusId()
-			self.mousesel.addItem(name)
+			self.mousesel.addItem(mouse)
 
 	def freqChanged(self, index):
 		if index == -1:
@@ -91,13 +78,7 @@ class MouseWidget(QWidget):
 			return
 		index -= 1
 		freq = self.freqList[index]
-		try:
-			self.mouse.claim()
-			self.mouse.setFreq(freq)
-		except RazerException, e:
-			msg = "Device access exception: %s" % e[1]
-			self.mainwnd.statusBar().showMessage(msg)
-		self.mouse.release()
+		razer.setFrequency(self.mouse, freq)
 
 	def resChanged(self, index):
 		if index == -1:
@@ -106,13 +87,7 @@ class MouseWidget(QWidget):
 			return
 		index -= 1
 		res = self.resList[index]
-		try:
-			self.mouse.claim()
-			self.mouse.setResolution(res)
-		except RazerException, e:
-			msg = "Device access exception: %s" % e[1]
-			self.mainwnd.statusBar().showMessage(msg)
-		self.mouse.release()
+		razer.setResolution(self.mouse, res)
 
 	def mouseChanged(self, index):
 		self.hzsel.clear()
@@ -126,30 +101,24 @@ class MouseWidget(QWidget):
 		self.ressel.setEnabled(1)
 		self.mouse = self.mice[index]
 		self.hzsel.addItem(self.tr("Unknown"))
-		self.freqList = self.mouse.supportedFreqs()
+		self.freqList = razer.getSupportedFreqs(self.mouse)
 		for freq in self.freqList:
 			self.hzsel.addItem(self.tr("%d Hz" % freq))
 		self.ressel.addItem(self.tr("Unknown"))
-		self.resList = self.mouse.supportedResolutions()
+		self.resList = razer.getSupportedRes(self.mouse)
 		for res in self.resList:
 			self.ressel.addItem(self.tr("%d DPI" % res))
 
 		for chk in self.ledCheckboxes:
 			self.ledsLayout.removeWidget(chk)
 		self.ledCheckboxes = []
-		for led in self.mouse.getLeds():
+		for led in razer.getLeds(self.mouse):
 			chk = LedCheckBox(self.mouse, led, self)
 			self.ledCheckboxes.append(chk)
 			self.ledsLayout.addWidget(chk)
 
-		try:
-			self.mouse.claim()
-			ver = self.mouse.getFwVersion()
-			self.fwVer.setText(self.tr("Firmware version: %u.%u" % (
-					   (ver & 0xFF00) >> 8, ver & 0x00FF)))
-		except RazerException:
-			self.fwVer.setText(self.tr("Firmware version: Unknown"))
-		self.mouse.release()
+		ver = razer.getFwVer(self.mouse)
+		self.fwVer.setText(self.tr("Firmware version: %u.%u" % (ver[0], ver[1])))
 
 class StatusBar(QStatusBar):
 	def showMessage(self, msg):
@@ -182,7 +151,8 @@ class MainWindow(QMainWindow):
 
 	# Rescan for new devices
 	def scan(self):
-		self.mice = scanMice()
+		razer.rescanMice()
+		self.mice = razer.getMice()
 		self.mousewidget.update(self.mice)
 		self.statusBar().showMessage(self.tr("Found %d Razer mice" % len(self.mice)))
 
@@ -194,19 +164,22 @@ class MainWindow(QMainWindow):
 						% QRAZERCFG_VERSION))
 
 def exit(exitcode):
-	razerExit()
 	sys.exit(exitcode)
 
 def main():
 	try:
-		razerInit()
-	except RazerException, e:
-		print "Failed to initialize Razer device access library:", e
+		global razer
+		razer = Razer()
+	except RazerEx, e:
+		print e
+		print "Is razerd running?"
 		sys.exit(1)
 
 	app = QApplication(sys.argv)
 	mainwnd = MainWindow()
 	mainwnd.show()
-	exit(app.exec_())
 
-main()
+	return app.exec_()
+
+if __name__ == "__main__":
+	exit(main())
