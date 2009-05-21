@@ -480,6 +480,7 @@ static int deathadder_set_resolution(struct razer_mouse *m,
 	return err;
 }
 
+#if 0
 static struct usb_device * wait_for_usbdev(uint16_t vendor_id,
 					   uint16_t product_id)
 {
@@ -504,11 +505,13 @@ static struct usb_device * wait_for_usbdev(uint16_t vendor_id,
 
 	return NULL;
 }
+#endif
 
 static int deathadder_flash_firmware(struct razer_mouse *m,
 				     const char *data, size_t len,
 				     unsigned int magic_number)
 {
+#if 0
 	struct deathadder_private *priv = m->internal;
 	int err;
 	uint16_t checksum, expected_checksum;
@@ -594,6 +597,8 @@ printf("cypress claimed\n");
 	razer_msleep(300);
 
 	return err;
+#endif
+	return -ENOSYS;
 }
 
 void razer_deathadder_gen_idstr(struct usb_device *udev, char *buf)
