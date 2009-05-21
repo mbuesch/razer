@@ -14,8 +14,6 @@
 #   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #   GNU General Public License for more details.
 
-RAZERCFG_VERSION	= "001"
-
 import sys
 import getopt
 import time
@@ -161,7 +159,7 @@ def exit(exitcode):
 
 def prVersion():
 	print "Razer device configuration tool"
-	print "Version", RAZERCFG_VERSION
+	print "Version", RAZER_VERSION
 
 def usage():
 	prVersion()

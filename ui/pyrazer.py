@@ -20,6 +20,7 @@
 
 import socket
 
+RAZER_VERSION	= "0.01"
 
 class RazerEx(Exception):
 	"Exception thrown by pyrazer code."

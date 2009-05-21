@@ -14,8 +14,6 @@
 #   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #   GNU General Public License for more details.
 
-QRAZERCFG_VERSION	= "001"
-
 import sys
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
@@ -160,8 +158,8 @@ class MainWindow(QMainWindow):
 		QMessageBox.information(self, self.tr("About"),
 					self.tr("Razer device configuration tool\n"
 						"Version %s\n"
-						"Copyright (c) 2007 Michael Buesch"
-						% QRAZERCFG_VERSION))
+						"Copyright (c) 2007-2009 Michael Buesch"
+						% RAZER_VERSION))
 
 def exit(exitcode):
 	sys.exit(exitcode)
