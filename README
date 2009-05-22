@@ -40,7 +40,36 @@ Then invoke "make" to build the binaries.
 INSTALLING
 ==========
 
+First you need to install the tool libraries and binaries. Do this by typing
+in the following commands:
+
+  sudo -i	# become root
   make install
+
+To automatically start the required system daemon "razerd" at system bootup time,
+you need to install the init-script. This software package includes a generic
+example script, that should work out-of-the-box on many Linux distributions.
+To install it, invoke the following commands:
+
+  sudo -i	# become root
+  cp ./razerd.initscript /etc/init.d/razerd
+  ln -s /etc/init.d/razerd /etc/rc2.d/S99razerd
+  ln -s /etc/init.d/razerd /etc/rc5.d/S99razerd
+  ln -s /etc/init.d/razerd /etc/rc0.d/K01razerd
+  ln -s /etc/init.d/razerd /etc/rc6.d/K01razerd
+
+
+UDEV notification:
+
+The  make install  step did already install the UDEV script automatically.
+It installed the script to
+  /etc/udev/rules.d/01-razer-udev.rules
+This should work on most distributions.
+
+Please reboot the machine or enter the following command to activate the
+udev notification:
+
+  udevadm control --reload_rules
 
 
 USING THE TOOLS
@@ -52,17 +81,6 @@ for doing the lowlevel hardware accesses and for tracking the current state
 of the device.
 While the daemon is running, the user interfaces "razercfg" (commandline) and
 "qrazercfg" (graphical user interface) can be used.
-
-
-UDEV NOTIFICATION
-=================
-
-The file "01-razer-udev.rules" in this package contains example rules
-on how to handle automatic device connect notification through udev.
-On Debian/Ubuntu Linux you need to
-   cp 01-razer-udev.rules /etc/udev/rules.d/01-razer.rules
-to install the rules. Note that you might have to adjust the RUN path in
-the .rules file, if you didn't install the stuff to /usr/local.
 
 
 ARCHITECTURE
