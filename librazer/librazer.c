@@ -416,6 +416,17 @@ void razer_generic_usb_release(struct razer_usb_context *ctx)
 	usb_close(ctx->h);
 }
 
+/** razer_usb_force_reinit - Force the USB-level reinitialization of a device,
+  * so it enters a known state.
+  */
+int razer_usb_force_reinit(struct razer_usb_context *ctx)
+{
+printf("FORCE REINIT\n");
+	//TODO
+
+	return 0;
+}
+
 static void timeval_add_msec(struct timeval *tv, unsigned int msec)
 {
 	unsigned int seconds, usec;
@@ -527,7 +538,7 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard)
 	/* Wait for the device to disconnect. */
 	gettimeofday(&now, NULL);
 	memcpy(&timeout, &now, sizeof(timeout));
-	timeval_add_msec(&timeout, 800);
+	timeval_add_msec(&timeout, 3000);
 	while (guard_find_usb_dev(&guard->old_desc,
 				  guard->old_dirname,
 				  guard->old_filename)) {
@@ -535,11 +546,11 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard)
 		if (timeval_after(&now, &timeout)) {
 			/* Timeout. Hm. It seems the device won't reconnect.
 			 * That's OK. We can reclaim the device now. */
-			fprintf(stderr, "razer_usb_reconnect_guard: "
-				"Didn't reconnect, huh?\n");
+			dprintf("razer_usb_reconnect_guard: "
+				"Didn't disconnect, huh?\n");
 			goto reclaim;
 		}
-		razer_msleep(1);
+		razer_msleep(10);
 	}
 
 	/* Construct the filename the device will reconnect on. */

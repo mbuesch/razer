@@ -36,6 +36,14 @@ enum {
 	DEATHADDER_NR_LEDS,
 };
 
+/* This is the device configuration structure sent to the device
+ * for firmware version >= 1.25 */
+struct deathadder_125_cfg {
+	uint8_t freq;
+	uint8_t res;
+	uint8_t profile;
+	uint8_t leds;
+} __attribute__((packed));
 
 struct deathadder_private {
 	bool claimed;
@@ -58,7 +66,7 @@ struct deathadder_private {
 
 static int deathadder_usb_write(struct deathadder_private *priv,
 				int request, int command,
-				const char *buf, size_t size)
+				const void *buf, size_t size)
 {
 	int err;
 
@@ -78,7 +86,7 @@ static int deathadder_usb_write(struct deathadder_private *priv,
 
 static int deathadder_usb_read(struct deathadder_private *priv,
 			       int request, int command,
-			       char *buf, size_t size)
+			       void *buf, size_t size)
 {
 	int err;
 
@@ -158,7 +166,6 @@ static int deathadder_commit(struct deathadder_private *priv)
 		}
 
 		if (priv->old_frequency != priv->frequency) {
-			priv->old_frequency = priv->frequency;
 			/* Commit frequency setting. */
 			err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
 						   0x07, &freq_value, sizeof(freq_value));
@@ -201,19 +208,19 @@ static int deathadder_commit(struct deathadder_private *priv)
 		if (err)
 			return err;
 	} else {
-		char config[4] = { 0, };
+		struct deathadder_125_cfg config = { 0, };
 
 		/* Translate frequency setting. */
 		switch (priv->frequency) {
 		case RAZER_MOUSE_FREQ_125HZ:
-			config[0] = 3;
+			config.freq = 3;
 			break;
 		case RAZER_MOUSE_FREQ_500HZ:
-			config[0] = 2;
+			config.freq = 2;
 			break;
 		case RAZER_MOUSE_FREQ_1000HZ:
 		case RAZER_MOUSE_FREQ_UNKNOWN:
-			config[0] = 1;
+			config.freq = 1;
 			break;
 		default:
 			return -EINVAL;
@@ -222,14 +229,14 @@ static int deathadder_commit(struct deathadder_private *priv)
 		/* Translate resolution setting. */
 		switch (priv->resolution) {
 		case RAZER_MOUSE_RES_450DPI:
-			config[1] = 3;
+			config.res = 3;
 			break;
 		case RAZER_MOUSE_RES_900DPI:
-			config[1] = 2;
+			config.res = 2;
 			break;
 		case RAZER_MOUSE_RES_1800DPI:
 		case RAZER_MOUSE_RES_UNKNOWN:
-			config[1] = 1;
+			config.res = 1;
 			break;
 		default:
 			return -EINVAL;
@@ -237,34 +244,37 @@ static int deathadder_commit(struct deathadder_private *priv)
 
 		/* Translate the profile ID. */
 		//TODO
-		config[2] = 1;
+		config.profile = 1;
 
 		/* Translate the LED states. */
 		if (priv->led_states[DEATHADDER_LED_LOGO])
-			config[3] |= 0x01;
+			config.leds |= 0x01;
 		if (priv->led_states[DEATHADDER_LED_SCROLL])
-			config[3] |= 0x02;
+			config.leds |= 0x02;
 
 
 		/* Commit the settings. */
 		err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
-					   0x10, config, sizeof(config));
+					   0x10, &config, sizeof(config));
 		if (err)
 			return err;
-		//FIXME
-		/* The frequency setting changed. The device firmware
-		 * will reboot the mouse now. This will cause a reconnect
-		 * on the USB bus. Call the guard... */
-		err = razer_usb_reconnect_guard_wait(&guard);
-		if (err)
-			return err;
-		/* The device might have reconnected, so write the config
-		 * another time to ensure all settings are active.
-		 */
-		err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
-					   0x10, config, sizeof(config));
-		if (err)
-			return err;
+
+		if (priv->frequency != priv->old_frequency) {
+			/* The frequency setting changed. The device firmware
+			 * will reboot the mouse now. This will cause a reconnect
+			 * on the USB bus. Call the guard... */
+			err = razer_usb_reconnect_guard_wait(&guard);
+			if (err)
+				return err;
+			/* The device has reconnected, so write the config
+			 * another time to ensure all settings are active.
+			 */
+			err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+						   0x10, &config, sizeof(config));
+			if (err)
+				return err;
+		}
+
 		/* The device needs a bit of punching in the face.
 		 * Ensure it properly responds to read accesses. */
 		for (i = 0; i < 5; i++) {
@@ -421,6 +431,7 @@ static int deathadder_set_freq(struct razer_mouse *m,
 		return -EBUSY;
 
 	old_freq = priv->frequency;
+	priv->old_frequency = old_freq;
 	priv->frequency = freq;
 
 	err = deathadder_commit(priv);
@@ -428,6 +439,7 @@ static int deathadder_set_freq(struct razer_mouse *m,
 		priv->frequency = old_freq;
 		return err;
 	}
+	priv->old_frequency = freq;
 
 	return err;
 }
@@ -629,6 +641,7 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 {
 	struct deathadder_private *priv;
 	unsigned int i;
+	int err;
 
 	priv = malloc(sizeof(struct deathadder_private));
 	if (!priv)
@@ -637,11 +650,19 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 	m->internal = priv;
 
 	razer_deathadder_assign_usb_device(m, usbdev);
-	priv->frequency = RAZER_MOUSE_FREQ_1000HZ; /* random guess */
+
+	err = razer_usb_force_reinit(&priv->usb);
+	if (err) {
+		fprintf(stderr, "hw_deathadder: Failed to reinit USB device\n");
+		free(priv);
+		return err;
+	}
+
+	priv->frequency = RAZER_MOUSE_FREQ_1000HZ;
 	priv->old_frequency = priv->frequency;
-	priv->resolution = RAZER_MOUSE_RES_UNKNOWN;
+	priv->resolution = RAZER_MOUSE_RES_1800DPI;
 	for (i = 0; i < DEATHADDER_NR_LEDS; i++)
-		priv->led_states[i] = RAZER_LED_UNKNOWN;
+		priv->led_states[i] = RAZER_LED_ON;
 
 	m->type = RAZER_MOUSETYPE_DEATHADDER;
 	razer_deathadder_gen_idstr(usbdev, m->idstr);

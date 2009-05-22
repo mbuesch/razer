@@ -616,8 +616,10 @@ static void command_getleds(struct client *client, const struct command *cmd, un
 		goto error;
 
 	send_u32(client, count);
-	for (led = leds_list; led; led = led->next)
+	for (led = leds_list; led; led = led->next) {
 		send_string(client, led->name);
+		send_u32(client, led->state);
+	}
 	razer_free_leds(leds_list);
 
 	return;

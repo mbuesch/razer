@@ -54,7 +54,13 @@ class OpPrintLeds:
 		leds = razer.getLeds(idstr)
 		print "LEDs on mouse %s:" % idstr
 		for led in leds:
-			sys.stdout.write("%s, " % led)
+			if led[1] == 0:
+				state = "off"
+			elif led[1] == 1:
+				state = "on"
+			else:
+				state = "unknown"
+			sys.stdout.write("%s => %s, " % (led[0], state))
 		print ""
 
 class OpSetLed:

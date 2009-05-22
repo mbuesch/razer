@@ -21,14 +21,18 @@ from pyrazer import *
 
 
 class LedCheckBox(QCheckBox):
-	def __init__(self, mouse, led, parent):
-		text = led
+	def __init__(self, mouse, ledname, ledstate, parent):
+		text = ledname
 		text += parent.tr(" LED")
 		QCheckBox.__init__(self, text, parent)
 
 		self.mousewidget = parent
 		self.mouse = mouse
-		self.led = led
+		self.led = ledname
+		if ledstate:
+			self.setCheckState(Qt.Checked)
+		else:
+			self.setCheckState(Qt.Unchecked)
 		self.connect(self, SIGNAL("stateChanged(int)"), self.toggled)
 
 	def toggled(self, state):
@@ -74,8 +78,7 @@ class MouseWidget(QWidget):
 			return
 		if index == 0: # "Unknown"
 			return
-		index -= 1
-		freq = self.freqList[index]
+		freq = self.hzsel.itemData(index).toUInt()[0]
 		razer.setFrequency(self.mouse, freq)
 
 	def resChanged(self, index):
@@ -83,8 +86,7 @@ class MouseWidget(QWidget):
 			return
 		if index == 0: # "Unknown"
 			return
-		index -= 1
-		res = self.resList[index]
+		res = self.ressel.itemData(index).toUInt()[0]
 		razer.setResolution(self.mouse, res)
 
 	def mouseChanged(self, index):
@@ -98,20 +100,29 @@ class MouseWidget(QWidget):
 		self.hzsel.setEnabled(1)
 		self.ressel.setEnabled(1)
 		self.mouse = self.mice[index]
-		self.hzsel.addItem(self.tr("Unknown"))
-		self.freqList = razer.getSupportedFreqs(self.mouse)
-		for freq in self.freqList:
-			self.hzsel.addItem(self.tr("%d Hz" % freq))
-		self.ressel.addItem(self.tr("Unknown"))
-		self.resList = razer.getSupportedRes(self.mouse)
-		for res in self.resList:
-			self.ressel.addItem(self.tr("%d DPI" % res))
+
+		self.hzsel.addItem(self.tr("Unknown"), QVariant(0))
+		freqList = razer.getSupportedFreqs(self.mouse)
+		curFreq = razer.getCurrentFreq(self.mouse)
+		for freq in freqList:
+			self.hzsel.addItem(self.tr("%d Hz" % freq), QVariant(freq))
+		index = self.hzsel.findData(QVariant(curFreq))
+		self.hzsel.setCurrentIndex(index)
+
+		self.ressel.addItem(self.tr("Unknown"), QVariant(0))
+		resList = razer.getSupportedRes(self.mouse)
+		curRes = razer.getCurrentRes(self.mouse)
+		for res in resList:
+			self.ressel.addItem(self.tr("%d DPI" % res), QVariant(res))
+		index = self.ressel.findData(QVariant(curRes))
+		self.ressel.setCurrentIndex(index)
 
 		for chk in self.ledCheckboxes:
 			self.ledsLayout.removeWidget(chk)
+			chk.deleteLater()
 		self.ledCheckboxes = []
 		for led in razer.getLeds(self.mouse):
-			chk = LedCheckBox(self.mouse, led, self)
+			chk = LedCheckBox(self.mouse, led[0], led[1], self)
 			self.ledCheckboxes.append(chk)
 			self.ledsLayout.addWidget(chk)
 

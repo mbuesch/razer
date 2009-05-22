@@ -182,12 +182,14 @@ class Razer:
 		return self.__recvU32()
 
 	def getLeds(self, idstr):
-		"Returns a list of LEDs on the mouse."
+		"Returns a list of LEDs on the mouse. Each entry is a tuple (name, state)."
 		self.__sendCommand(self.COMMAND_ID_GETLEDS, idstr)
 		count = self.__recvU32()
 		leds = []
 		for i in range(0, count):
-			leds.append(self.__recvString())
+			name = self.__recvString()
+			state = self.__recvU32()
+			leds.append( (name, state) )
 		return leds
 
 	def setLed(self, idstr, ledName, newState):
