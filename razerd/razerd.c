@@ -29,6 +29,7 @@
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <getopt.h>
 
 #ifdef __DragonFly__
 #include <sys/endian.h>
@@ -43,6 +44,13 @@
 # define dprintf		noprintf
 #endif
 static inline int noprintf(const char *t, ...) { return 0; }
+
+typedef _Bool bool;
+
+struct commandline_args {
+	bool background;
+} cmdargs;
+
 
 #define VAR_RUN			"/var/run"
 #define VAR_RUN_RAZERD		VAR_RUN "/razerd"
@@ -143,8 +151,6 @@ struct client {
 	socklen_t socklen;
 	int fd;
 };
-
-typedef _Bool bool;
 
 /* Control socket FDs. */
 static int ctlsock = -1;
@@ -913,9 +919,11 @@ static void event_handler(enum razer_event event,
 {//TODO
 }
 
-static void mainloop(void)
+static int mainloop(void)
 {
 	struct client *client;
+
+	printf("Razer device service daemon\n");
 
 	mice = razer_rescan_mice();
 
@@ -935,11 +943,72 @@ static void mainloop(void)
 		check_control_socket(ctlsock, &clients);
 		check_client_connections();
 	}
+
+	return 1;
+}
+
+static void banner(FILE *fd)
+{
+	fprintf(fd, "Razer device service daemon\n");
+	fprintf(fd, "Copyright 2009 Michael Buesch <mb@bu3sch.de>\n");
+}
+
+static void usage(FILE *fd, int argc, char **argv)
+{
+	banner(fd);
+	fprintf(fd, "\nUsage: %s [OPTIONS]\n", argv[0]);
+	fprintf(fd, "\n");
+	fprintf(fd, "\n");
+	fprintf(fd, "  -B|--background           Fork into the background (daemon mode)\n");
+	fprintf(fd, "\n");
+	fprintf(fd, "  -h|--help                 Print this help text\n");
+	fprintf(fd, "  -v|--version              Print the version number\n");
+}
+
+static int parse_args(int argc, char **argv)
+{
+	static struct option long_options[] = {
+		{ "help", no_argument, 0, 'h', },
+		{ "version", no_argument, 0, 'v', },
+		{ "background", no_argument, 0, 'B', },
+		{ 0, },
+	};
+
+	int c, idx;
+
+	while (1) {
+		c = getopt_long(argc, argv, "hvB",
+				long_options, &idx);
+		if (c == -1)
+			break;
+		switch (c) {
+		case 'h':
+			usage(stdout, argc, argv);
+			return 1;
+		case 'v':
+			banner(stdout);
+			return 1;
+		case 'B':
+			cmdargs.background = 1;
+			break;
+		default:
+			return -1;
+		}
+	}
+
+	return 0;
 }
 
 int main(int argc, char **argv)
 {
 	int err;
+	pid_t pid;
+
+	err = parse_args(argc, argv);
+	if (err > 0)
+		return 0;
+	if (err)
+		return err;
 
 	setup_sighandler();
 	err = setup_environment();
@@ -951,5 +1020,23 @@ int main(int argc, char **argv)
 		cleanup_environment();
 		return 1;
 	}
-	mainloop();
+
+	if (cmdargs.background) {
+		pid = fork();
+		if (pid == 0) {
+			/* Child process */
+			return mainloop();
+		}
+		if (pid > 0) {
+			/* Parent process */
+			dprintf("Forked into background (pid=%lu)\n",
+				(unsigned long)pid);
+			return 0;
+		}
+		fprintf(stderr, "Failed to fork into the background: %s\n",
+			strerror(errno));
+		return 1;
+	}
+
+	return mainloop();
 }
