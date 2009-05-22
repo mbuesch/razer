@@ -192,11 +192,17 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 	m->base_ops = id->u.mouse_ops;
 	m->base_ops->init(m, udev);
 
+	dprintf("Allocated and initialized new mouse (type=%d)\n",
+		m->base_ops->type);
+
 	return m;
 }
 
 static void razer_free_mouse(struct razer_mouse *m)
 {
+	dprintf("Freeing mouse (type=%d)\n",
+		m->base_ops->type);
+
 	m->base_ops->release(m);
 	memset(m, 0, sizeof(*m));
 	free(m);

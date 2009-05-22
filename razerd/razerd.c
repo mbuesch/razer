@@ -40,11 +40,11 @@
 
 
 #if DEBUG
-# define dprintf		printf
+# define dprintf(...)		printf("[razerd debug]: " __VA_ARGS__)
 #else
 # define dprintf		noprintf
 #endif
-static inline int noprintf(const char *template, ...) { return 0; }
+static inline int noprintf(const char *t, ...) { return 0; }
 
 #define VAR_RUN			"/var/run"
 #define VAR_RUN_RAZERD		VAR_RUN "/razerd"

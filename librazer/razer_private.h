@@ -2,6 +2,17 @@
 #define RAZER_PRIVATE_H_
 
 #include <usb.h>
+#include <stdio.h>
+
+#define DEBUG	1 /* Enable/disable debugging */
+
+
+#if DEBUG
+# define dprintf(...)		printf("[librazer debug]: " __VA_ARGS__)
+#else
+# define dprintf		noprintf
+#endif
+static inline int noprintf(const char *t, ...) { return 0; }
 
 
 #define for_each_usbbus(bus, buslist) \
