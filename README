@@ -78,10 +78,11 @@ The architecture layout of the razer tools looks like this:
  -------------------   |   | lowlevel |     --------      ---------
 | hardware driver 1 |--x---| librazer |----| razerd |----| pyrazer |
  -------------------   |    ----------      --------      ---------
-                       |                      ^ ^ ^         ^ ^ ^
- -------------------   |                      | | |         | | |
-| hardware driver n |--^                      | | |         | | |
- -------------------                          | | |         | | |
+                       |                        |           ^ ^ ^
+ -------------------   |                   -----------      | | |
+| hardware driver n |--^                  | librazerd |     | | |
+ -------------------                       -----------      | | |
+                                              ^ ^ ^         | | |
                                               | | |         | | |
                            ---------------    | | |         | | |
                           | Application 0 |---^ | |         | | |
@@ -107,7 +108,10 @@ The architecture layout of the razer tools looks like this:
                           | Other Python applications |---------^
                            ---------------------------
 
-So in general, your application wants to access the razer device through
-pyrazer or (if it's not a python app) through the razerd socket directly.
-Applications should never poke with librazer directly, because there will
-be no instance that keeps track of the device state (razerd).
+So in general, your application wants to access the razer devices through
+pyrazer or (if it's not a python app) through librazerd.
+(Note that librazerd is not written, yet. So currently the only way to
+access the devices is through pyrazer).
+Applications should never poke with lowlevel librazer directly, because there
+will be no instance that keeps track of the device state and permissions and
+concurrency.

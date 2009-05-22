@@ -1,9 +1,9 @@
 /*
  *   Razer lowlevel device access library.
  *   Applications do NOT want to use this.
- *   Applications should connect to the razerd socket instead.
+ *   Applications should use pyrazer or librazerd instead.
  *
- *   Copyright (C) 2007-2008 Michael Buesch <mb@bu3sch.de>
+ *   Copyright (C) 2007-2009 Michael Buesch <mb@bu3sch.de>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -19,11 +19,12 @@
 #ifndef LIB_RAZER_H_
 #define LIB_RAZER_H_
 
-#include <stdlib.h>
-
-#if defined(c_plusplus) || defined(__cplusplus)
-extern "C" {
+#ifndef RAZERCFG_BUILD
+# error "librazer.h is a razercfg internal library!"
+# error "Do not include this file into your application!"
 #endif
+
+#include <stdlib.h>
 
 
 #define RAZER_IDSTR_MAX_SIZE	128
@@ -290,9 +291,5 @@ int razer_init(void);
   * Call this after any operation with the library.
   */
 void razer_exit(void);
-
-#if defined(c_plusplus) || defined(__cplusplus)
-} /* extern "C" */
-#endif
 
 #endif /* LIB_RAZER_H_ */

@@ -7,4 +7,4 @@ else (BIGENDIAN)
 	add_definitions(-DLITTLE_ENDIAN_HOST)
 endif (BIGENDIAN)
 
-add_definitions("-D_GNU_SOURCE -D_BSD_SOURCE")
+add_definitions("-D_GNU_SOURCE -D_BSD_SOURCE -DRAZERCFG_BUILD")
