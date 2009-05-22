@@ -1,7 +1,7 @@
 /*
  *   Razer device access library
  *
- *   Copyright (C) 2007-2008 Michael Buesch <mb@bu3sch.de>
+ *   Copyright (C) 2007-2009 Michael Buesch <mb@bu3sch.de>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -113,7 +113,29 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 
 static bool librazer_initialized;
 static struct razer_mouse *mice_list = NULL;
+/* We currently only have one handler. */
+static razer_event_handler_t event_handler;
 
+
+int razer_register_event_handler(razer_event_handler_t handler)
+{
+	if (event_handler)
+		return -EEXIST;
+	event_handler = handler;
+	return 0;
+}
+
+void razer_unregister_event_handler(razer_event_handler_t handler)
+{
+	event_handler = NULL;
+}
+
+static void razer_notify_event(enum razer_event type,
+			       const struct razer_event_data *data)
+{
+	if (event_handler)
+		event_handler(type, data);
+}
 
 static int match_usbdev(const struct usb_device_descriptor *desc,
 			const struct razer_usb_device *id)
@@ -182,6 +204,7 @@ struct razer_mouse * razer_mouse_list_find(struct razer_mouse *base, const char 
 static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 				      struct usb_device *udev)
 {
+	struct razer_event_data ev;
 	struct razer_mouse *m;
 
 	m = malloc(sizeof(*m));
@@ -195,13 +218,21 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 	dprintf("Allocated and initialized new mouse (type=%d)\n",
 		m->base_ops->type);
 
+	ev.u.mouse = m;
+	razer_notify_event(RAZER_EV_MOUSE_ADD, &ev);
+
 	return m;
 }
 
 static void razer_free_mouse(struct razer_mouse *m)
 {
+	struct razer_event_data ev;
+
 	dprintf("Freeing mouse (type=%d)\n",
 		m->base_ops->type);
+
+	ev.u.mouse = m;
+	razer_notify_event(RAZER_EV_MOUSE_REMOVE, &ev);
 
 	m->base_ops->release(m);
 	memset(m, 0, sizeof(*m));
@@ -615,7 +646,7 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard, bool
 	/* Wait for the device to reconnect. */
 	gettimeofday(&now, NULL);
 	memcpy(&timeout, &now, sizeof(timeout));
-	timeval_add_msec(&timeout, 1000);
+	timeval_add_msec(&timeout, 3000);
 	while (1) {
 		dev = guard_find_usb_dev(&guard->old_desc,
 					 guard->old_dirname,

@@ -253,6 +253,34 @@ struct razer_mouse * razer_rescan_mice(void);
  */
 struct razer_mouse * razer_mouse_list_find(struct razer_mouse *base, const char *idstr);
 
+/** enum razer_event - The type of an event.
+ */
+enum razer_event {
+	RAZER_EV_MOUSE_ADD,
+	RAZER_EV_MOUSE_REMOVE,
+};
+
+/** struct razer_event_data - Context data for an event.
+ */
+struct razer_event_data {
+	union {
+		struct razer_mouse *mouse;
+	} u;
+};
+
+/** razer_event_handler_t - The type of an event handler.
+ */
+typedef void (*razer_event_handler_t)(enum razer_event event,
+				      const struct razer_event_data *data);
+
+/** razer_register_event_handler - Register an event handler.
+ */
+int razer_register_event_handler(razer_event_handler_t handler);
+
+/** razer_unregister_event_handler - Unregister an event handler.
+ */
+void razer_unregister_event_handler(razer_event_handler_t handler);
+
 /** razer_init - LibRazer initialization
   * Call this before any other library function.
   */

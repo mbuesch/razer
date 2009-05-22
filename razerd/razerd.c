@@ -908,6 +908,11 @@ static void check_privileged_connections(void)
 	}
 }
 
+static void event_handler(enum razer_event event,
+			  const struct razer_event_data *data)
+{//TODO
+}
+
 static void mainloop(void)
 {
 	struct client *client;
@@ -940,5 +945,11 @@ int main(int argc, char **argv)
 	err = setup_environment();
 	if (err)
 		return 1;
+	err = razer_register_event_handler(event_handler);
+	if (err) {
+		fprintf(stderr, "Failed to register event handler\n");
+		cleanup_environment();
+		return 1;
+	}
 	mainloop();
 }
