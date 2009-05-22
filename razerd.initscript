@@ -1,0 +1,44 @@
+#!/bin/sh
+#
+# Razer device configuration tool
+# Generic init script
+#
+# Copyright (c) 2009 Michael Buesch
+#
+
+# Path to the PID-file
+PIDFILE="/var/run/razerd.pid"
+
+export PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+
+
+case "$1" in
+	start)
+		razerd -B -P $PIDFILE
+		res=$?
+		if [ $res -eq 0 ]; then
+			echo "Service razerd started."
+		else
+			echo "Failed to start razerd."
+		fi
+		;;
+	stop)
+		if [ -r "$PIDFILE" ]; then
+			kill `cat $PIDFILE`
+			echo "Service razerd stopped."
+		else
+			echo "Service razerd is not running."
+		fi
+		;;
+	restart|reload|force-reload)
+		$0 stop
+		sleep 1
+		$0 start
+		;;
+	*)
+		echo "Usage $0 [start|stop|restart|reload|force-reload"
+		exit 1
+		;;
+esac
+
+exit 0
