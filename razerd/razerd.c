@@ -30,6 +30,8 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <getopt.h>
+#include <syslog.h>
+#include <stdarg.h>
 
 #ifdef __DragonFly__
 #include <sys/endian.h>
@@ -37,13 +39,6 @@
 #include <byteswap.h>
 #endif
 
-
-#if DEBUG
-# define dprintf(...)		printf("[razerd debug]: " __VA_ARGS__)
-#else
-# define dprintf		noprintf
-#endif
-static inline int noprintf(const char *t, ...) { return 0; }
 
 typedef _Bool bool;
 
@@ -165,6 +160,46 @@ static struct client *privileged_clients;
 static struct razer_mouse *mice;
 
 
+static void loginfo(const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	if (cmdargs.background)
+		vsyslog(LOG_MAKEPRI(LOG_DAEMON, LOG_INFO), fmt, args);
+	else
+		vfprintf(stdout, fmt, args);
+	va_end(args);
+}
+
+static void logerr(const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	if (cmdargs.background)
+		vsyslog(LOG_MAKEPRI(LOG_DAEMON, LOG_ERR), fmt, args);
+	else
+		vfprintf(stderr, fmt, args);
+	va_end(args);
+}
+
+static void logdebug(const char *fmt, ...)
+{
+#if DEBUG
+	va_list args;
+
+	va_start(args, fmt);
+	if (cmdargs.background) {
+		vsyslog(LOG_MAKEPRI(LOG_DAEMON, LOG_DEBUG), fmt, args);
+	} else {
+		fprintf(stdout, "[razerd debug]: ");
+		vfprintf(stdout, fmt, args);
+	}
+	va_end(args);
+#endif
+}
+
 static void cleanup_var_run(void)
 {
 	unlink(SOCKPATH);
@@ -187,14 +222,14 @@ static int create_socket(const char *path, unsigned int perm,
 
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd == -1) {
-		fprintf(stderr, "Failed to create socket %s: %s\n",
-			path, strerror(errno));
+		logerr("Failed to create socket %s: %s\n",
+		       path, strerror(errno));
 		goto error;
 	}
 	err = fcntl(fd, F_SETFL, O_NONBLOCK);
 	if (err) {
-		fprintf(stderr, "Failed to set O_NONBLOCK on socket %s: %s\n",
-			path, strerror(errno));
+		logerr("Failed to set O_NONBLOCK on socket %s: %s\n",
+		       path, strerror(errno));
 		goto error_close_sock;
 	}
 	unlink(path);
@@ -202,20 +237,20 @@ static int create_socket(const char *path, unsigned int perm,
 	strncpy(sockaddr.sun_path, path, sizeof(sockaddr.sun_path) - 1);
 	err = bind(fd, (struct sockaddr *)&sockaddr, SUN_LEN(&sockaddr));
 	if (err) {
-		fprintf(stderr, "Failed to bind socket to %s: %s\n",
-			path, strerror(errno));
+		logerr("Failed to bind socket to %s: %s\n",
+		       path, strerror(errno));
 		goto error_close_sock;
 	}
 	err = chmod(path, perm);
 	if (err) {
-		fprintf(stderr, "Failed to set %s socket permissions: %s\n",
-			path, strerror(errno));
+		logerr("Failed to set %s socket permissions: %s\n",
+		       path, strerror(errno));
 		goto error_unlink_sock;
 	}
 	err = listen(fd, nrlisten);
 	if (err) {
-		fprintf(stderr, "Failed to listen on socket %s: %s\n",
-			path, strerror(errno));
+		logerr("Failed to listen on socket %s: %s\n",
+		       path, strerror(errno));
 		goto error_unlink_sock;
 	}
 
@@ -238,16 +273,16 @@ static int setup_var_run(void)
 	/* Create /var/run subdirectory. */
 	err = mkdir(VAR_RUN_RAZERD, 0755);
 	if (err && errno != EEXIST) {
-		fprintf(stderr, "Failed to create directory %s: %s\n",
-			VAR_RUN_RAZERD, strerror(errno));
+		logerr("Failed to create directory %s: %s\n",
+		       VAR_RUN_RAZERD, strerror(errno));
 		return err;
 	}
 
 	/* Create PID-file */
 	fd = open(PIDFILE, O_WRONLY | O_CREAT | O_TRUNC, 0444);
 	if (fd == -1) {
-		fprintf(stderr, "Failed to create pidfile %s: %s\n",
-			PIDFILE, strerror(errno));
+		logerr("Failed to create pidfile %s: %s\n",
+		       PIDFILE, strerror(errno));
 		cleanup_var_run();
 		return -1;
 	}
@@ -255,8 +290,8 @@ static int setup_var_run(void)
 	ssize = write(fd, buf, strlen(buf));
 	close(fd);
 	if (ssize != strlen(buf)) {
-		fprintf(stderr, "Failed to write to pidfile %s: %s\n",
-			PIDFILE, strerror(errno));
+		logerr("Failed to write to pidfile %s: %s\n",
+		       PIDFILE, strerror(errno));
 		cleanup_var_run();
 		return -1;
 	}
@@ -283,8 +318,8 @@ static void remove_pidfile(void)
 	if (!cmdargs.pidfile)
 		return;
 	if (unlink(cmdargs.pidfile)) {
-		fprintf(stderr, "Failed to remove PID-file %s: %s\n",
-			cmdargs.pidfile, strerror(errno));
+		logerr("Failed to remove PID-file %s: %s\n",
+		       cmdargs.pidfile, strerror(errno));
 	}
 }
 
@@ -300,8 +335,8 @@ static int create_pidfile(void)
 
 	fd = open(cmdargs.pidfile, O_RDWR | O_CREAT | O_TRUNC, 0444);
 	if (fd < 0) {
-		fprintf(stderr, "Failed to create PID-file %s: %s\n",
-			cmdargs.pidfile, strerror(errno));
+		logerr("Failed to create PID-file %s: %s\n",
+		       cmdargs.pidfile, strerror(errno));
 		return -1;
 	}
 	snprintf(buf, sizeof(buf), "%lu",
@@ -309,8 +344,8 @@ static int create_pidfile(void)
 	res = write(fd, buf, strlen(buf));
 	close(fd);
 	if (res != strlen(buf)) {
-		fprintf(stderr, "Failed to write PID-file %s: %s\n",
-			cmdargs.pidfile, strerror(errno));
+		logerr("Failed to write PID-file %s: %s\n",
+		       cmdargs.pidfile, strerror(errno));
 		return -1;
 	}
 
@@ -324,7 +359,7 @@ static int setup_environment(void)
 	create_pidfile();
 	err = razer_init();
 	if (err) {
-		fprintf(stderr, "librazer initialization failed. (%d)\n", err);
+		logerr("librazer initialization failed. (%d)\n", err);
 		remove_pidfile();
 		return err;
 	}
@@ -350,15 +385,15 @@ static void signal_handler(int signum)
 	switch (signum) {
 	case SIGINT:
 	case SIGTERM:
-		printf("Terminating razerd.\n");
+		loginfo("Terminating razerd.\n");
 		cleanup_environment();
 		exit(0);
 		break;
 	case SIGPIPE:
-		printf("Broken pipe.\n");//FIXME
+		logerr("Broken pipe.\n");//FIXME
 		break;
 	default:
-		fprintf(stderr, "Received unknown signal %d\n", signum);
+		logerr("Received unknown signal %d\n", signum);
 	}
 }
 
@@ -440,8 +475,8 @@ static void check_control_socket(int socket_fd, struct client **client_list)
 	/* Connected */
 	err = fcntl(fd, F_SETFL, O_NONBLOCK);
 	if (err) {
-		fprintf(stderr, "Failed to set O_NONBLOCK on client: %s\n",
-			strerror(errno));
+		logerr("Failed to set O_NONBLOCK on client: %s\n",
+		       strerror(errno));
 		close(fd);
 		return;
 	}
@@ -452,18 +487,18 @@ static void check_control_socket(int socket_fd, struct client **client_list)
 	}
 	client_list_add(client_list, client);
 	if (client_list == &privileged_clients)
-		dprintf("Privileged client connected (fd=%d)\n", fd);
+		logdebug("Privileged client connected (fd=%d)\n", fd);
 	else
-		dprintf("Client connected (fd=%d)\n", fd);
+		logdebug("Client connected (fd=%d)\n", fd);
 }
 
 static void disconnect_client(struct client **client_list, struct client *client)
 {
 	client_list_del(client_list, client);
 	if (client_list == &privileged_clients)
-		dprintf("Privileged client disconnected (fd=%d)\n", client->fd);
+		logdebug("Privileged client disconnected (fd=%d)\n", client->fd);
 	else
-		dprintf("Client disconnected (fd=%d)\n", client->fd);
+		logdebug("Client disconnected (fd=%d)\n", client->fd);
 	free_client(client);
 }
 
@@ -799,34 +834,28 @@ static void command_flashfw(struct client *client, const struct command *cmd, un
 	uint32_t errorcode = ERR_NONE;
 	char *image = NULL;
 
-printf("flashfw 1 %u\n", len);
 	if (len < CMD_SIZE(flashfw)) {
 		errorcode = ERR_CMDSIZE;
 		goto error;
 	}
 	image_size = be32_to_cpu(cmd->flashfw.imagesize);
-printf("flashfw 2  %u\n", image_size);
 	if (image_size > MAX_FIRMWARE_SIZE) {
-printf("2big\n");
 		errorcode = ERR_CMDSIZE;
 		goto error;
 	}
 
-printf("flashfw 3\n");
 	image = malloc(image_size);
 	if (!image) {
 		errorcode = ERR_NOMEM;
 		goto error;
 	}
 
-printf("flashfw 4\n");
 	err = recv_bulk(client, image, image_size);
 	if (err) {
 		errorcode = ERR_PAYLOAD;
 		goto error;
 	}
 
-printf("flashfw 5\n");
 	mouse = razer_mouse_list_find(mice, cmd->idstr);
 	if (!mouse) {
 		errorcode = ERR_NOMOUSE;
@@ -968,7 +997,7 @@ static int mainloop(void)
 	struct client *client;
 	int err;
 
-	printf("Razer device service daemon\n");
+	loginfo("Razer device service daemon\n");
 
 	setup_sighandler();
 	err = setup_environment();
@@ -976,7 +1005,7 @@ static int mainloop(void)
 		return 1;
 	err = razer_register_event_handler(event_handler);
 	if (err) {
-		fprintf(stderr, "Failed to register event handler\n");
+		logerr("Failed to register event handler\n");
 		cleanup_environment();
 		return 1;
 	}
@@ -1079,12 +1108,12 @@ int main(int argc, char **argv)
 		}
 		if (pid > 0) {
 			/* Parent process */
-			dprintf("Forked into background (pid=%lu)\n",
-				(unsigned long)pid);
+			logdebug("Forked into background (pid=%lu)\n",
+				 (unsigned long)pid);
 			return 0;
 		}
-		fprintf(stderr, "Failed to fork into the background: %s\n",
-			strerror(errno));
+		logerr("Failed to fork into the background: %s\n",
+		       strerror(errno));
 		return 1;
 	}
 
