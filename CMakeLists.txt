@@ -22,6 +22,8 @@ endmacro(CHECK_LIB)
 
 check_lib(usb usb.h)
 
+set(CMAKE_C_FLAGS_DEBUG -DDEBUG)
+
 add_subdirectory(librazer)
 add_subdirectory(razerd)
 add_subdirectory(ui)

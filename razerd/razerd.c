@@ -15,8 +15,6 @@
  *   GNU General Public License for more details.
  */
 
-#define DEBUG	1
-
 #include "librazer.h"
 
 #include <stdio.h>
@@ -51,8 +49,6 @@ static inline int noprintf(const char *t, ...) { return 0; }
 #define PIDFILE			VAR_RUN_RAZERD "/razerd.pid"
 #define SOCKPATH		VAR_RUN_RAZERD "/socket"
 #define PRIV_SOCKPATH		VAR_RUN_RAZERD "/socket.privileged"
-
-#define RESCAN_INTERVAL_MSEC	1000 /* Rescan interval, in milliseconds. */
 
 #define INTERFACE_REVISION	0
 

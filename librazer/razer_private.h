@@ -4,8 +4,6 @@
 #include <usb.h>
 #include <stdio.h>
 
-#define DEBUG	1 /* Enable/disable debugging */
-
 
 #if DEBUG
 # define dprintf(...)		printf("[librazer debug]: " __VA_ARGS__)

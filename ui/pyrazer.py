@@ -5,7 +5,7 @@
 #
 #   This library connects to the lowlevel 'razerd' system daemon.
 #
-#   Copyright (C) 2008 Michael Buesch <mb@bu3sch.de>
+#   Copyright (C) 2008-2009 Michael Buesch <mb@bu3sch.de>
 #
 #   This program is free software; you can redistribute it and/or
 #   modify it under the terms of the GNU General Public License
@@ -20,7 +20,7 @@
 
 import socket
 
-RAZER_VERSION	= "0.01"
+RAZER_VERSION	= "0.02"
 
 class RazerEx(Exception):
 	"Exception thrown by pyrazer code."
@@ -68,6 +68,12 @@ class Razer:
 			self.privsock.connect(self.PRIVSOCKET_PATH)
 		except socket.error, e:
 			self.privsock = None # No privileged access
+
+		self.__sendCommand(self.COMMAND_ID_GETREV)
+		rev = self.__recvU32()
+		if (rev != self.INTERFACE_REVISION):
+			raise RazerEx("Incompatible interface revision. razerd=%u, me=%u" %\
+					(rev, self.INTERFACE_REVISION))
 
 	def __be32_to_int(self, be32Str):
 		return ((ord(be32Str[0]) << 24) | \
