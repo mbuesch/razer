@@ -15,6 +15,8 @@
  *   GNU General Public License for more details.
  */
 
+#define DEBUG	1
+
 #include "librazer.h"
 
 #include <stdio.h>
@@ -36,6 +38,13 @@
 #include <byteswap.h>
 #endif
 
+
+#if DEBUG
+# define dprintf		printf
+#else
+# define dprintf		noprintf
+#endif
+static inline int noprintf(const char *template, ...) { return 0; }
 
 #define VAR_RUN			"/var/run"
 #define VAR_RUN_RAZERD		VAR_RUN "/razerd"
@@ -376,13 +385,20 @@ static void check_control_socket(int socket_fd, struct client **client_list)
 	socklen_t socklen;
 	struct client *client;
 	struct sockaddr_un remoteaddr;
-	int fd;
+	int err, fd;
 
 	socklen = sizeof(remoteaddr);
 	fd = accept(socket_fd, (struct sockaddr *)&remoteaddr, &socklen);
 	if (fd == -1)
 		return;
 	/* Connected */
+	err = fcntl(fd, F_SETFL, O_NONBLOCK);
+	if (err) {
+		fprintf(stderr, "Failed to set O_NONBLOCK on client: %s\n",
+			strerror(errno));
+		close(fd);
+		return;
+	}
 	client = new_client(&remoteaddr, socklen, fd);
 	if (!client) {
 		close(fd);
@@ -390,19 +406,19 @@ static void check_control_socket(int socket_fd, struct client **client_list)
 	}
 	client_list_add(client_list, client);
 	if (client_list == &privileged_clients)
-		printf("Privileged client connected\n");
+		dprintf("Privileged client connected (fd=%d)\n", fd);
 	else
-		printf("Client connected\n");
+		dprintf("Client connected (fd=%d)\n", fd);
 }
 
 static void disconnect_client(struct client **client_list, struct client *client)
 {
 	client_list_del(client_list, client);
-	free_client(client);
 	if (client_list == &privileged_clients)
-		printf("Privileged client disconnected\n");
+		dprintf("Privileged client disconnected (fd=%d)\n", client->fd);
 	else
-		printf("Client disconnected\n");
+		dprintf("Client disconnected (fd=%d)\n", client->fd);
+	free_client(client);
 }
 
 static inline uint32_t cpu_to_be32(uint32_t v)
@@ -905,6 +921,8 @@ static void mainloop(void)
 		FD_SET(privsock, &wait_fdset);
 		FD_SET(ctlsock, &wait_fdset);
 		for (client = clients; client; client = client->next)
+			FD_SET(client->fd, &wait_fdset);
+		for (client = privileged_clients; client; client = client->next)
 			FD_SET(client->fd, &wait_fdset);
 		select(FD_SETSIZE, &wait_fdset, NULL, NULL, NULL);
 
