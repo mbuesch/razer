@@ -49,6 +49,7 @@ typedef _Bool bool;
 
 struct commandline_args {
 	bool background;
+	const char *pidfile;
 } cmdargs;
 
 
@@ -277,18 +278,60 @@ static int setup_var_run(void)
 	return 0;
 }
 
+static void remove_pidfile(void)
+{
+	if (!cmdargs.pidfile)
+		return;
+	if (unlink(cmdargs.pidfile)) {
+		fprintf(stderr, "Failed to remove PID-file %s: %s\n",
+			cmdargs.pidfile, strerror(errno));
+	}
+}
+
+static int create_pidfile(void)
+{
+	char buf[32] = { 0, };
+	pid_t pid = getpid();
+	int fd;
+	ssize_t res;
+
+	if (!cmdargs.pidfile)
+		return 0;
+
+	fd = open(cmdargs.pidfile, O_RDWR | O_CREAT | O_TRUNC, 0444);
+	if (fd < 0) {
+		fprintf(stderr, "Failed to create PID-file %s: %s\n",
+			cmdargs.pidfile, strerror(errno));
+		return -1;
+	}
+	snprintf(buf, sizeof(buf), "%lu",
+		 (unsigned long)pid);
+	res = write(fd, buf, strlen(buf));
+	close(fd);
+	if (res != strlen(buf)) {
+		fprintf(stderr, "Failed to write PID-file %s: %s\n",
+			cmdargs.pidfile, strerror(errno));
+		return -1;
+	}
+
+	return 0;
+}
+
 static int setup_environment(void)
 {
 	int err;
 
+	create_pidfile();
 	err = razer_init();
 	if (err) {
 		fprintf(stderr, "librazer initialization failed. (%d)\n", err);
+		remove_pidfile();
 		return err;
 	}
 	err = setup_var_run();
 	if (err) {
 		razer_exit();
+		remove_pidfile();
 		return err;
 	}
 
@@ -299,6 +342,7 @@ static void cleanup_environment(void)
 {
 	cleanup_var_run();
 	razer_exit();
+	remove_pidfile();
 }
 
 static void signal_handler(int signum)
@@ -922,8 +966,20 @@ static void event_handler(enum razer_event event,
 static int mainloop(void)
 {
 	struct client *client;
+	int err;
 
 	printf("Razer device service daemon\n");
+
+	setup_sighandler();
+	err = setup_environment();
+	if (err)
+		return 1;
+	err = razer_register_event_handler(event_handler);
+	if (err) {
+		fprintf(stderr, "Failed to register event handler\n");
+		cleanup_environment();
+		return 1;
+	}
 
 	mice = razer_rescan_mice();
 
@@ -960,6 +1016,7 @@ static void usage(FILE *fd, int argc, char **argv)
 	fprintf(fd, "\n");
 	fprintf(fd, "\n");
 	fprintf(fd, "  -B|--background           Fork into the background (daemon mode)\n");
+	fprintf(fd, "  -P|--pidfile PATH         Create a PID-file\n");
 	fprintf(fd, "\n");
 	fprintf(fd, "  -h|--help                 Print this help text\n");
 	fprintf(fd, "  -v|--version              Print the version number\n");
@@ -971,13 +1028,14 @@ static int parse_args(int argc, char **argv)
 		{ "help", no_argument, 0, 'h', },
 		{ "version", no_argument, 0, 'v', },
 		{ "background", no_argument, 0, 'B', },
+		{ "pidfile", required_argument, 0, 'P', },
 		{ 0, },
 	};
 
 	int c, idx;
 
 	while (1) {
-		c = getopt_long(argc, argv, "hvB",
+		c = getopt_long(argc, argv, "hvBP:",
 				long_options, &idx);
 		if (c == -1)
 			break;
@@ -990,6 +1048,9 @@ static int parse_args(int argc, char **argv)
 			return 1;
 		case 'B':
 			cmdargs.background = 1;
+			break;
+		case 'P':
+			cmdargs.pidfile = optarg;
 			break;
 		default:
 			return -1;
@@ -1009,17 +1070,6 @@ int main(int argc, char **argv)
 		return 0;
 	if (err)
 		return err;
-
-	setup_sighandler();
-	err = setup_environment();
-	if (err)
-		return 1;
-	err = razer_register_event_handler(event_handler);
-	if (err) {
-		fprintf(stderr, "Failed to register event handler\n");
-		cleanup_environment();
-		return 1;
-	}
 
 	if (cmdargs.background) {
 		pid = fork();
