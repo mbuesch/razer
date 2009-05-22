@@ -3,15 +3,6 @@
 # We just send a rescan command to razerd.
 # It will pick up new mice and forward information to the applications.
 
-# DeathAdder mouse
-ACTION=="add", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="0007", RUN+="/usr/local/bin/razercfg --scan"
-ACTION=="remove", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="0007", RUN+="/usr/local/bin/razercfg --scan"
-
-# Krait mouse
-ACTION=="add", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="0003", RUN+="/usr/local/bin/razercfg --scan"
-ACTION=="remove", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="0003", RUN+="/usr/local/bin/razercfg --scan"
-
-# Lachesis mouse
-ACTION=="add", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="000C", RUN+="/usr/local/bin/razercfg --scan"
-ACTION=="remove", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="000C", RUN+="/usr/local/bin/razercfg --scan"
+ACTION=="add", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", RUN+="/usr/local/bin/razercfg --scan"
+ACTION=="remove", SUBSYSTEM=="usb_device", RUN+="/usr/local/bin/razercfg --scan"
 
