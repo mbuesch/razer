@@ -10,3 +10,8 @@ ACTION=="remove", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProd
 # Krait mouse
 ACTION=="add", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="0003", RUN+="/usr/local/bin/razercfg --scan"
 ACTION=="remove", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="0003", RUN+="/usr/local/bin/razercfg --scan"
+
+# Lachesis mouse
+ACTION=="add", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="000C", RUN+="/usr/local/bin/razercfg --scan"
+ACTION=="remove", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", SYSFS{idProduct}=="000C", RUN+="/usr/local/bin/razercfg --scan"
+
