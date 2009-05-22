@@ -15,3 +15,15 @@ add_definitions("-D_GNU_SOURCE")
 target_link_libraries(razer usb)
 
 install(TARGETS razer DESTINATION lib)
+
+
+add_custom_target(razer_udev_rules
+		   COMMAND ${CMAKE_SOURCE_DIR}/gen_udev_rules.sh
+		   ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${CMAKE_INSTALL_PREFIX}
+		   DEPENDS ${CMAKE_SOURCE_DIR}/01-razer-udev.rules.template
+		   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+		   COMMENT Generate udev rules)
+add_dependencies(razer razer_udev_rules)
+
+install(FILES ${CMAKE_BINARY_DIR}/01-razer-udev.rules
+	DESTINATION /etc/udev/rules.d/)

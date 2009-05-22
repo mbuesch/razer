@@ -1,8 +1,0 @@
-# UDEV rules for razer mice
-#
-# We just send a rescan command to razerd.
-# It will pick up new mice and forward information to the applications.
-
-ACTION=="add", SUBSYSTEM=="usb_device", SYSFS{idVendor}=="1532", RUN+="/usr/local/bin/razercfg --scan"
-ACTION=="remove", SUBSYSTEM=="usb_device", RUN+="/usr/local/bin/razercfg --scan"
-
