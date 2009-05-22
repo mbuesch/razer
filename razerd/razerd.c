@@ -186,7 +186,7 @@ static void logerr(const char *fmt, ...)
 
 static void logdebug(const char *fmt, ...)
 {
-#if DEBUG
+#ifdef DEBUG
 	va_list args;
 
 	va_start(args, fmt);

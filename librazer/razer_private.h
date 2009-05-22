@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 
-#if DEBUG
+#ifdef DEBUG
 # define dprintf(...)		printf("[librazer debug]: " __VA_ARGS__)
 #else
 # define dprintf		noprintf
