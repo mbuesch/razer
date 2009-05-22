@@ -175,7 +175,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 			/* The frequency setting changed. The device firmware
 			 * will reboot the mouse now. This will cause a reconnect
 			 * on the USB bus. Call the guard... */
-			err = razer_usb_reconnect_guard_wait(&guard);
+			err = razer_usb_reconnect_guard_wait(&guard, 0);
 			if (err)
 				return err;
 			/* The device needs a bit of punching in the face after reconnect. */
@@ -263,7 +263,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 			/* The frequency setting changed. The device firmware
 			 * will reboot the mouse now. This will cause a reconnect
 			 * on the USB bus. Call the guard... */
-			err = razer_usb_reconnect_guard_wait(&guard);
+			err = razer_usb_reconnect_guard_wait(&guard, 0);
 			if (err)
 				return err;
 			/* The device has reconnected, so write the config

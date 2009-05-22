@@ -303,6 +303,7 @@ void razer_exit(void)
 	if (!librazer_initialized)
 		return;
 	razer_free_mice(mice_list);
+	mice_list = NULL;
 	librazer_initialized = 0;
 }
 
@@ -419,10 +420,34 @@ void razer_generic_usb_release(struct razer_usb_context *ctx)
 /** razer_usb_force_reinit - Force the USB-level reinitialization of a device,
   * so it enters a known state.
   */
-int razer_usb_force_reinit(struct razer_usb_context *ctx)
+int razer_usb_force_reinit(struct razer_usb_context *device_ctx)
 {
-printf("FORCE REINIT\n");
-	//TODO
+	struct usb_dev_handle *h;
+	struct usb_device *hub;
+	struct razer_usb_reconnect_guard rg;
+	int err;
+
+	dprintf("Forcing device reinitialization\n");
+
+	razer_usb_reconnect_guard_init(&rg, device_ctx);
+
+	hub = device_ctx->dev->bus->root_dev;
+	dprintf("Resetting root hub %s:%s\n",
+		hub->bus->dirname, hub->filename);
+
+	h = usb_open(hub);
+	if (!h) {
+		fprintf(stderr, "razer_usb_force_reinit: usb_open failed\n");
+		return -ENODEV;
+	}
+	usb_reset(h);
+	usb_close(h);
+
+	err = razer_usb_reconnect_guard_wait(&rg, 1);
+	if (err) {
+		fprintf(stderr, "razer_usb_force_reinit: "
+			"Failed to discover the reconnected device\n");
+	}
 
 	return 0;
 }
@@ -492,10 +517,13 @@ int razer_usb_reconnect_guard_init(struct razer_usb_reconnect_guard *guard,
 
 static struct usb_device * guard_find_usb_dev(const struct usb_device_descriptor *desc,
 					      const char *dirname,
-					      const char *filename)
+					      unsigned int filename,
+					      bool hub_reset)
 {
 	struct usb_bus *bus, *buslist;
 	struct usb_device *dev;
+	unsigned int dev_filename;
+	int res;
 
 	usb_find_busses();
 	usb_find_devices();
@@ -507,8 +535,18 @@ static struct usb_device * guard_find_usb_dev(const struct usb_device_descriptor
 				continue;
 			if (strncmp(dev->bus->dirname, dirname, PATH_MAX) != 0)
 				continue;
-			if (strncmp(dev->filename, filename, PATH_MAX) != 0)
-				continue;
+			res = sscanf(dev->filename, "%03u", &dev_filename);
+			if (res != 1) {
+				fprintf(stderr, "guard_find_usb_dev: Could not parse filename.\n");
+				return NULL;
+			}
+			if (hub_reset) {
+				if (dev_filename < filename)
+					continue;
+			} else {
+				if (dev_filename != filename)
+					continue;
+			}
 			/* found it! */
 			return dev;
 		}
@@ -523,17 +561,30 @@ static struct usb_device * guard_find_usb_dev(const struct usb_device_descriptor
  * function tries to keep track of the device and it will update the
  * usb context information.
  * Of course, this is not completely race-free, but we try to do our best.
+ *
+ * hub_reset is true, if the device reconnects due to a HUB reset event.
+ * Otherwise it's assumed that the device reconnects on behalf of itself.
+ * If hub_reset is false, the device is expected to be claimed.
  */
-int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard)
+int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard, bool hub_reset)
 {
-	char reconn_filename[PATH_MAX + 1];
+	unsigned int reconn_filename;
 	unsigned int old_filename_nr;
 	int res, errorcode = 0;
 	struct usb_device *dev;
 	struct timeval now, timeout;
 
-	/* Release the device, so the kernel can detect the bus reconnect. */
-	razer_generic_usb_release(guard->ctx);
+	if (!hub_reset) {
+		/* Release the device, so the kernel can detect the bus reconnect. */
+		razer_generic_usb_release(guard->ctx);
+	}
+
+	res = sscanf(guard->old_filename, "%03u", &old_filename_nr);
+	if (res != 1) {
+		fprintf(stderr, "razer_usb_reconnect_guard: Could not parse filename.\n");
+		errorcode = -EINVAL;
+		goto reclaim;
+	}
 
 	/* Wait for the device to disconnect. */
 	gettimeofday(&now, NULL);
@@ -541,7 +592,8 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard)
 	timeval_add_msec(&timeout, 3000);
 	while (guard_find_usb_dev(&guard->old_desc,
 				  guard->old_dirname,
-				  guard->old_filename)) {
+				  old_filename_nr,
+				  hub_reset)) {
 		gettimeofday(&now, NULL);
 		if (timeval_after(&now, &timeout)) {
 			/* Timeout. Hm. It seems the device won't reconnect.
@@ -553,15 +605,12 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard)
 		razer_msleep(10);
 	}
 
-	/* Construct the filename the device will reconnect on. */
-	res = sscanf(guard->old_filename, "%03u", &old_filename_nr);
-	if (res != 1) {
-		fprintf(stderr, "razer_usb_reconnect_guard: Could not parse filename.\n");
-		errorcode = -EINVAL;
-		goto reclaim;
-	}
-	snprintf(reconn_filename, sizeof(reconn_filename), "%03u",
-		 old_filename_nr + 1);
+	/* Construct the filename the device will reconnect on.
+	 * On a device reset the new filename will match reconn_filename.
+	 * In case of a hub_reset, the new filename will be >= reconn_filename.
+	 * FIXME: The 7bit(?) number will wrap.
+	 */
+	reconn_filename = old_filename_nr + 1;
 
 	/* Wait for the device to reconnect. */
 	gettimeofday(&now, NULL);
@@ -570,13 +619,16 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard)
 	while (1) {
 		dev = guard_find_usb_dev(&guard->old_desc,
 					 guard->old_dirname,
-					 reconn_filename);
+					 reconn_filename,
+					 hub_reset);
 		if (dev)
 			break;
 		gettimeofday(&now, NULL);
 		if (timeval_after(&now, &timeout)) {
 			fprintf(stderr, "razer_usb_reconnect_guard: The device did not "
 				"reconnect! It might not work anymore. Try to replug it.\n");
+			dprintf("Expected reconnect busid was: %s:%s%03u\n",
+				guard->old_dirname, (hub_reset ? ">=" : ""), reconn_filename);
 			errorcode = -EBUSY;
 			goto out;
 		}
@@ -586,11 +638,13 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard)
 	guard->ctx->dev = dev;
 
 reclaim:
-	/* Reclaim the new device. */
-	res = razer_generic_usb_claim(guard->ctx);
-	if (res) {
-		fprintf(stderr, "razer_usb_reconnect_guard: Reclaim failed.\n");
-		return res;
+	if (!hub_reset) {
+		/* Reclaim the new device. */
+		res = razer_generic_usb_claim(guard->ctx);
+		if (res) {
+			fprintf(stderr, "razer_usb_reconnect_guard: Reclaim failed.\n");
+			return res;
+		}
 	}
 out:
 	return errorcode;
