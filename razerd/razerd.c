@@ -41,6 +41,12 @@
 
 
 typedef _Bool bool;
+#undef min
+#undef max
+#undef offsetof
+#define offsetof(type, member)	((size_t)&((type *)0)->member)
+#define min(x, y)		((x) < (y) ? (x) : (y))
+#define max(x, y)		((x) > (y) ? (x) : (y))
 
 struct commandline_args {
 	bool background;
@@ -137,9 +143,37 @@ struct command {
 	} __attribute__((packed));
 } __attribute__((packed));
 
-#define offsetof(type, member)	((size_t)&((type *)0)->member)
 #define CMD_SIZE(name)	(offsetof(struct command, name) + \
 			 sizeof(((struct command *)0)->name))
+
+enum {
+	REPLY_ID_U32 = 0,		/* An unsigned 32bit integer. */
+	REPLY_ID_STR,			/* A string */
+
+	/* Asynchonous notifications. */
+	NOTIFY_ID_NEWMOUSE = 128,	/* New mouse was connected. */
+	NOTIFY_ID_DELMOUSE,		/* A mouse was removed. */
+};
+
+struct reply_hdr {
+	uint8_t id;
+} __attribute__((packed));
+
+struct reply {
+	struct reply_hdr hdr;
+	union {
+		struct {
+			uint32_t val;
+		} __attribute__((packed)) u32;
+		struct {
+			uint16_t len;
+			char str[0];
+		} __attribute__((packed)) string;
+	} __attribute__((packed));
+} __attribute__((packed));
+
+#define REPLY_SIZE(name)	(offsetof(struct reply, name) + \
+				 sizeof(((struct reply *)0)->name))
 
 struct client {
 	struct client *next;
@@ -511,20 +545,54 @@ static inline uint32_t cpu_to_be32(uint32_t v)
 #endif
 }
 
+
+static inline uint16_t cpu_to_be16(uint16_t v)
+{
+#ifdef BIG_ENDIAN_HOST
+	return v;
+#else
+	return bswap_16(v);
+#endif
+}
+
 static inline uint32_t be32_to_cpu(uint32_t v)
 {
 	return cpu_to_be32(v);
 }
 
+static inline uint16_t be16_to_cpu(uint16_t v)
+{
+	return cpu_to_be16(v);
+}
+
+static int send_reply(struct client *client, struct reply *r, size_t len)
+{
+	return send(client->fd, r, len, 0);
+}
+
 static int send_u32(struct client *client, uint32_t v)
 {
-	v = cpu_to_be32(v);
-	return send(client->fd, &v, sizeof(v), 0);
+	struct reply r;
+
+	r.hdr.id = REPLY_ID_U32;
+	r.u32.val = cpu_to_be32(v);
+
+	return send_reply(client, &r, REPLY_SIZE(u32));
 }
 
 static int send_string(struct client *client, const char *str)
 {
-	return send(client->fd, str, strlen(str) + 1, 0);
+	char buf[2048];
+	struct reply *r = (struct reply *)buf;
+	size_t len;
+
+	r->hdr.id = REPLY_ID_STR;
+	len = min(sizeof(buf) - REPLY_SIZE(string) - 1,
+		  strlen(str));
+	r->string.len = cpu_to_be16(len);
+	strncpy(r->string.str, str, len);
+
+	return send_reply(client, r, REPLY_SIZE(string) + len);
 }
 
 static int recv_bulk(struct client *client, char *buf, unsigned int len)

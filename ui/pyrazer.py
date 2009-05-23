@@ -52,11 +52,14 @@ class Razer:
 
 	COMMAND_PRIV_FLASHFW = 128	# Upload and flash a firmware image
 
+	REPLY_ID_U32 = 0		# An unsigned 32bit integer.
+	REPLY_ID_STR = 1		# A string
+
+	NOTIFY_ID_NEWMOUSE = 128	# New mouse was connected.
+	NOTIFY_ID_DELMOUSE = 129	# A mouse was removed.
+
 
 	def __init__(self):
-		self.__connect()
-
-	def __connect(self):
 		"Connect to razerd."
 		try:
 			self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -81,11 +84,19 @@ class Razer:
 		        (ord(be32Str[2]) << 8)  | \
 		        (ord(be32Str[3])))
 
+	def __be16_to_int(self, be16Str):
+		return ((ord(be16Str[0]) << 8)  | \
+		        (ord(be16Str[1])))
+
 	def __int_to_be32(self, integer):
 		return "%c%c%c%c" % ((integer >> 24) & 0xFF,\
 				     (integer >> 16) & 0xFF,\
 				     (integer >> 8) & 0xFF,\
 				     (integer & 0xFF))
+
+	def __int_to_be16(self, integer):
+		return "%c%c" % ((integer >> 8) & 0xFF,\
+				 (integer & 0xFF))
 
 	def __constructCommand(self, commandId, idstr, payload):
 		cmd = "%c" % commandId
@@ -120,25 +131,55 @@ class Razer:
 		cmd = self.__constructCommand(commandId, idstr, payload)
 		self.__sendPrivileged(cmd)
 
+	def __handleReceivedMessage(self, packet):
+		pass#TODO
+
+	def __receive(self, sock):
+		"Receive the next message. This will block until a message arrives."
+		hdrlen = 1
+		hdr = sock.recv(hdrlen)
+		id = ord(hdr[0])
+		payload = None
+		if id == self.REPLY_ID_U32:
+			payload = self.__be32_to_int(sock.recv(4))
+		elif id == self.REPLY_ID_STR:
+			strlen = self.__be16_to_int(sock.recv(2))
+			payload = sock.recv(strlen)
+		elif id == self.NOTIFY_ID_NEWMOUSE:
+			pass
+		elif id == self.NOTIFY_ID_DELMOUSE:
+			pass
+		else:
+			raise RazerEx("Received unknown message (id=%u)" % id)
+
+		return (id, payload)
+
+	def __receiveExpectedMessage(self, sock, expectedId):
+		"""Receive messages until the expected one appears.
+		Unexpected messages will be handled by __handleReceivedMessage.
+		This function returns the payload of the expected message."""
+		while 1:
+			pack = self.__receive(sock)
+			if (pack[0] == expectedId):
+				break
+			else:
+				self.__handleReceivedMessage(pack)
+		return pack[1]
+
 	def __recvU32(self):
-		data = self.sock.recv(4)
-		return self.__be32_to_int(data)
+		"Receive an expected REPLY_ID_U32"
+		return self.__receiveExpectedMessage(self.sock, self.REPLY_ID_U32)
 
 	def __recvU32Privileged(self):
+		"Receive an expected REPLY_ID_U32 on the privileged socket"
 		try:
-			data = self.privsock.recv(4)
+			return self.__receiveExpectedMessage(self.privsock, self.REPLY_ID_U32)
 		except (socket.error, AttributeError):
 			raise RazerEx("Privileged recvU32 failed. Do you have permission?")
-		return self.__be32_to_int(data)
 
 	def __recvString(self):
-		string = ""
-		while 1:
-			char = self.sock.recv(1)
-			if char == '\0':
-				break
-			string += char
-		return string
+		"Receive an expected REPLY_ID_STR"
+		return self.__receiveExpectedMessage(self.sock, self.REPLY_ID_STR)
 
 	def rescanMice(self):
 		"Send the command to rescan for mice to the daemon."

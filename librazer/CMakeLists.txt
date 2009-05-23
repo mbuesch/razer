@@ -22,7 +22,7 @@ add_custom_target(razer_udev_rules
 		   ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${CMAKE_INSTALL_PREFIX}
 		   DEPENDS ${CMAKE_SOURCE_DIR}/01-razer-udev.rules.template
 		   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-		   COMMENT Generate udev rules)
+		   COMMENT "Generate udev rules")
 add_dependencies(razer razer_udev_rules)
 
 install(FILES ${CMAKE_BINARY_DIR}/01-razer-udev.rules
