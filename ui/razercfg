@@ -21,6 +21,13 @@ from ConfigParser import *
 from pyrazer import *
 
 
+class OpSleep:
+	def __init__(self, seconds):
+		self.seconds = seconds
+
+	def run(self, idstr):
+		time.sleep(self.seconds)
+
 class OpGetFwVer:
 	def run(self, idstr):
 		verTuple = razer.getFwVer(idstr)
