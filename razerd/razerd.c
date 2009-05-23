@@ -327,7 +327,6 @@ static int create_socket(const char *path, unsigned int perm,
 		       path, strerror(errno));
 		goto error_close_sock;
 	}
-	unlink(path);
 	sockaddr.sun_family = AF_UNIX;
 	strncpy(sockaddr.sun_path, path, sizeof(sockaddr.sun_path) - 1);
 	err = bind(fd, (struct sockaddr *)&sockaddr, SUN_LEN(&sockaddr));
@@ -375,19 +374,26 @@ static int setup_var_run(void)
 
 	/* Create the control socket. */
 	ctlsock = create_socket(SOCKPATH, 0666, 25);
-	if (ctlsock == -1) {
-		cleanup_var_run();
-		return -1;
-	}
+	if (ctlsock == -1)
+		goto err_remove_pidfile;
 
 	/* Create the socket for privileged operations. */
 	privsock = create_socket(PRIV_SOCKPATH, 0660, 15);
-	if (privsock == -1) {
-		cleanup_var_run();
-		return -1;
-	}
+	if (privsock == -1)
+		goto err_remove_ctlsock;
 
 	return 0;
+
+err_remove_ctlsock:
+	unlink(SOCKPATH);
+	close(ctlsock);
+	ctlsock = -1;
+
+err_remove_pidfile:
+	remove_pidfile();
+	rmdir(VAR_RUN_RAZERD);
+
+	return -1;
 }
 
 static int setup_environment(void)
