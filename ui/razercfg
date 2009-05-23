@@ -307,6 +307,9 @@ def parse_args():
 			continue
 	if currentDevOps and currentDevOps.ops:
 		devOpsList.append(currentDevOps)
+	if not devOpsList:
+		usage()
+		exit(1)
 	return devOpsList
 
 def main():
