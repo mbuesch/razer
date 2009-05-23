@@ -25,6 +25,10 @@ RAZER_VERSION	= "0.03"
 
 
 
+class RazerEx(Exception):
+	"Exception thrown by pyrazer code."
+
+
 def razer_be32_to_int(be32Str):
 	return ((ord(be32Str[0]) << 24) | \
 	        (ord(be32Str[1]) << 16) | \
@@ -86,9 +90,6 @@ class RazerDevId:
 	def getDevId(self):
 		"Returns the device ID string"
 		return self.devid
-
-class RazerEx(Exception):
-	"Exception thrown by pyrazer code."
 
 class Razer:
 	SOCKET_PATH	= "/var/run/razerd/socket"

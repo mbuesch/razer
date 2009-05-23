@@ -178,7 +178,7 @@ def usage():
 	print ""
 	print "-d|--device DEV      Selects the device with the bus ID \"DEV\""
 	print "    Use the special value \"mouse\" for DEV to select"
-	print "    the first found razer mouse device in the system."
+	print "    the first razer mouse device found in the system."
 	print "-c|--config FILE     Read the config file and apply it."
 	print "    Use the special value \".\" for FILE to select the default file"
 	print ""
@@ -222,6 +222,13 @@ def parse_args():
 			scanDevices()
 			exit(0)
 		if o in ("-d", "--device"):
+			if v == "mouse": # magic; select the first mouse
+				razer.rescanMice()
+				mice = razer.getMice()
+				if not mice:
+					print "No Razer mouse found on your system"
+					exit(1)
+				v = mice[0]
 			if currentDevOps and currentDevOps.ops:
 				devOpsList.append(currentDevOps)
 			currentDevOps = DevOps(v)
