@@ -156,6 +156,7 @@ class MainWindow(QMainWindow):
 
 		self.setStatusBar(StatusBar())
 
+		self.mice = []
 		self.scan()
 		self.pokeNotificationTimer()
 
@@ -164,15 +165,18 @@ class MainWindow(QMainWindow):
 
 	def pollNotifications(self):
 		n = razer.pollNotifications()
-		#TODO
+		if n:
+			self.scan()
 		self.pokeNotificationTimer()
 
 	# Rescan for new devices
 	def scan(self):
 		razer.rescanMice()
-		self.mice = razer.getMice()
-		self.mousewidget.update(self.mice)
-		self.statusBar().showMessage(self.tr("Found %d Razer mice" % len(self.mice)))
+		mice = razer.getMice()
+		if len(mice) != len(self.mice):
+			self.statusBar().showMessage(self.tr("Found %d Razer mice" % len(mice)))
+		self.mice = mice
+		self.mousewidget.update(mice)
 
 	def about(self):
 		QMessageBox.information(self, self.tr("About"),
