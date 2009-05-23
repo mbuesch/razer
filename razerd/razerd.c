@@ -48,10 +48,24 @@ typedef _Bool bool;
 #define min(x, y)		((x) < (y) ? (x) : (y))
 #define max(x, y)		((x) > (y) ? (x) : (y))
 
+enum {
+	LOGLEVEL_ERROR = 0,
+	LOGLEVEL_WARNING,
+	LOGLEVEL_INFO,
+	LOGLEVEL_DEBUG,
+};
+
 struct commandline_args {
 	bool background;
 	const char *pidfile;
-} cmdargs;
+	int loglevel;
+} cmdargs = {
+#ifdef DEBUG
+	.loglevel	= LOGLEVEL_DEBUG,
+#else
+	.loglevel	= LOGLEVEL_INFO,
+#endif
+};
 
 
 #define VAR_RUN			"/var/run"
@@ -203,6 +217,8 @@ static void loginfo(const char *fmt, ...)
 {
 	va_list args;
 
+	if (cmdargs.loglevel < LOGLEVEL_INFO)
+		return;
 	va_start(args, fmt);
 	if (cmdargs.background)
 		vsyslog(LOG_MAKEPRI(LOG_DAEMON, LOG_INFO), fmt, args);
@@ -215,6 +231,8 @@ static void logerr(const char *fmt, ...)
 {
 	va_list args;
 
+	if (cmdargs.loglevel < LOGLEVEL_ERROR)
+		return;
 	va_start(args, fmt);
 	if (cmdargs.background)
 		vsyslog(LOG_MAKEPRI(LOG_DAEMON, LOG_ERR), fmt, args);
@@ -225,9 +243,10 @@ static void logerr(const char *fmt, ...)
 
 static void logdebug(const char *fmt, ...)
 {
-#ifdef DEBUG
 	va_list args;
 
+	if (cmdargs.loglevel < LOGLEVEL_DEBUG)
+		return;
 	va_start(args, fmt);
 	if (cmdargs.background) {
 		vsyslog(LOG_MAKEPRI(LOG_DAEMON, LOG_DEBUG), fmt, args);
@@ -236,7 +255,6 @@ static void logdebug(const char *fmt, ...)
 		vfprintf(stdout, fmt, args);
 	}
 	va_end(args);
-#endif
 }
 
 static void cleanup_var_run(void)
@@ -1140,6 +1158,8 @@ static void usage(FILE *fd, int argc, char **argv)
 	fprintf(fd, "\n");
 	fprintf(fd, "  -B|--background           Fork into the background (daemon mode)\n");
 	fprintf(fd, "  -P|--pidfile PATH         Create a PID-file\n");
+	fprintf(fd, "  -l|--loglevel LEVEL       Set the loglevel\n");
+	fprintf(fd, "                            0=error, 1=warning, 2=info(default), 3=debug\n");
 	fprintf(fd, "\n");
 	fprintf(fd, "  -h|--help                 Print this help text\n");
 	fprintf(fd, "  -v|--version              Print the version number\n");
@@ -1152,13 +1172,14 @@ static int parse_args(int argc, char **argv)
 		{ "version", no_argument, 0, 'v', },
 		{ "background", no_argument, 0, 'B', },
 		{ "pidfile", required_argument, 0, 'P', },
+		{ "loglevel", required_argument, 0, 'l', },
 		{ 0, },
 	};
 
 	int c, idx;
 
 	while (1) {
-		c = getopt_long(argc, argv, "hvBP:",
+		c = getopt_long(argc, argv, "hvBP:l:",
 				long_options, &idx);
 		if (c == -1)
 			break;
@@ -1174,6 +1195,12 @@ static int parse_args(int argc, char **argv)
 			break;
 		case 'P':
 			cmdargs.pidfile = optarg;
+			break;
+		case 'l':
+			if (sscanf(optarg, "%d", &cmdargs.loglevel) != 1) {
+				fprintf(stderr, "Failed to parse --loglevel argument\n");
+				return -1;
+			}
 			break;
 		default:
 			return -1;
