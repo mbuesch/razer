@@ -171,7 +171,7 @@ class Razer:
 			self.__sendPrivileged(chunk)
 			result = self.__recvU32Privileged()
 			if result != 0:
-				raise RazerEx("Privileged bulk write failed.")
+				raise RazerEx("Privileged bulk write failed. %u" % result)
 
 	def __sendCommand(self, commandId, idstr="", payload=""):
 		cmd = self.__constructCommand(commandId, idstr, payload)

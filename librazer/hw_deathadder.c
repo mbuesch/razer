@@ -21,6 +21,7 @@
 
 #include "hw_deathadder.h"
 #include "razer_private.h"
+#include "cypress_bootloader.h"
 
 #include <errno.h>
 #include <stdlib.h>
@@ -62,7 +63,7 @@ struct deathadder_private {
 
 #define DEATHADDER_USB_TIMEOUT		3000
 #define DADD_FW(major, minor)		(((major) << 8) | (minor))
-#define DEATHADDER_FW_IMAGE_SIZE	0x200000//FIXME
+#define DEATHADDER_FW_IMAGE_SIZE	0x200000
 
 static int deathadder_usb_write(struct deathadder_private *priv,
 				int request, int command,
@@ -492,7 +493,6 @@ static int deathadder_set_resolution(struct razer_mouse *m,
 	return err;
 }
 
-#if 0
 static struct usb_device * wait_for_usbdev(uint16_t vendor_id,
 					   uint16_t product_id)
 {
@@ -517,21 +517,18 @@ static struct usb_device * wait_for_usbdev(uint16_t vendor_id,
 
 	return NULL;
 }
-#endif
 
 static int deathadder_flash_firmware(struct razer_mouse *m,
 				     const char *data, size_t len,
 				     unsigned int magic_number)
 {
-#if 0
 	struct deathadder_private *priv = m->internal;
 	int err;
 	uint16_t checksum, expected_checksum;
 	unsigned int i;
 	char value;
 	struct usb_device *cydev;
-	usb_dev_handle *cyh;
-	unsigned int interface;
+	struct cypress cy;
 
 	if (magic_number != RAZER_FW_FLASH_MAGIC)
 		return -EINVAL;
@@ -539,15 +536,13 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 		return -EBUSY;
 
 	/* Firmware needs to be image plus 2 bytes checksum. */
-//	if (len != DEATHADDER_FW_IMAGE_SIZE + 2) {
-	if (len != 16*1024) {
+	if (len != DEATHADDER_FW_IMAGE_SIZE + 2) {
 		fprintf(stderr, "razer-deathadder: "
 			"Firmware image has wrong size %u (expected %u).\n",
 			(unsigned int)len,
 			(unsigned int)(DEATHADDER_FW_IMAGE_SIZE + 2));
 		return -EINVAL;
 	}
-#if 0
 	/* Verify the checksum. */
 	checksum = 0;
 	for (i = 0; i < DEATHADDER_FW_IMAGE_SIZE; i += 2) {
@@ -561,9 +556,8 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 			"Firmware image has invalid checksum. "
 			"(was: 0x%02X, expected: 0x%02X)\n",
 			checksum, expected_checksum);
-		return -EINVAL;
+//FIXME		return -EINVAL;
 	}
-#endif
 
 	/* Enter bootloader mode */
 	razer_msleep(50);
@@ -575,42 +569,24 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 		return err;
 	}
 	/* Wait for the cypress device to appear. */
-	cydev = wait_for_usbdev(0x04B4, 0xE006);
+	cydev = wait_for_usbdev(CYPRESS_BOOT_VENDORID, CYPRESS_BOOT_PRODUCTID);
 	if (!cydev) {
 		fprintf(stderr, "razer-deathadder: Cypress device didn't appear.\n");
 		return -1;
 	}
 	razer_msleep(100);
-printf("Found cypress dev\n");
-	cyh = usb_open(cydev);
-	if (!cyh) {
-		fprintf(stderr, "razer-deathadder: Failed to open Cypress device.\n");
-		return -1;
-	}
-	interface = cydev->config->interface->altsetting[0].bInterfaceNumber;
-#if 0
-	err = usb_detach_kernel_driver_np(cyh, interface);
-	if (err) {
-		fprintf(stderr, "razer-deathadder: "
-			"failed to detach kernel driver for Cypress device.\n");
-		//TODO abort?
-	}
-#endif
-	err = usb_claim_interface(cyh, interface);
-	if (err) {
-		fprintf(stderr, "razer-deathadder: Failed to claim Cypress device.\n");
-		usb_close(cyh);
-		return -1;
-	}
-printf("cypress claimed\n");
 
-	//TODO
-	usb_close(cyh);
-	razer_msleep(300);
+	err = cypress_open(&cy, cydev);
+	if (err)
+		return err;
+	err = cypress_upload_image(&cy, data, DEATHADDER_FW_IMAGE_SIZE);
+	cypress_close(&cy);
+	if (err)
+		return err;
 
-	return err;
-#endif
-	return -ENOSYS;
+	//FIXME need to reconnect the device?
+
+	return 0;
 }
 
 void razer_deathadder_gen_idstr(struct usb_device *udev, char *buf)

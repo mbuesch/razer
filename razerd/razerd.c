@@ -435,7 +435,7 @@ static void signal_handler(int signum)
 		exit(0);
 		break;
 	case SIGPIPE:
-		logerr("Broken pipe.\n");//FIXME
+		logerr("Broken pipe.\n");
 		break;
 	default:
 		logerr("Received unknown signal %d\n", signum);
@@ -611,14 +611,20 @@ static int recv_bulk(struct client *client, char *buf, unsigned int len)
 	unsigned int next_len, i;
 	int nr;
 
+//FIXME timeout
 	for (i = 0; i < len; i += BULK_CHUNK_SIZE) {
 		next_len = BULK_CHUNK_SIZE;
 		if (i + next_len > len)
 			next_len = len - i;
-		do {
+		while (1) {
 			nr = recv(client->fd, buf + i, next_len, 0);
-		} while (!nr);//FIXME
-//printf("recv %d %u\n", nr, next_len);
+			if (nr < 0) {
+				if (errno == EAGAIN)
+					continue;
+			}
+			if (nr > 0)
+				break;
+		}
 		if (nr != next_len) {
 			send_u32(client, ERR_PAYLOAD);
 			return -1;

@@ -167,7 +167,6 @@ def scanDevices():
 		print mouse
 
 def exit(exitcode):
-	#TODO
 	sys.exit(exitcode)
 
 def prVersion():

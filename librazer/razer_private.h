@@ -1,6 +1,8 @@
 #ifndef RAZER_PRIVATE_H_
 #define RAZER_PRIVATE_H_
 
+#include "librazer.h"
+
 #include <usb.h>
 #include <stdio.h>
 #include <string.h>
