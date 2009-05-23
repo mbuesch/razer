@@ -19,6 +19,7 @@
 """
 
 import socket
+import select
 
 RAZER_VERSION	= "0.02"
 
@@ -78,12 +79,15 @@ class Razer:
 	REPLY_ID_U32 = 0		# An unsigned 32bit integer.
 	REPLY_ID_STR = 1		# A string
 	# Notifications. These go through the reply channel.
+	__NOTIFY_ID_FIRST = 128
 	NOTIFY_ID_NEWMOUSE = 128	# New mouse was connected.
 	NOTIFY_ID_DELMOUSE = 129	# A mouse was removed.
 
 
-	def __init__(self):
+	def __init__(self, enableNotifications=False):
 		"Connect to razerd."
+		self.enableNotifications = enableNotifications
+		self.notifications = []
 		try:
 			self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 			self.sock.connect(self.SOCKET_PATH)
@@ -135,8 +139,11 @@ class Razer:
 		self.__sendPrivileged(cmd)
 
 	def __handleReceivedMessage(self, packet):
-		print "got notification", packet[0]
-		pass#TODO
+		id = packet[0]
+		if id < self.__NOTIFY_ID_FIRST:
+			raise RazerEx("Received unhandled packet %u" % id)
+		if self.enableNotifications:
+			self.notifications.append(packet)
 
 	def __receive(self, sock):
 		"Receive the next message. This will block until a message arrives."
@@ -184,6 +191,20 @@ class Razer:
 	def __recvString(self):
 		"Receive an expected REPLY_ID_STR"
 		return self.__receiveExpectedMessage(self.sock, self.REPLY_ID_STR)
+
+	def pollNotifications(self):
+		"Returns a list of pending notifications (id, payload)"
+		if not self.enableNotifications:
+			raise RazerEx("Polled notifications while notifications were disabled")
+		while 1:
+			res = select.select([self.sock], [], [], 0.001)
+			if not res[0]:
+				break
+			pack = self.__receive(self.sock)
+			self.__handleReceivedMessage(pack)
+		notifications = self.notifications
+		self.notifications = []
+		return notifications
 
 	def rescanMice(self):
 		"Send the command to rescan for mice to the daemon."
