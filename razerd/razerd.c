@@ -70,7 +70,6 @@ struct commandline_args {
 
 #define VAR_RUN			"/var/run"
 #define VAR_RUN_RAZERD		VAR_RUN "/razerd"
-#define PIDFILE			VAR_RUN_RAZERD "/razerd.pid"
 #define SOCKPATH		VAR_RUN_RAZERD "/socket"
 #define PRIV_SOCKPATH		VAR_RUN_RAZERD "/socket.privileged"
 
@@ -257,6 +256,45 @@ static void logdebug(const char *fmt, ...)
 	va_end(args);
 }
 
+static void remove_pidfile(void)
+{
+	if (!cmdargs.pidfile)
+		return;
+	if (unlink(cmdargs.pidfile)) {
+		logerr("Failed to remove PID-file %s: %s\n",
+		       cmdargs.pidfile, strerror(errno));
+	}
+}
+
+static int create_pidfile(void)
+{
+	char buf[32] = { 0, };
+	pid_t pid = getpid();
+	int fd;
+	ssize_t res;
+
+	if (!cmdargs.pidfile)
+		return 0;
+
+	fd = open(cmdargs.pidfile, O_RDWR | O_CREAT | O_TRUNC, 0444);
+	if (fd < 0) {
+		logerr("Failed to create PID-file %s: %s\n",
+		       cmdargs.pidfile, strerror(errno));
+		return -1;
+	}
+	snprintf(buf, sizeof(buf), "%lu",
+		 (unsigned long)pid);
+	res = write(fd, buf, strlen(buf));
+	close(fd);
+	if (res != strlen(buf)) {
+		logerr("Failed to write PID-file %s: %s\n",
+		       cmdargs.pidfile, strerror(errno));
+		return -1;
+	}
+
+	return 0;
+}
+
 static void cleanup_var_run(void)
 {
 	unlink(SOCKPATH);
@@ -267,7 +305,7 @@ static void cleanup_var_run(void)
 	close(privsock);
 	privsock = -1;
 
-	unlink(PIDFILE);
+	remove_pidfile();
 	rmdir(VAR_RUN_RAZERD);
 }
 
@@ -323,9 +361,7 @@ error:
 
 static int setup_var_run(void)
 {
-	int fd, err;
-	ssize_t ssize;
-	char buf[32] = { 0, };
+	int err;
 
 	/* Create /var/run subdirectory. */
 	err = mkdir(VAR_RUN_RAZERD, 0755);
@@ -335,23 +371,7 @@ static int setup_var_run(void)
 		return err;
 	}
 
-	/* Create PID-file */
-	fd = open(PIDFILE, O_WRONLY | O_CREAT | O_TRUNC, 0444);
-	if (fd == -1) {
-		logerr("Failed to create pidfile %s: %s\n",
-		       PIDFILE, strerror(errno));
-		cleanup_var_run();
-		return -1;
-	}
-	snprintf(buf, sizeof(buf), "%lu\n", (unsigned long)getpid());
-	ssize = write(fd, buf, strlen(buf));
-	close(fd);
-	if (ssize != strlen(buf)) {
-		logerr("Failed to write to pidfile %s: %s\n",
-		       PIDFILE, strerror(errno));
-		cleanup_var_run();
-		return -1;
-	}
+	create_pidfile();
 
 	/* Create the control socket. */
 	ctlsock = create_socket(SOCKPATH, 0666, 25);
@@ -370,60 +390,18 @@ static int setup_var_run(void)
 	return 0;
 }
 
-static void remove_pidfile(void)
-{
-	if (!cmdargs.pidfile)
-		return;
-	if (unlink(cmdargs.pidfile)) {
-		logerr("Failed to remove PID-file %s: %s\n",
-		       cmdargs.pidfile, strerror(errno));
-	}
-}
-
-static int create_pidfile(void)
-{
-	char buf[32] = { 0, };
-	pid_t pid = getpid();
-	int fd;
-	ssize_t res;
-
-	if (!cmdargs.pidfile)
-		return 0;
-
-	fd = open(cmdargs.pidfile, O_RDWR | O_CREAT | O_TRUNC, 0444);
-	if (fd < 0) {
-		logerr("Failed to create PID-file %s: %s\n",
-		       cmdargs.pidfile, strerror(errno));
-		return -1;
-	}
-	snprintf(buf, sizeof(buf), "%lu",
-		 (unsigned long)pid);
-	res = write(fd, buf, strlen(buf));
-	close(fd);
-	if (res != strlen(buf)) {
-		logerr("Failed to write PID-file %s: %s\n",
-		       cmdargs.pidfile, strerror(errno));
-		return -1;
-	}
-
-	return 0;
-}
-
 static int setup_environment(void)
 {
 	int err;
 
-	create_pidfile();
 	err = razer_init();
 	if (err) {
 		logerr("librazer initialization failed. (%d)\n", err);
-		remove_pidfile();
 		return err;
 	}
 	err = setup_var_run();
 	if (err) {
 		razer_exit();
-		remove_pidfile();
 		return err;
 	}
 

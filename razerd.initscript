@@ -7,7 +7,7 @@
 #
 
 # Path to the PID-file
-PIDFILE="/var/run/razerd.pid"
+PIDFILE="/var/run/razerd/razerd.pid"
 
 export PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 
