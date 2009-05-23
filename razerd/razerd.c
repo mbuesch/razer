@@ -169,6 +169,11 @@ struct reply {
 			uint16_t len;
 			char str[0];
 		} __attribute__((packed)) string;
+
+		struct {
+		} __attribute__((packed)) notify_newmouse;
+		struct {
+		} __attribute__((packed)) notify_delmouse;
 	} __attribute__((packed));
 } __attribute__((packed));
 
@@ -1055,9 +1060,30 @@ static void check_privileged_connections(void)
 	}
 }
 
+static void broadcast_notification(unsigned int notifyId, size_t size)
+{
+	struct reply r;
+	struct client *client;
+
+	for (client = clients; client; client = client->next) {
+		r.hdr.id = notifyId;
+		send_reply(client, &r, size);
+	}
+}
+
 static void event_handler(enum razer_event event,
 			  const struct razer_event_data *data)
-{//TODO
+{
+	switch (event) {
+	case RAZER_EV_MOUSE_ADD:
+		broadcast_notification(NOTIFY_ID_NEWMOUSE,
+				       REPLY_SIZE(notify_newmouse));
+		break;
+	case RAZER_EV_MOUSE_REMOVE:
+		broadcast_notification(NOTIFY_ID_DELMOUSE,
+				       REPLY_SIZE(notify_delmouse));
+		break;
+	}
 }
 
 static int mainloop(void)

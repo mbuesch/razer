@@ -22,6 +22,28 @@ import socket
 
 RAZER_VERSION	= "0.02"
 
+
+
+def razer_be32_to_int(be32Str):
+	return ((ord(be32Str[0]) << 24) | \
+	        (ord(be32Str[1]) << 16) | \
+	        (ord(be32Str[2]) << 8)  | \
+	        (ord(be32Str[3])))
+
+def razer_be16_to_int(be16Str):
+	return ((ord(be16Str[0]) << 8)  | \
+	        (ord(be16Str[1])))
+
+def razer_int_to_be32(integer):
+	return "%c%c%c%c" % ((integer >> 24) & 0xFF,\
+			     (integer >> 16) & 0xFF,\
+			     (integer >> 8) & 0xFF,\
+			     (integer & 0xFF))
+
+def razer_int_to_be16(integer):
+	return "%c%c" % ((integer >> 8) & 0xFF,\
+			 (integer & 0xFF))
+
 class RazerEx(Exception):
 	"Exception thrown by pyrazer code."
 
@@ -52,9 +74,10 @@ class Razer:
 
 	COMMAND_PRIV_FLASHFW = 128	# Upload and flash a firmware image
 
+	# Replies to commands
 	REPLY_ID_U32 = 0		# An unsigned 32bit integer.
 	REPLY_ID_STR = 1		# A string
-
+	# Notifications. These go through the reply channel.
 	NOTIFY_ID_NEWMOUSE = 128	# New mouse was connected.
 	NOTIFY_ID_DELMOUSE = 129	# A mouse was removed.
 
@@ -77,26 +100,6 @@ class Razer:
 		if (rev != self.INTERFACE_REVISION):
 			raise RazerEx("Incompatible interface revision. razerd=%u, me=%u" %\
 					(rev, self.INTERFACE_REVISION))
-
-	def __be32_to_int(self, be32Str):
-		return ((ord(be32Str[0]) << 24) | \
-		        (ord(be32Str[1]) << 16) | \
-		        (ord(be32Str[2]) << 8)  | \
-		        (ord(be32Str[3])))
-
-	def __be16_to_int(self, be16Str):
-		return ((ord(be16Str[0]) << 8)  | \
-		        (ord(be16Str[1])))
-
-	def __int_to_be32(self, integer):
-		return "%c%c%c%c" % ((integer >> 24) & 0xFF,\
-				     (integer >> 16) & 0xFF,\
-				     (integer >> 8) & 0xFF,\
-				     (integer & 0xFF))
-
-	def __int_to_be16(self, integer):
-		return "%c%c" % ((integer >> 8) & 0xFF,\
-				 (integer & 0xFF))
 
 	def __constructCommand(self, commandId, idstr, payload):
 		cmd = "%c" % commandId
@@ -132,6 +135,7 @@ class Razer:
 		self.__sendPrivileged(cmd)
 
 	def __handleReceivedMessage(self, packet):
+		print "got notification", packet[0]
 		pass#TODO
 
 	def __receive(self, sock):
@@ -141,9 +145,9 @@ class Razer:
 		id = ord(hdr[0])
 		payload = None
 		if id == self.REPLY_ID_U32:
-			payload = self.__be32_to_int(sock.recv(4))
+			payload = razer_be32_to_int(sock.recv(4))
 		elif id == self.REPLY_ID_STR:
-			strlen = self.__be16_to_int(sock.recv(2))
+			strlen = razer_be16_to_int(sock.recv(2))
 			payload = sock.recv(strlen)
 		elif id == self.NOTIFY_ID_NEWMOUSE:
 			pass
@@ -254,19 +258,19 @@ class Razer:
 
 	def setFrequency(self, idstr, newFrequency):
 		"Set a new scan frequency (in Hz)."
-		payload = self.__int_to_be32(newFrequency)
+		payload = razer_int_to_be32(newFrequency)
 		self.__sendCommand(self.COMMAND_ID_SETFREQ, idstr, payload)
 		return self.__recvU32()
 
 	def setResolution(self, idstr, newResolution):
 		"Set a new scan resolution (in DPI)."
-		payload = self.__int_to_be32(newResolution)
+		payload = razer_int_to_be32(newResolution)
 		self.__sendCommand(self.COMMAND_ID_SETRES, idstr, payload)
 		return self.__recvU32()
 
 	def flashFirmware(self, idstr, image):
 		"Flash a new firmware on the device. Needs high privileges!"
-		payload = self.__int_to_be32(len(image))
+		payload = razer_int_to_be32(len(image))
 		self.__sendPrivilegedCommand(self.COMMAND_PRIV_FLASHFW, idstr, payload)
 		self.__sendBulkPrivileged(image)
 		return self.__recvU32Privileged()
