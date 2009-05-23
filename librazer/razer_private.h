@@ -3,6 +3,7 @@
 
 #include <usb.h>
 #include <stdio.h>
+#include <string.h>
 
 
 #ifdef DEBUG
@@ -49,5 +50,18 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard, bool
 int razer_usb_force_reinit(struct razer_usb_context *ctx);
 
 void razer_msleep(unsigned int msecs);
+
+#define BUSTYPESTR_USB		"USB"
+#define DEVTYPESTR_MOUSE	"Mouse"
+static inline void razer_create_idstr(char *buf,
+				      const char *bustype,
+				      const char *busposition,
+				      const char *devtype,
+				      const char *devname,
+				      const char *devid)
+{
+	snprintf(buf, RAZER_IDSTR_MAX_SIZE, "%s:%s:%s-%s:%s",
+		 devtype, devname, bustype, busposition, devid);
+}
 
 #endif /* RAZER_PRIVATE_H_ */

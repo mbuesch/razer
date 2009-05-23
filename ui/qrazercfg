@@ -2,7 +2,7 @@
 #
 #   Razer device QT configuration tool
 #
-#   Copyright (C) 2007 Michael Buesch <mb@bu3sch.de>
+#   Copyright (C) 2007-2009 Michael Buesch <mb@bu3sch.de>
 #
 #   This program is free software; you can redistribute it and/or
 #   modify it under the terms of the GNU General Public License
@@ -23,7 +23,7 @@ from pyrazer import *
 class LedCheckBox(QCheckBox):
 	def __init__(self, mouse, ledname, ledstate, parent):
 		text = ledname
-		text += parent.tr(" LED")
+		text += parent.tr(" LED enabled")
 		QCheckBox.__init__(self, text, parent)
 
 		self.mousewidget = parent
@@ -71,7 +71,10 @@ class MouseWidget(QWidget):
 		self.mice = mice
 		self.mousesel.clear()
 		for mouse in mice:
-			self.mousesel.addItem(mouse)
+			id = RazerDevId(mouse)
+			self.mousesel.addItem("%s   %s-%s %s" % \
+				(id.getDevName(), id.getBusType(),
+				 id.getBusPosition(), id.getDevId()))
 
 	def freqChanged(self, index):
 		if index == -1:
@@ -159,6 +162,8 @@ class MainWindow(QMainWindow):
 		self.mice = []
 		self.scan()
 		self.pokeNotificationTimer()
+
+		self.resize(350, 350)
 
 	def pokeNotificationTimer(self):
 		QTimer.singleShot(300, self.pollNotifications)

@@ -21,7 +21,7 @@
 import socket
 import select
 
-RAZER_VERSION	= "0.02"
+RAZER_VERSION	= "0.03"
 
 
 
@@ -44,6 +44,48 @@ def razer_int_to_be32(integer):
 def razer_int_to_be16(integer):
 	return "%c%c" % ((integer >> 8) & 0xFF,\
 			 (integer & 0xFF))
+
+class RazerDevId:
+	"devid parser"
+
+	DEVTYPE_UNKNOWN = "Unknown"
+	DEVTYPE_MOUSE = "Mouse"
+
+	BUSTYPE_UNKNOWN = "Unknown"
+	BUSTYPE_USB = "USB"
+
+	def __init__(self, devid):
+		self.devtype = self.DEVTYPE_UNKNOWN
+		self.bustype = self.BUSTYPE_UNKNOWN
+		self.buspos = ""
+		self.devname = ""
+		self.devid = ""
+		try:
+			id = devid.split(':')
+			self.devtype = id[0]
+			self.devname = id[1]
+			bus = id[2].split('-')
+			self.bustype = bus[0]
+			self.buspos = bus[1]
+			self.devid = id[3]
+		except IndexError:
+			pass
+
+	def getDevType(self):
+		"Returns DEVTYPE_..."
+		return self.devtype
+	def getBusType(self):
+		"Returns BUSTYPE_..."
+		return self.bustype
+	def getBusPosition(self):
+		"Returns the bus position ID string"
+		return self.buspos
+	def getDevName(self):
+		"Returns the device name string"
+		return self.devname
+	def getDevId(self):
+		"Returns the device ID string"
+		return self.devid
 
 class RazerEx(Exception):
 	"Exception thrown by pyrazer code."
