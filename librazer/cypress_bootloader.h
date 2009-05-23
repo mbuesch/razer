@@ -6,7 +6,7 @@
 
 struct cypress {
 	struct razer_usb_context usb;
-	unsigned int interface;
+	unsigned int ep;
 };
 
 #define CYPRESS_BOOT_VENDORID	0x04B4

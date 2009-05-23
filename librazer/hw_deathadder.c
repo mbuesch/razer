@@ -63,7 +63,7 @@ struct deathadder_private {
 
 #define DEATHADDER_USB_TIMEOUT		3000
 #define DADD_FW(major, minor)		(((major) << 8) | (minor))
-#define DEATHADDER_FW_IMAGE_SIZE	0x200000
+#define DEATHADDER_FW_IMAGE_SIZE	0x8000
 
 static int deathadder_usb_write(struct deathadder_private *priv,
 				int request, int command,
@@ -536,7 +536,7 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 		return -EBUSY;
 
 	/* Firmware needs to be image plus 2 bytes checksum. */
-	if (len != DEATHADDER_FW_IMAGE_SIZE + 2) {
+	if (len != DEATHADDER_FW_IMAGE_SIZE /*+ 2*/) {//FIXME
 		fprintf(stderr, "razer-deathadder: "
 			"Firmware image has wrong size %u (expected %u).\n",
 			(unsigned int)len,
