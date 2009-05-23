@@ -92,6 +92,10 @@ class MouseWidget(QWidget):
 	def mouseChanged(self, index):
 		self.hzsel.clear()
 		self.ressel.clear()
+		for chk in self.ledCheckboxes:
+			self.ledsLayout.removeWidget(chk)
+			chk.deleteLater()
+		self.ledCheckboxes = []
 		if index == -1:
 			self.hzsel.setEnabled(0)
 			self.ressel.setEnabled(0)
@@ -117,10 +121,6 @@ class MouseWidget(QWidget):
 		index = self.ressel.findData(QVariant(curRes))
 		self.ressel.setCurrentIndex(index)
 
-		for chk in self.ledCheckboxes:
-			self.ledsLayout.removeWidget(chk)
-			chk.deleteLater()
-		self.ledCheckboxes = []
 		for led in razer.getLeds(self.mouse):
 			chk = LedCheckBox(self.mouse, led[0], led[1], self)
 			self.ledCheckboxes.append(chk)

@@ -45,8 +45,12 @@ typedef _Bool bool;
 #undef max
 #undef offsetof
 #define offsetof(type, member)	((size_t)&((type *)0)->member)
-#define min(x, y)		((x) < (y) ? (x) : (y))
-#define max(x, y)		((x) > (y) ? (x) : (y))
+#define min(x, y)		({ __typeof__(x) __x = (x); \
+				   __typeof__(y) __y = (y); \
+				   __x < __y ? __x : __y; })
+#define max(x, y)		({ __typeof__(x) __x = (x); \
+				   __typeof__(y) __y = (y); \
+				   __x > __y ? __x : __y; })
 
 enum {
 	LOGLEVEL_ERROR = 0,
