@@ -1,0 +1,31 @@
+PPSETTIME fails with EINVAL on PowerPC (at least).
+Let's remove it, as a temporary workaround.
+
+---
+ prog/pp.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+--- m8cutils-22.orig/prog/pp.c
++++ m8cutils-22/prog/pp.c
+@@ -75,7 +75,7 @@ static void set_input(int new_input)
+ 
+ int pp_open(const char *path,int need_epp)
+ {
+-    struct timeval timeout = { .tv_sec = PP_TIMEOUT_S, .tv_usec = 0 };
++/*    struct timeval timeout = { .tv_sec = PP_TIMEOUT_S, .tv_usec = 0 };*/
+ 
+     if (!path)
+ 	path = DEFAULT_PARPORT;
+@@ -95,10 +95,12 @@ int pp_open(const char *path,int need_ep
+ 	perror("ioctl(PPCLAIM)");
+ 	exit(1);
+     }
++#if 0
+     if (ioctl(fd,PPSETTIME,&timeout) < 0) {
+ 	perror("ioctl(SETTIME)");
+ 	exit(1);
+     }   
++#endif
+     return fd;
+ }
+ 

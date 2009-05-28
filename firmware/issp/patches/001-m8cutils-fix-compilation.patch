@@ -1,0 +1,37 @@
+GCC warns about unused functions.
+As m8cutils is compiled with -Werror, compilation fails in jrb.c
+
+---
+ libfdr/jrb.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+--- m8cutils-22.orig/libfdr/jrb.c
++++ m8cutils-22/libfdr/jrb.c
+@@ -50,8 +50,10 @@ static JRB lprev(JRB n);
+ static JRB rprev(JRB n);
+ static void recolor(JRB n);
+ static void single_rotate(JRB y, int l);
++#if 0
+ static void jrb_print_tree(JRB t, int level);
+ static void jrb_iprint_tree(JRB t, int level);
++#endif
+  
+ #define isred(n) (n->red)
+ #define isblack(n) (!isred(n))
+@@ -549,7 +551,7 @@ void jrb_delete_node(JRB n)
+   }
+ }
+  
+- 
++#if 0 
+ void jrb_print_tree(JRB t, int level)
+ {
+   int i;
+@@ -601,6 +603,7 @@ void jrb_iprint_tree(JRB t, int level)
+     }
+   }
+ }
++#endif
+       
+ int jrb_nblack(JRB n)
+ {
