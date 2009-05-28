@@ -77,7 +77,7 @@ struct commandline_args {
 #define SOCKPATH		VAR_RUN_RAZERD "/socket"
 #define PRIV_SOCKPATH		VAR_RUN_RAZERD "/socket.privileged"
 
-#define INTERFACE_REVISION	0
+#define INTERFACE_REVISION	1
 
 #define COMMAND_MAX_SIZE	512
 #define COMMAND_HDR_SIZE	sizeof(struct command_hdr)
@@ -92,12 +92,17 @@ enum {
 	COMMAND_ID_GETFWVER,		/* Get the firmware rev of a mouse. */
 	COMMAND_ID_SUPPFREQS,		/* Get a list of supported frequencies. */
 	COMMAND_ID_SUPPRESOL,		/* Get a list of supported resolutions. */
+	COMMAND_ID_SUPPDPIMAPPINGS,	/* Get a list of supported DPI mappings. */
+	COMMAND_ID_CHANGEDPIMAPPING,	/* Modify a DPI mapping. */
+	COMMAND_ID_GETDPIMAPPING,	/* Get the active DPI mapping for a profile. */
+	COMMAND_ID_SETDPIMAPPING,	/* Set the active DPI mapping for a profile. */
 	COMMAND_ID_GETLEDS,		/* Get a list of LEDs on the device. */
 	COMMAND_ID_SETLED,		/* Set the state of a LED. */
-	COMMAND_ID_SETRES,		/* Set the resolution. */
-	COMMAND_ID_SETFREQ,		/* Set the frequency. */
-	COMMAND_ID_GETRES,		/* Get the current resolution. */
 	COMMAND_ID_GETFREQ,		/* Get the current frequency. */
+	COMMAND_ID_SETFREQ,		/* Set the frequency. */
+	COMMAND_ID_GETPROFILES,		/* Get a list of supported profiles. */
+	COMMAND_ID_GETACTIVEPROF,	/* Get the active profile. */
+	COMMAND_ID_SETACTIVEPROF,	/* Set the active profile. */
 
 	/* Privileged commands */
 	COMMAND_PRIV_FLASHFW = 128,	/* Upload and flash a firmware image */
@@ -132,6 +137,14 @@ struct command {
 		} __attribute__((packed)) suppresol;
 
 		struct {
+		} __attribute__((packed)) suppdpimappings;
+
+		struct {
+			uint32_t id;
+			uint32_t new_resolution;
+		} __attribute__((packed)) changedpimapping;
+
+		struct {
 		} __attribute__((packed)) getleds;
 
 		struct {
@@ -140,18 +153,23 @@ struct command {
 		} __attribute__((packed)) setled;
 
 		struct {
-			uint32_t new_resolution;
-		} __attribute__((packed)) setres;
-
-		struct {
+			uint32_t profile_id;
 			uint32_t new_frequency;
 		} __attribute__((packed)) setfreq;
 
 		struct {
-		} __attribute__((packed)) getfreq;
+		} __attribute__((packed)) getprofiles;
 
 		struct {
-		} __attribute__((packed)) getres;
+		} __attribute__((packed)) getactiveprof;
+
+		struct {
+			uint32_t id;
+		} __attribute__((packed)) setactiveprof;
+
+		struct {
+			uint32_t profile_id;
+		} __attribute__((packed)) getfreq;
 
 		struct {
 			uint32_t imagesize;
@@ -671,36 +689,30 @@ out:
 	send_u32(client, fwver);
 }
 
-static void command_getres(struct client *client, const struct command *cmd, unsigned int len)
-{
-	struct razer_mouse *mouse;
-	enum razer_mouse_res res;
-
-	if (len < CMD_SIZE(getres))
-		goto error;
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
-	if (!mouse)
-		goto error;
-	res = mouse->get_resolution(mouse);
-
-	send_u32(client, res);
-
-	return;
-error:
-	send_u32(client, RAZER_MOUSE_RES_UNKNOWN);
-}
-
 static void command_getfreq(struct client *client, const struct command *cmd, unsigned int len)
 {
 	struct razer_mouse *mouse;
+	struct razer_mouse_profile *list, *profile;
 	enum razer_mouse_freq freq;
+	unsigned int i;
 
 	if (len < CMD_SIZE(getfreq))
 		goto error;
 	mouse = razer_mouse_list_find(mice, cmd->idstr);
 	if (!mouse)
 		goto error;
-	freq = mouse->get_freq(mouse);
+	list = mouse->get_profiles(mouse);
+	if (!list)
+		goto error;
+	for (i = 0; i < mouse->nr_profiles; i++) {
+		if (list[i].nr == be32_to_cpu(cmd->getfreq.profile_id)) {
+			profile = &list[i];
+			break;
+		}
+	}
+	if (!profile || !profile->get_freq)
+		goto error;
+	freq = profile->get_freq(profile);
 
 	send_u32(client, freq);
 
@@ -759,6 +771,82 @@ static void command_suppresol(struct client *client, const struct command *cmd, 
 error:
 	count = 0;
 	send_u32(client, count);
+}
+
+static void command_suppdpimappings(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	struct razer_mouse_dpimapping *list;
+	int i, count;
+
+	if (len < CMD_SIZE(suppdpimappings))
+		goto error;
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse)
+		goto error;
+	count = mouse->supported_dpimappings(mouse, &list);
+	if (count <= 0)
+		goto error;
+
+	send_u32(client, count);
+	for (i = 0; i < count; i++) {
+		send_u32(client, list[i].nr);
+		send_u32(client, list[i].res);
+		send_u32(client, list[i].change ? 1 : 0);
+	}
+	/* No need to free list. It's statically allocated. */
+
+	return;
+error:
+	count = 0;
+	send_u32(client, count);
+}
+
+static void command_changedpimapping(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	struct razer_mouse_dpimapping *list, *mapping;
+	int err, i, count;
+	uint32_t errorcode = ERR_NONE;
+
+	if (len < CMD_SIZE(changedpimapping)) {
+		errorcode = ERR_CMDSIZE;
+		goto error;
+	}
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse) {
+		errorcode = ERR_NOMOUSE;
+		goto error;
+	}
+	count = mouse->supported_dpimappings(mouse, &list);
+	if (count <= 0) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+	for (i = 0; i < count; i++) {
+		if (list[i].nr == be32_to_cpu(cmd->changedpimapping.id)) {
+			mapping = &list[i];
+			break;
+		}
+	}
+	if (!mapping || !mapping->change) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+
+	err = mouse->claim(mouse);
+	if (err) {
+		errorcode = ERR_CLAIM;
+		goto error;
+	}
+	err = mapping->change(mapping,
+			      be32_to_cpu(cmd->changedpimapping.new_resolution));
+	if (err)
+		errorcode = ERR_FAIL;
+	mouse->release(mouse);
+
+error:
+	send_u32(client, errorcode);
 }
 
 static void command_rescanmice(struct client *client, const struct command *cmd, unsigned int len)
@@ -849,41 +937,12 @@ error:
 	send_u32(client, errorcode);
 }
 
-static void command_setres(struct client *client, const struct command *cmd, unsigned int len)
-{
-	struct razer_mouse *mouse;
-	int err;
-	uint32_t errorcode = ERR_NONE;
-
-	if (len < CMD_SIZE(setres)) {
-		errorcode = ERR_CMDSIZE;
-		goto error;
-	}
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
-	if (!mouse) {
-		errorcode = ERR_NOMOUSE;
-		goto error;
-	}
-	err = mouse->claim(mouse);
-	if (err) {
-		errorcode = ERR_CLAIM;
-		goto error;
-	}
-	err = mouse->set_resolution(mouse, be32_to_cpu(cmd->setres.new_resolution));
-	mouse->release(mouse);
-	if (err) {
-		errorcode = ERR_FAIL;
-		goto error;
-	}
-
-error:
-	send_u32(client, errorcode);
-}
-
 static void command_setfreq(struct client *client, const struct command *cmd, unsigned int len)
 {
 	struct razer_mouse *mouse;
+	struct razer_mouse_profile *list, *profile;
 	int err;
+	unsigned int i;
 	uint32_t errorcode = ERR_NONE;
 
 	if (len < CMD_SIZE(setfreq)) {
@@ -895,17 +954,124 @@ static void command_setfreq(struct client *client, const struct command *cmd, un
 		errorcode = ERR_NOMOUSE;
 		goto error;
 	}
+	list = mouse->get_profiles(mouse);
+	if (!list) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+	for (i = 0; i < mouse->nr_profiles; i++) {
+		if (list[i].nr == be32_to_cpu(cmd->setfreq.profile_id)) {
+			profile = &list[i];
+			break;
+		}
+	}
+	if (!profile || !profile->set_freq) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+
 	err = mouse->claim(mouse);
 	if (err) {
 		errorcode = ERR_CLAIM;
 		goto error;
 	}
-	err = mouse->set_freq(mouse, be32_to_cpu(cmd->setfreq.new_frequency));
+	err = profile->set_freq(profile, be32_to_cpu(cmd->setfreq.new_frequency));
 	mouse->release(mouse);
 	if (err) {
 		errorcode = ERR_FAIL;
 		goto error;
 	}
+
+error:
+	send_u32(client, errorcode);
+}
+
+static void command_getprofiles(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	struct razer_mouse_profile *list;
+	unsigned int i;
+
+	if (len < CMD_SIZE(getprofiles))
+		goto error;
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse)
+		goto error;
+	list = mouse->get_profiles(mouse);
+	if (!list)
+		goto error;
+
+	send_u32(client, mouse->nr_profiles);
+	for (i = 0; i < mouse->nr_profiles; i++)
+		send_u32(client, list[i].nr);
+
+	return;
+error:
+	send_u32(client, 0);
+}
+
+static void command_getactiveprof(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	struct razer_mouse_profile *activeprof;
+
+	if (len < CMD_SIZE(getactiveprof))
+		goto error;
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse)
+		goto error;
+	activeprof = mouse->get_active_profile(mouse);
+	if (!activeprof)
+		goto error;
+
+	send_u32(client, activeprof->nr);
+
+	return;
+error:
+	send_u32(client, 0xFFFFFFFF);
+}
+
+static void command_setactiveprof(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	struct razer_mouse_profile *list, *profile = NULL;
+	int i, err;
+	uint32_t errorcode = ERR_NONE;
+
+	if (len < CMD_SIZE(setactiveprof)) {
+		errorcode = ERR_CMDSIZE;
+		goto error;
+	}
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse) {
+		errorcode = ERR_NOMOUSE;
+		goto error;
+	}
+	list = mouse->get_profiles(mouse);
+	if (!list) {
+		errorcode = ERR_NOMEM;
+		goto error;
+	}
+	for (i = 0; i < mouse->nr_profiles; i++) {
+		if (list[i].nr == be32_to_cpu(cmd->setactiveprof.id)) {
+			profile = &list[i];
+			break;
+		}
+	}
+	if (!profile) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+
+	err = mouse->claim(mouse);
+	if (err) {
+		errorcode = ERR_CLAIM;
+		goto error;
+	}
+	err = mouse->set_active_profile(mouse, profile);
+	if (err)
+		errorcode = ERR_FAIL;
+	mouse->release(mouse);
 
 error:
 	send_u32(client, errorcode);
@@ -989,20 +1155,29 @@ static void handle_received_command(struct client *client, const char *_cmd, uns
 	case COMMAND_ID_SUPPRESOL:
 		command_suppresol(client, cmd, len);
 		break;
+	case COMMAND_ID_SUPPDPIMAPPINGS:
+		command_suppdpimappings(client, cmd, len);
+		break;
+	case COMMAND_ID_CHANGEDPIMAPPING:
+		command_changedpimapping(client, cmd, len);
+		break;
 	case COMMAND_ID_GETLEDS:
 		command_getleds(client, cmd, len);
 		break;
 	case COMMAND_ID_SETLED:
 		command_setled(client, cmd, len);
 		break;
-	case COMMAND_ID_SETRES:
-		command_setres(client, cmd, len);
-		break;
 	case COMMAND_ID_SETFREQ:
 		command_setfreq(client, cmd, len);
 		break;
-	case COMMAND_ID_GETRES:
-		command_getres(client, cmd, len);
+	case COMMAND_ID_GETPROFILES:
+		command_getprofiles(client, cmd, len);
+		break;
+	case COMMAND_ID_GETACTIVEPROF:
+		command_getactiveprof(client, cmd, len);
+		break;
+	case COMMAND_ID_SETACTIVEPROF:
+		command_setactiveprof(client, cmd, len);
 		break;
 	case COMMAND_ID_GETFREQ:
 		command_getfreq(client, cmd, len);

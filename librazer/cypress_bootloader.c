@@ -49,15 +49,6 @@ struct cypress_status {
 #define CYPRESS_STAT_INVALCMD	0x80 /* Incalid command error */
 
 
-static inline uint16_t cpu_to_be16(uint16_t v)
-{
-#ifdef BIG_ENDIAN_HOST
-	return v;
-#else
-	return bswap_16(v);
-#endif
-}
-
 static int cypress_send_command(struct cypress *c,
 				const struct cypress_command *command,
 				size_t command_size)
@@ -178,6 +169,7 @@ return 0;//TODO
 			return -1;
 		}
 		image += 32;
+		/* Last 32 bytes */
 		err = cypress_cmd_writefl(c, block, 1, image);
 		if (err) {
 			fprintf(stderr, "cypress: Failed to write image (2)\n");

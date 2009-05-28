@@ -75,9 +75,6 @@ struct razer_led {
 
 /** enum razer_mouse_freq - Mouse scan frequency
   * @RAZER_MOUSE_FREQ_UNKNOWN: Unknown scan frequency
-  * @RAZER_MOUSE_FREQ_125HZ: 100Hz scan frequency
-  * @RAZER_MOUSE_FREQ_500HZ: 500Hz scan frequency
-  * @RAZER_MOUSE_FREQ_1000HZ: 1000Hz scan frequency
   */
 enum razer_mouse_freq {
 	RAZER_MOUSE_FREQ_UNKNOWN	= 0,
@@ -88,14 +85,10 @@ enum razer_mouse_freq {
 
 /** enum razer_mouse_res - Mouse scan resolutions
   * @RAZER_MOUSE_RES_UNKNOWN: Unknown scan resolution
-  * @RAZER_MOUSE_RES_400DPI: 400DPI scan resolution
-  * @RAZER_MOUSE_RES_450DPI: 450DPI scan resolution
-  * @RAZER_MOUSE_RES_900DPI: 900DPI scan resolution
-  * @RAZER_MOUSE_RES_1600DPI: 1600DPI scan resolution
-  * @RAZER_MOUSE_RES_1800DPI: 1800DPI scan resolution
   */
 enum razer_mouse_res {
 	RAZER_MOUSE_RES_UNKNOWN		= 0,
+	RAZER_MOUSE_RES_125DPI		= 125,
 	RAZER_MOUSE_RES_400DPI		= 400,
 	RAZER_MOUSE_RES_450DPI		= 450,
 	RAZER_MOUSE_RES_900DPI		= 900,
@@ -112,6 +105,47 @@ enum razer_mouse_type {
 	RAZER_MOUSETYPE_DEATHADDER,
 	RAZER_MOUSETYPE_KRAIT,
 	RAZER_MOUSETYPE_LACHESIS,
+};
+
+/** struct razer_mouse_dpimapping - Mouse scan resolution mapping.
+ *
+ * @nr: An ID number. Read only!
+ *
+ * @res: The resolution value. Read only!
+ *
+ * @change: Change this mapping to another resolution value.
+ *	May be NULL, if the mapping cannot be changed.
+ */
+struct razer_mouse_dpimapping {
+	unsigned int nr;
+	enum razer_mouse_res res;
+
+	int (*change)(struct razer_mouse_dpimapping *d, enum razer_mouse_res res);
+
+	struct razer_mouse *mouse;
+};
+
+/** struct razer_mouse_profile - A mouse profile
+ *
+ * @get_freq: Get the currently used scan frequency.
+ *
+ * @set_freq: Change the mouse scan frequency.
+ *
+ * @get_dpimapping: Returns the active scan resolution mapping.
+ *
+ * @set_dpimapping: Sets the active scan resolution mapping.
+ */
+struct razer_mouse_profile {
+	unsigned int nr;
+
+	enum razer_mouse_freq (*get_freq)(struct razer_mouse_profile *p);
+	int (*set_freq)(struct razer_mouse_profile *p, enum razer_mouse_freq freq);
+
+	struct razer_mouse_dpimapping * (*get_dpimapping)(struct razer_mouse_profile *p);
+	int (*set_dpimapping)(struct razer_mouse_profile *p,
+			      struct razer_mouse_dpimapping *d);
+
+	struct razer_mouse *mouse;
 };
 
 /** enum razer_mouse_flags - Flags for a mouse
@@ -152,27 +186,34 @@ enum {
   * 	leds_list points to the first LED in the list.
   * 	The caller is responsible to free every item in leds_list.
   *
+  * @flash_firmware: Upload a firmware image to the device and
+  *     flash it to the PROM. &magic_number is &RAZER_FW_FLASH_MAGIC.
+  *     The magic is used to project against accidental calls.
+  *
+  * @nr_profiles: The number of profiles supported by this device.
+  *
+  * @get_profiles: Returns an array of supported profiles.
+  *	Array length is nr_profiles.
+  *
+  * @get_active_profile: Returns the currently active profile.
+  *
+  * @set_active_profile: Selects the active profile.
+  *	May be NULL, if there's only one profile.
+  *
+  * @supported_resolutions: Returns a list of supported scan resolutions
+  *	for this mouse in res_ptr.
+  *	The return value is a positive list length or a negative error code.
+  *
   * @supported_freqs: Get an array of supported scan frequencies.
   * 	Returns the array size or a negative error code.
   * 	freq_ptr points to the array.
   * 	The caller is responsible to free freq_ptr.
   *
-  * @get_freq: Get the currently used scan frequency.
+  * @supported_dpimappings: Returns a list of supported scan resolution
+  *	mappings in res_ptr.
+  *	The function return value is the positive list size or a negative
+  *	error code.
   *
-  * @set_freq: Change the mouse scan frequency.
-  *
-  * @supported_resolutions: Get an array of supported scan resolutions.
-  * 	Returns the array size or a negative error code.
-  * 	res_ptr points to the array.
-  * 	The caller is responsible to free res_ptr.
-  *
-  * @get_resolution: Get the currently used scan resolution.
-  *
-  * @set_resolution: Change the mouse scan resolution.
-  *
-  * @flash_firmware: Upload a firmware image to the device and
-  *     flash it to the PROM. &magic_number is &RAZER_FW_FLASH_MAGIC.
-  *     The magic is used to project against accidental calls.
   */
 struct razer_mouse {
 	struct razer_mouse *next;
@@ -190,19 +231,22 @@ struct razer_mouse {
 	int (*get_leds)(struct razer_mouse *m,
 			struct razer_led **leds_list);
 
-	int (*supported_freqs)(struct razer_mouse *m,
-			       enum razer_mouse_freq **freq_ptr);
-	enum razer_mouse_freq (*get_freq)(struct razer_mouse *m);
-	int (*set_freq)(struct razer_mouse *m, enum razer_mouse_freq freq);
-
-	int (*supported_resolutions)(struct razer_mouse *m,
-				     enum razer_mouse_res **res_ptr);
-	enum razer_mouse_res (*get_resolution)(struct razer_mouse *m);
-	int (*set_resolution)(struct razer_mouse *m, enum razer_mouse_res res);
-
 	int (*flash_firmware)(struct razer_mouse *m,
 			      const char *data, size_t len,
 			      unsigned int magic_number);
+
+	unsigned int nr_profiles;
+	struct razer_mouse_profile * (*get_profiles)(struct razer_mouse *m);
+	struct razer_mouse_profile * (*get_active_profile)(struct razer_mouse *m);
+	int (*set_active_profile)(struct razer_mouse *m,
+				  struct razer_mouse_profile *p);
+
+	int (*supported_resolutions)(struct razer_mouse *m,
+				     enum razer_mouse_res **res_ptr);
+	int (*supported_freqs)(struct razer_mouse *m,
+			       enum razer_mouse_freq **freq_ptr);
+	int (*supported_dpimappings)(struct razer_mouse *m,
+				     struct razer_mouse_dpimapping **res_ptr);
 
 	/* Do not touch these pointers. */
 	const struct razer_mouse_base_ops *base_ops;

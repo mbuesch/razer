@@ -6,7 +6,7 @@
  *   This hardware driver is based on reverse engineering and
  *   hardware documentation provided under NDA.
  *
- *   Copyright (C) 2007-2008 Michael Buesch <mb@bu3sch.de>
+ *   Copyright (C) 2007-2009 Michael Buesch <mb@bu3sch.de>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -58,7 +58,10 @@ struct deathadder_private {
 	/* Previous freq. For predicting reconnect events only. */
 	enum razer_mouse_freq old_frequency;
 	/* The currently set resolution. */
-	enum razer_mouse_res resolution;
+	struct razer_mouse_dpimapping *cur_dpimapping;
+
+	struct razer_mouse_profile profile;
+	struct razer_mouse_dpimapping dpimapping[3];
 };
 
 #define DEATHADDER_USB_TIMEOUT		3000
@@ -151,7 +154,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 		}
 
 		/* Translate resolution setting. */
-		switch (priv->resolution) {
+		switch (priv->cur_dpimapping->res) {
 		case RAZER_MOUSE_RES_450DPI:
 			res_value = 3;
 			break;
@@ -228,7 +231,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 		}
 
 		/* Translate resolution setting. */
-		switch (priv->resolution) {
+		switch (priv->cur_dpimapping->res) {
 		case RAZER_MOUSE_RES_450DPI:
 			config.res = 3;
 			break;
@@ -414,17 +417,17 @@ static int deathadder_supported_freqs(struct razer_mouse *m,
 	return count;
 }
 
-static enum razer_mouse_freq deathadder_get_freq(struct razer_mouse *m)
+static enum razer_mouse_freq deathadder_get_freq(struct razer_mouse_profile *p)
 {
-	struct deathadder_private *priv = m->internal;
+	struct deathadder_private *priv = p->mouse->internal;
 
 	return priv->frequency;
 }
 
-static int deathadder_set_freq(struct razer_mouse *m,
+static int deathadder_set_freq(struct razer_mouse_profile *p,
 			       enum razer_mouse_freq freq)
 {
-	struct deathadder_private *priv = m->internal;
+	struct deathadder_private *priv = p->mouse->internal;
 	enum razer_mouse_freq old_freq;
 	int err;
 
@@ -462,35 +465,6 @@ static int deathadder_supported_resolutions(struct razer_mouse *m,
 	*res_list = list;
 
 	return count;
-}
-
-static enum razer_mouse_res deathadder_get_resolution(struct razer_mouse *m)
-{
-	struct deathadder_private *priv = m->internal;
-
-	return priv->resolution;
-}
-
-static int deathadder_set_resolution(struct razer_mouse *m,
-				     enum razer_mouse_res res)
-{
-	struct deathadder_private *priv = m->internal;
-	enum razer_mouse_res old_res;
-	int err;
-
-	if (!priv->claimed)
-		return -EBUSY;
-
-	old_res = priv->resolution;
-	priv->resolution = res;
-
-	err = deathadder_commit(priv);
-	if (err) {
-		priv->resolution = res;
-		return err;
-	}
-
-	return err;
 }
 
 static struct usb_device * wait_for_usbdev(uint16_t vendor_id,
@@ -589,6 +563,59 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 	return 0;
 }
 
+static struct razer_mouse_profile * deathadder_get_profiles(struct razer_mouse *m)
+{
+	struct deathadder_private *priv = m->internal;
+
+	return &priv->profile;
+}
+
+static struct razer_mouse_profile * deathadder_get_active_profile(struct razer_mouse *m)
+{
+	struct deathadder_private *priv = m->internal;
+
+	return &priv->profile;
+}
+
+static int deathadder_supported_dpimappings(struct razer_mouse *m,
+					    struct razer_mouse_dpimapping **res_ptr)
+{
+	struct deathadder_private *priv = m->internal;
+
+	*res_ptr = &priv->dpimapping[0];
+
+	return ARRAY_SIZE(priv->dpimapping);
+}
+
+static struct razer_mouse_dpimapping * deathadder_get_dpimapping(struct razer_mouse_profile *p)
+{
+	struct deathadder_private *priv = p->mouse->internal;
+
+	return priv->cur_dpimapping;
+}
+
+static int deathadder_set_dpimapping(struct razer_mouse_profile *p,
+				     struct razer_mouse_dpimapping *d)
+{
+	struct deathadder_private *priv = p->mouse->internal;
+	struct razer_mouse_dpimapping *oldmapping;
+	int err;
+
+	if (!priv->claimed)
+		return -EBUSY;
+
+	oldmapping = priv->cur_dpimapping;
+	priv->cur_dpimapping = d;
+
+	err = deathadder_commit(priv);
+	if (err) {
+		priv->cur_dpimapping = oldmapping;
+		return err;
+	}
+
+	return err;
+}
+
 void razer_deathadder_gen_idstr(struct usb_device *udev, char *buf)
 {
 	char devid[64];
@@ -639,9 +666,32 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 
 	priv->frequency = RAZER_MOUSE_FREQ_1000HZ;
 	priv->old_frequency = priv->frequency;
-	priv->resolution = RAZER_MOUSE_RES_1800DPI;
 	for (i = 0; i < DEATHADDER_NR_LEDS; i++)
 		priv->led_states[i] = RAZER_LED_ON;
+
+	priv->profile.nr = 0;
+	priv->profile.get_freq = deathadder_get_freq;
+	priv->profile.set_freq = deathadder_set_freq;
+	priv->profile.get_dpimapping = deathadder_get_dpimapping;
+	priv->profile.set_dpimapping = deathadder_set_dpimapping;
+	priv->profile.mouse = m;
+
+	priv->dpimapping[0].nr = 0;
+	priv->dpimapping[0].res = RAZER_MOUSE_RES_450DPI;
+	priv->dpimapping[0].change = NULL;
+	priv->dpimapping[0].mouse = m;
+
+	priv->dpimapping[1].nr = 1;
+	priv->dpimapping[1].res = RAZER_MOUSE_RES_900DPI;
+	priv->dpimapping[1].change = NULL;
+	priv->dpimapping[1].mouse = m;
+
+	priv->dpimapping[2].nr = 2;
+	priv->dpimapping[2].res = RAZER_MOUSE_RES_1800DPI;
+	priv->dpimapping[2].change = NULL;
+	priv->dpimapping[2].mouse = m;
+
+	priv->cur_dpimapping = &priv->dpimapping[2];
 
 	m->type = RAZER_MOUSETYPE_DEATHADDER;
 	razer_deathadder_gen_idstr(usbdev, m->idstr);
@@ -650,13 +700,13 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 	m->release = deathadder_release;
 	m->get_fw_version = deathadder_get_fw_version;
 	m->get_leds = deathadder_get_leds;
-	m->supported_freqs = deathadder_supported_freqs;
-	m->get_freq = deathadder_get_freq;
-	m->set_freq = deathadder_set_freq;
-	m->supported_resolutions = deathadder_supported_resolutions;
-	m->get_resolution = deathadder_get_resolution;
-	m->set_resolution = deathadder_set_resolution;
 	m->flash_firmware = deathadder_flash_firmware;
+	m->nr_profiles = 1;
+	m->get_profiles = deathadder_get_profiles;
+	m->get_active_profile = deathadder_get_active_profile;
+	m->supported_resolutions = deathadder_supported_resolutions;
+	m->supported_freqs = deathadder_supported_freqs;
+	m->supported_dpimappings = deathadder_supported_dpimappings;
 
 	return 0;
 }

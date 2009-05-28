@@ -6,6 +6,9 @@
 #include <usb.h>
 #include <stdio.h>
 #include <string.h>
+#include <byteswap.h>
+#include <stdint.h>
+
 
 
 #ifdef DEBUG
@@ -14,6 +17,8 @@
 # define dprintf		noprintf
 #endif
 static inline int noprintf(const char *t, ...) { return 0; }
+
+#define ARRAY_SIZE(array)	(sizeof(array) / sizeof((array)[0]))
 
 
 #define for_each_usbbus(bus, buslist) \
@@ -65,5 +70,51 @@ static inline void razer_create_idstr(char *buf,
 	snprintf(buf, RAZER_IDSTR_MAX_SIZE, "%s:%s:%s-%s:%s",
 		 devtype, devname, bustype, busposition, devid);
 }
+
+
+typedef uint16_t	be16_t;
+typedef uint32_t	be32_t;
+typedef uint16_t	le16_t;
+typedef uint32_t	le32_t;
+
+static inline be16_t cpu_to_be16(uint16_t v)
+{
+#ifdef BIG_ENDIAN_HOST
+	return v;
+#else
+	return bswap_16(v);
+#endif
+}
+
+static inline be32_t cpu_to_be32(uint32_t v)
+{
+#ifdef BIG_ENDIAN_HOST
+	return v;
+#else
+	return bswap_32(v);
+#endif
+}
+
+static inline le16_t cpu_to_le16(uint16_t v)
+{
+#ifndef BIG_ENDIAN_HOST
+	return v;
+#else
+	return bswap_16(v);
+#endif
+}
+
+static inline le32_t cpu_to_le32(uint32_t v)
+{
+#ifndef BIG_ENDIAN_HOST
+	return v;
+#else
+	return bswap_32(v);
+#endif
+}
+
+
+le16_t razer_xor16_checksum(const void *buffer, size_t size);
+
 
 #endif /* RAZER_PRIVATE_H_ */

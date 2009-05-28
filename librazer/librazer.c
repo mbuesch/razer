@@ -680,3 +680,18 @@ reclaim:
 out:
 	return errorcode;
 }
+
+le16_t razer_xor16_checksum(const void *_buffer, size_t size)
+{
+	const char *buffer = _buffer;
+	uint16_t sum = 0;
+	size_t i;
+
+	for (i = 0; i < size; i++) {
+		sum ^= buffer[i] & 0xFF;
+		if (i < size - 1)
+			sum ^= ((uint16_t)(buffer[i + 1])) << 8;
+	}
+
+	return cpu_to_le16(sum);
+}
