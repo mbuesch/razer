@@ -46,26 +46,33 @@ class MouseWidget(QWidget):
 		QWidget.__init__(self, parent)
 
 		self.mainwnd = parent
-		layout = QVBoxLayout(self)
+
+		self.setLayout(QVBoxLayout(self))
+
 		self.mousesel = QComboBox(self)
 		self.connect(self.mousesel, SIGNAL("currentIndexChanged(int)"), self.mouseChanged)
-		layout.addWidget(self.mousesel)
-		layout.addSpacing(15)
-		layout.addStretch()
-		layout.addWidget(QLabel(self.tr("Mouse scan frequency:"), self))
-		self.hzsel = QComboBox(self)
-		self.connect(self.hzsel, SIGNAL("currentIndexChanged(int)"), self.freqChanged)
-		layout.addWidget(self.hzsel)
-		layout.addWidget(QLabel(self.tr("Mouse scan resolution:"), self))
-		self.ressel = QComboBox(self)
-		self.connect(self.ressel, SIGNAL("currentIndexChanged(int)"), self.resChanged)
-		layout.addWidget(self.ressel)
-		self.ledsLayout = QVBoxLayout()
-		layout.addLayout(self.ledsLayout)
-		self.ledCheckboxes = []
-		layout.addStretch()
+		self.layout().addWidget(self.mousesel)
+		self.layout().addSpacing(15)
+		self.layout().addStretch()
+
+		self.profiletab = QTabWidget(self)
+		self.layout().addWidget(self.profiletab)
+
+#		layout.addWidget(QLabel(self.tr("Mouse scan frequency:"), self))
+#		self.hzsel = QComboBox(self)
+#		self.connect(self.hzsel, SIGNAL("currentIndexChanged(int)"), self.freqChanged)
+#		layout.addWidget(self.hzsel)
+#		layout.addWidget(QLabel(self.tr("Mouse scan resolution:"), self))
+#		self.ressel = QComboBox(self)
+#		self.connect(self.ressel, SIGNAL("currentIndexChanged(int)"), self.resChanged)
+#		layout.addWidget(self.ressel)
+#		self.ledsLayout = QVBoxLayout()
+#		layout.addLayout(self.ledsLayout)
+#		self.ledCheckboxes = []
+
+		self.layout().addStretch()
 		self.fwVer = QLabel(self)
-		layout.addWidget(self.fwVer)
+		self.layout().addWidget(self.fwVer)
 
 	def update(self, mice):
 		self.mice = mice
@@ -93,6 +100,7 @@ class MouseWidget(QWidget):
 		razer.setResolution(self.mouse, res)
 
 	def mouseChanged(self, index):
+		return#FIXME
 		self.hzsel.clear()
 		self.ressel.clear()
 		for chk in self.ledCheckboxes:

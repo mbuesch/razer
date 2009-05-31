@@ -145,6 +145,15 @@ struct command {
 		} __attribute__((packed)) changedpimapping;
 
 		struct {
+			uint32_t profile_id;
+		} __attribute__((packed)) getdpimapping;
+
+		struct {
+			uint32_t profile_id;
+			uint32_t mapping_id;
+		} __attribute__((packed)) setdpimapping;
+
+		struct {
 		} __attribute__((packed)) getleds;
 
 		struct {
@@ -653,6 +662,40 @@ static int recv_bulk(struct client *client, char *buf, unsigned int len)
 	return 0;
 }
 
+static struct razer_mouse_profile * find_mouse_profile(struct razer_mouse *mouse,
+						       unsigned int profile_id)
+{
+	struct razer_mouse_profile *list;
+	unsigned int i;
+
+	list = mouse->get_profiles(mouse);
+	if (!list)
+		return NULL;
+	for (i = 0; i < mouse->nr_profiles; i++) {
+		if (list[i].nr == profile_id)
+			return &list[i];
+	}
+
+	return NULL;
+}
+
+static struct razer_mouse_dpimapping * find_mouse_dpimapping(struct razer_mouse *mouse,
+							     unsigned int mapping_id)
+{
+	struct razer_mouse_dpimapping *list;
+	int i, count;
+
+	count = mouse->supported_dpimappings(mouse, &list);
+	if (count <= 0)
+		return NULL;
+	for (i = 0; i < count; i++) {
+		if (list[i].nr == mapping_id)
+			return &list[i];
+	}
+
+	return NULL;
+}
+
 static void command_getmice(struct client *client, const struct command *cmd, unsigned int len)
 {
 	unsigned int count;
@@ -692,24 +735,15 @@ out:
 static void command_getfreq(struct client *client, const struct command *cmd, unsigned int len)
 {
 	struct razer_mouse *mouse;
-	struct razer_mouse_profile *list, *profile;
+	struct razer_mouse_profile *profile;
 	enum razer_mouse_freq freq;
-	unsigned int i;
 
 	if (len < CMD_SIZE(getfreq))
 		goto error;
 	mouse = razer_mouse_list_find(mice, cmd->idstr);
 	if (!mouse)
 		goto error;
-	list = mouse->get_profiles(mouse);
-	if (!list)
-		goto error;
-	for (i = 0; i < mouse->nr_profiles; i++) {
-		if (list[i].nr == be32_to_cpu(cmd->getfreq.profile_id)) {
-			profile = &list[i];
-			break;
-		}
-	}
+	profile = find_mouse_profile(mouse, be32_to_cpu(cmd->getfreq.profile_id));
 	if (!profile || !profile->get_freq)
 		goto error;
 	freq = profile->get_freq(profile);
@@ -805,8 +839,8 @@ error:
 static void command_changedpimapping(struct client *client, const struct command *cmd, unsigned int len)
 {
 	struct razer_mouse *mouse;
-	struct razer_mouse_dpimapping *list, *mapping;
-	int err, i, count;
+	struct razer_mouse_dpimapping *mapping;
+	int err;
 	uint32_t errorcode = ERR_NONE;
 
 	if (len < CMD_SIZE(changedpimapping)) {
@@ -818,17 +852,7 @@ static void command_changedpimapping(struct client *client, const struct command
 		errorcode = ERR_NOMOUSE;
 		goto error;
 	}
-	count = mouse->supported_dpimappings(mouse, &list);
-	if (count <= 0) {
-		errorcode = ERR_FAIL;
-		goto error;
-	}
-	for (i = 0; i < count; i++) {
-		if (list[i].nr == be32_to_cpu(cmd->changedpimapping.id)) {
-			mapping = &list[i];
-			break;
-		}
-	}
+	mapping = find_mouse_dpimapping(mouse, be32_to_cpu(cmd->changedpimapping.id));
 	if (!mapping || !mapping->change) {
 		errorcode = ERR_FAIL;
 		goto error;
@@ -844,6 +868,75 @@ static void command_changedpimapping(struct client *client, const struct command
 	if (err)
 		errorcode = ERR_FAIL;
 	mouse->release(mouse);
+
+error:
+	send_u32(client, errorcode);
+}
+
+static void command_getdpimapping(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	struct razer_mouse_profile *profile;
+	struct razer_mouse_dpimapping *mapping;
+
+	if (len < CMD_SIZE(getdpimapping))
+		goto error;
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse)
+		goto error;
+	profile = find_mouse_profile(mouse, be32_to_cpu(cmd->getdpimapping.profile_id));
+	if (!profile)
+		goto error;
+	mapping = profile->get_dpimapping(profile);
+	if (!mapping)
+		goto error;
+
+	send_u32(client, mapping->nr);
+
+	return;
+error:
+	send_u32(client, 0xFFFFFFFF);
+}
+
+static void command_setdpimapping(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	struct razer_mouse_profile *profile;
+	struct razer_mouse_dpimapping *mapping;
+	uint32_t errorcode = ERR_NONE;
+	int err;
+
+	if (len < CMD_SIZE(setdpimapping)) {
+		errorcode = ERR_CMDSIZE;
+		goto error;
+	}
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse) {
+		errorcode = ERR_NOMOUSE;
+		goto error;
+	}
+	profile = find_mouse_profile(mouse, be32_to_cpu(cmd->setdpimapping.profile_id));
+	if (!profile || !profile->set_dpimapping) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+	mapping = find_mouse_dpimapping(mouse, be32_to_cpu(cmd->setdpimapping.mapping_id));
+	if (!mapping) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+
+	err = mouse->claim(mouse);
+	if (err) {
+		errorcode = ERR_CLAIM;
+		goto error;
+	}
+	err = profile->set_dpimapping(profile, mapping);
+	mouse->release(mouse);
+	if (err) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
 
 error:
 	send_u32(client, errorcode);
@@ -940,9 +1033,8 @@ error:
 static void command_setfreq(struct client *client, const struct command *cmd, unsigned int len)
 {
 	struct razer_mouse *mouse;
-	struct razer_mouse_profile *list, *profile;
+	struct razer_mouse_profile *profile;
 	int err;
-	unsigned int i;
 	uint32_t errorcode = ERR_NONE;
 
 	if (len < CMD_SIZE(setfreq)) {
@@ -954,17 +1046,7 @@ static void command_setfreq(struct client *client, const struct command *cmd, un
 		errorcode = ERR_NOMOUSE;
 		goto error;
 	}
-	list = mouse->get_profiles(mouse);
-	if (!list) {
-		errorcode = ERR_FAIL;
-		goto error;
-	}
-	for (i = 0; i < mouse->nr_profiles; i++) {
-		if (list[i].nr == be32_to_cpu(cmd->setfreq.profile_id)) {
-			profile = &list[i];
-			break;
-		}
-	}
+	profile = find_mouse_profile(mouse, be32_to_cpu(cmd->setfreq.profile_id));
 	if (!profile || !profile->set_freq) {
 		errorcode = ERR_FAIL;
 		goto error;
@@ -1034,8 +1116,8 @@ error:
 static void command_setactiveprof(struct client *client, const struct command *cmd, unsigned int len)
 {
 	struct razer_mouse *mouse;
-	struct razer_mouse_profile *list, *profile = NULL;
-	int i, err;
+	struct razer_mouse_profile *profile;
+	int err;
 	uint32_t errorcode = ERR_NONE;
 
 	if (len < CMD_SIZE(setactiveprof)) {
@@ -1047,17 +1129,7 @@ static void command_setactiveprof(struct client *client, const struct command *c
 		errorcode = ERR_NOMOUSE;
 		goto error;
 	}
-	list = mouse->get_profiles(mouse);
-	if (!list) {
-		errorcode = ERR_NOMEM;
-		goto error;
-	}
-	for (i = 0; i < mouse->nr_profiles; i++) {
-		if (list[i].nr == be32_to_cpu(cmd->setactiveprof.id)) {
-			profile = &list[i];
-			break;
-		}
-	}
+	profile = find_mouse_profile(mouse, be32_to_cpu(cmd->setactiveprof.id));
 	if (!profile) {
 		errorcode = ERR_FAIL;
 		goto error;
@@ -1160,6 +1232,12 @@ static void handle_received_command(struct client *client, const char *_cmd, uns
 		break;
 	case COMMAND_ID_CHANGEDPIMAPPING:
 		command_changedpimapping(client, cmd, len);
+		break;
+	case COMMAND_ID_GETDPIMAPPING:
+		command_getdpimapping(client, cmd, len);
+		break;
+	case COMMAND_ID_SETDPIMAPPING:
+		command_setdpimapping(client, cmd, len);
 		break;
 	case COMMAND_ID_GETLEDS:
 		command_getleds(client, cmd, len);

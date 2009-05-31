@@ -95,7 +95,7 @@ class Razer:
 	SOCKET_PATH	= "/var/run/razerd/socket"
 	PRIVSOCKET_PATH	= "/var/run/razerd/socket.privileged"
 
-	INTERFACE_REVISION = 0
+	INTERFACE_REVISION = 1
 
 	COMMAND_MAX_SIZE = 512
 	COMMAND_HDR_SIZE = 1
@@ -104,17 +104,22 @@ class Razer:
 	RAZER_LEDNAME_MAX_SIZE = 64
 
 	COMMAND_ID_GETREV = 0		# Get the revision number of the socket interface.
-	COMMAND_ID_RESCANMICE = 1	# Rescan mice
+	COMMAND_ID_RESCANMICE = 1	# Rescan mice.
 	COMMAND_ID_GETMICE = 2		# Get a list of detected mice.
 	COMMAND_ID_GETFWVER = 3		# Get the firmware rev of a mouse.
 	COMMAND_ID_SUPPFREQS = 4	# Get a list of supported frequencies.
 	COMMAND_ID_SUPPRESOL = 5	# Get a list of supported resolutions.
-	COMMAND_ID_GETLEDS = 6		# Get a list of LEDs on the device.
-	COMMAND_ID_SETLED = 7		# Set the state of a LED.
-	COMMAND_ID_SETRES = 8		# Set the resolution.
-	COMMAND_ID_SETFREQ = 9		# Set the frequency.
-	COMMAND_ID_GETRES = 10		# Get the current resolution.
-	COMMAND_ID_GETFREQ = 11		# Get the current frequency.
+	COMMAND_ID_SUPPDPIMAPPINGS = 6	# Get a list of supported DPI mappings.
+	COMMAND_ID_CHANGEDPIMAPPING = 7	# Modify a DPI mapping.
+	COMMAND_ID_GETDPIMAPPING = 8	# Get the active DPI mapping for a profile.
+	COMMAND_ID_SETDPIMAPPING = 9	# Set the active DPI mapping for a profile.
+	COMMAND_ID_GETLEDS = 10		# Get a list of LEDs on the device.
+	COMMAND_ID_SETLED = 11		# Set the state of a LED.
+	COMMAND_ID_GETFREQ = 12		# Get the current frequency.
+	COMMAND_ID_SETFREQ = 13		# Set the frequency.
+	COMMAND_ID_GETPROFILES = 14	# Get a list of supported profiles.
+	COMMAND_ID_GETACTIVEPROF = 15	# Get the active profile.
+	COMMAND_ID_SETACTIVEPROF = 16	# Set the active profile.
 
 	COMMAND_PRIV_FLASHFW = 128	# Upload and flash a firmware image
 
@@ -276,10 +281,11 @@ class Razer:
 		for i in range(0, count):
 			freqs.append(self.__recvU32())
 		return freqs
-	
-	def getCurrentFreq(self, idstr):
+
+	def getCurrentFreq(self, idstr, profileId):
 		"Returns the currently selected frequency for a mouse."
-		self.__sendCommand(self.COMMAND_ID_GETFREQ, idstr)
+		payload = razer_int_to_be32(profileId)
+		self.__sendCommand(self.COMMAND_ID_GETFREQ, idstr, payload)
 		return self.__recvU32()
 
 	def getSupportedRes(self, idstr):
@@ -290,11 +296,6 @@ class Razer:
 		for i in range(0, count):
 			res.append(self.__recvU32())
 		return res
-
-	def getCurrentRes(self, idstr):
-		"Returns the currently selected resolution for a mouse."
-		self.__sendCommand(self.COMMAND_ID_GETRES, idstr)
-		return self.__recvU32()
 
 	def getLeds(self, idstr):
 		"Returns a list of LEDs on the mouse. Each entry is a tuple (name, state)."
@@ -320,16 +321,60 @@ class Razer:
 		self.__sendCommand(self.COMMAND_ID_SETLED, idstr, payload)
 		return self.__recvU32()
 
-	def setFrequency(self, idstr, newFrequency):
+	def setFrequency(self, idstr, profileId, newFrequency):
 		"Set a new scan frequency (in Hz)."
-		payload = razer_int_to_be32(newFrequency)
+		payload = razer_int_to_be32(profileId) + razer_int_to_be32(newFrequency)
 		self.__sendCommand(self.COMMAND_ID_SETFREQ, idstr, payload)
 		return self.__recvU32()
 
-	def setResolution(self, idstr, newResolution):
-		"Set a new scan resolution (in DPI)."
-		payload = razer_int_to_be32(newResolution)
-		self.__sendCommand(self.COMMAND_ID_SETRES, idstr, payload)
+	def getSupportedDpiMappings(self, idstr):
+		"Returns a list of supported DPI mappings. Each entry is a tuple (id, resolution, isMutable)"
+		self.__sendCommand(self.COMMAND_ID_SUPPDPIMAPPINGS, idstr)
+		count = self.__recvU32()
+		mappings = []
+		for i in range(0, count):
+			id = self.__recvU32()
+			res = self.__recvU32()
+			mutable = self.__recvU32()
+			mappings.append( (id, res, mutable) )
+		return mappings
+
+	def changeDpiMapping(self, idstr, mappingId, newResolution):
+		"Changes the resolution value of a DPI mapping."
+		payload = razer_int_to_be32(mappingId) + razer_int_to_be32(newResolution)
+		self.__sendCommand(self.COMMAND_ID_CHANGEDPIMAPPING, idstr, payload)
+		return self.__recvU32()
+
+	def getDpiMapping(self, idstr, profileId):
+		"Gets the resolution mapping of a profile."
+		payload = razer_int_to_be32(profileId)
+		self.__sendCommand(self.COMMAND_ID_GETDPIMAPPING, idstr, payload)
+		return self.__recvU32()
+
+	def setDpiMapping(self, idstr, profileId, mappingId):
+		"Sets the resolution mapping of a profile."
+		payload = razer_int_to_be32(profileId) + razer_int_to_be32(mappingId)
+		self.__sendCommand(self.COMMAND_ID_SETDPIMAPPING, idstr, payload)
+		return self.__recvU32()
+
+	def getProfiles(self, idstr):
+		"Returns a list of profiles. Each entry is the profile ID."
+		self.__sendCommand(self.COMMAND_ID_GETPROFILES, idstr)
+		count = self.__recvU32()
+		profiles = []
+		for i in range(0, count):
+			profiles.append(self.__recvU32())
+		return profiles
+
+	def getActiveProfile(self, idstr):
+		"Returns the ID of the active profile."
+		self.__sendCommand(self.COMMAND_ID_GETACTIVEPROF, idstr)
+		return self.__recvU32()
+
+	def setActiveProfile(self, idstr, profileId):
+		"Selects the active profile."
+		payload = razer_int_to_be32(profileId)
+		self.__sendCommand(self.COMMAND_ID_SETACTIVEPROF, idstr, payload)
 		return self.__recvU32()
 
 	def flashFirmware(self, idstr, image):

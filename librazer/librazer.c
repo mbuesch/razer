@@ -206,6 +206,7 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 {
 	struct razer_event_data ev;
 	struct razer_mouse *m;
+	int err;
 
 	m = malloc(sizeof(*m));
 	if (!m)
@@ -213,7 +214,11 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 	memset(m, 0, sizeof(*m));
 	m->flags |= RAZER_MOUSEFLG_NEW;
 	m->base_ops = id->u.mouse_ops;
-	m->base_ops->init(m, udev);
+	err = m->base_ops->init(m, udev);
+	if (err) {
+		free(m);
+		return NULL;
+	}
 
 	dprintf("Allocated and initialized new mouse (type=%d)\n",
 		m->base_ops->type);
