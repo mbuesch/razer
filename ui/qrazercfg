@@ -21,13 +21,12 @@ from pyrazer import *
 
 
 class LedCheckBox(QCheckBox):
-	def __init__(self, mouse, ledname, ledstate, parent):
+	def __init__(self, ledsWidget, ledname, ledstate):
 		text = ledname
-		text += parent.tr(" LED enabled")
-		QCheckBox.__init__(self, text, parent)
+		text += ledsWidget.tr(" LED enabled")
+		QCheckBox.__init__(self, text, ledsWidget)
+		self.ledsWidget = ledsWidget
 
-		self.mousewidget = parent
-		self.mouse = mouse
 		self.led = ledname
 		if ledstate:
 			self.setCheckState(Qt.Checked)
@@ -36,10 +35,121 @@ class LedCheckBox(QCheckBox):
 		self.connect(self, SIGNAL("stateChanged(int)"), self.toggled)
 
 	def toggled(self, state):
-		if state:
-			razer.setLed(self.mouse, self.led, 1)
-		else:
-			razer.setLed(self.mouse, self.led, 0)
+		razer.setLed(self.ledsWidget.mouseWidget.mouse, self.led, bool(state))
+
+class LedsWidget(QGroupBox):
+	def __init__(self, mouseWidget):
+		QGroupBox.__init__(self, "LEDs", mouseWidget)
+		self.mouseWidget = mouseWidget
+
+		self.setLayout(QVBoxLayout(self))
+		self.leds = []
+
+	def clear(self):
+		for led in self.leds:
+			led.deleteLater()
+		self.leds = []
+
+	def add(self, name, state):
+		led = LedCheckBox(self, name, state)
+		self.layout().addWidget(led)
+		self.leds.append(led)
+
+class MouseProfileWidget(QWidget):
+	def __init__(self, mouseWidget, profileId):
+		QWidget.__init__(self, mouseWidget)
+		self.mouseWidget = mouseWidget
+		self.profileId = profileId
+
+		self.setLayout(QGridLayout(self))
+
+		self.profileActive = QRadioButton(self.tr("Profile active"), self)
+		self.layout().addWidget(self.profileActive, 0, 0)
+
+		self.layout().addWidget(QLabel(self.tr("Mouse scan frequency:"), self), 1, 0)
+		supportedFreqs = razer.getSupportedFreqs(self.mouseWidget.mouse)
+		curFreq = razer.getCurrentFreq(self.mouseWidget.mouse, profileId)
+		self.freqSel = QComboBox(self)
+		self.freqSel.addItem(self.tr("Unknown Hz"), QVariant(0))
+		for freq in supportedFreqs:
+			self.freqSel.addItem(self.tr("%u Hz" % freq), QVariant(freq))
+		index = self.freqSel.findData(QVariant(curFreq))
+		if index >= 0:
+			self.freqSel.setCurrentIndex(index)
+		self.connect(self.freqSel, SIGNAL("currentIndexChanged(int)"), self.freqChanged)
+		self.layout().addWidget(self.freqSel, 1, 1)
+
+		self.layout().addWidget(QLabel(self.tr("Mouse scan resolution:"), self), 2, 0)
+		supportedMappings = razer.getSupportedDpiMappings(self.mouseWidget.mouse)
+		curMapping = razer.getDpiMapping(self.mouseWidget.mouse, profileId)
+		self.resSel = QComboBox(self)
+		self.resSel.addItem(self.tr("Unknown mapping"), QVariant(0xFFFFFFFF))
+		for mapping in supportedMappings:
+			id = mapping[0]
+			res = mapping[1]
+			if res:
+				res = str(res)
+			else:
+				res = self.tr("Unknown")
+			self.resSel.addItem(self.tr("Scan resolution %u   (%s DPI)" % (id+1, res)),
+					    QVariant(id))
+		index = self.resSel.findData(QVariant(curMapping))
+		if index >= 0:
+			self.resSel.setCurrentIndex(index)
+		self.connect(self.resSel, SIGNAL("currentIndexChanged(int)"), self.resChanged)
+		self.layout().addWidget(self.resSel, 2, 1)
+
+	def freqChanged(self, index):
+		if index == -1:
+			return
+		if index == 0: # "Unknown"
+			return
+		freq = self.freqSel.itemData(index).toUInt()[0]
+		razer.setFrequency(self.mouse, freq)
+
+	def resChanged(self, index):
+		if index == -1:
+			return
+		if index == 0: # "Unknown"
+			return
+		res = self.resSel.itemData(index).toUInt()[0]
+		razer.setResolution(self.mouse, res)
+
+class OneDpiMapping(QWidget):
+	def __init__(self, dpiMappingsWidget, id, resolution, isMutable):
+		QWidget.__init__(self, dpiMappingsWidget)
+		self.dpiMappingsWidget = dpiMappingsWidget
+
+		self.setLayout(QHBoxLayout(self))
+		self.layout().addWidget(QLabel(self.tr("Scan resolution %u" % (id+1)), self))
+		supportedRes = razer.getSupportedRes(self.dpiMappingsWidget.mouseWidget.mouse)
+		self.mappingSel = QComboBox(self)
+		self.mappingSel.addItem(self.tr("Unknown DPI"), QVariant(0))
+		for res in supportedRes:
+			self.mappingSel.addItem(self.tr("%u DPI" % res), QVariant(res))
+		index = self.mappingSel.findData(QVariant(resolution))
+		if index >= 0:
+			self.mappingSel.setCurrentIndex(index)
+		self.mappingSel.setEnabled(isMutable)
+		self.layout().addWidget(self.mappingSel)
+
+class MouseDpiMappingsWidget(QGroupBox):
+	def __init__(self, mouseWidget):
+		QGroupBox.__init__(self, mouseWidget.tr("Possible scan resolutions"), mouseWidget)
+		self.mouseWidget = mouseWidget
+
+		self.setLayout(QVBoxLayout(self))
+		self.mappings = []
+
+	def clear(self):
+		for mapping in self.mappings:
+			mapping.deleteLater()
+		self.mappings = []
+
+	def add(self, id, resolution, isMutable):
+		mapping = OneDpiMapping(self, id, resolution, isMutable)
+		self.mappings.append(mapping)
+		self.layout().addWidget(mapping)
 
 class MouseWidget(QWidget):
 	def __init__(self, parent=None):
@@ -53,22 +163,15 @@ class MouseWidget(QWidget):
 		self.connect(self.mousesel, SIGNAL("currentIndexChanged(int)"), self.mouseChanged)
 		self.layout().addWidget(self.mousesel)
 		self.layout().addSpacing(15)
-		self.layout().addStretch()
 
 		self.profiletab = QTabWidget(self)
 		self.layout().addWidget(self.profiletab)
 
-#		layout.addWidget(QLabel(self.tr("Mouse scan frequency:"), self))
-#		self.hzsel = QComboBox(self)
-#		self.connect(self.hzsel, SIGNAL("currentIndexChanged(int)"), self.freqChanged)
-#		layout.addWidget(self.hzsel)
-#		layout.addWidget(QLabel(self.tr("Mouse scan resolution:"), self))
-#		self.ressel = QComboBox(self)
-#		self.connect(self.ressel, SIGNAL("currentIndexChanged(int)"), self.resChanged)
-#		layout.addWidget(self.ressel)
-#		self.ledsLayout = QVBoxLayout()
-#		layout.addLayout(self.ledsLayout)
-#		self.ledCheckboxes = []
+		self.dpimappings = MouseDpiMappingsWidget(self)
+		self.layout().addWidget(self.dpimappings)
+
+		self.leds = LedsWidget(self)
+		self.layout().addWidget(self.leds)
 
 		self.layout().addStretch()
 		self.fwVer = QLabel(self)
@@ -83,59 +186,43 @@ class MouseWidget(QWidget):
 				(id.getDevName(), id.getBusType(),
 				 id.getBusPosition(), id.getDevId()))
 
-	def freqChanged(self, index):
-		if index == -1:
-			return
-		if index == 0: # "Unknown"
-			return
-		freq = self.hzsel.itemData(index).toUInt()[0]
-		razer.setFrequency(self.mouse, freq)
-
-	def resChanged(self, index):
-		if index == -1:
-			return
-		if index == 0: # "Unknown"
-			return
-		res = self.ressel.itemData(index).toUInt()[0]
-		razer.setResolution(self.mouse, res)
-
 	def mouseChanged(self, index):
-		return#FIXME
-		self.hzsel.clear()
-		self.ressel.clear()
-		for chk in self.ledCheckboxes:
-			self.ledsLayout.removeWidget(chk)
-			chk.deleteLater()
-		self.ledCheckboxes = []
+		self.profiletab.clear()
+		self.dpimappings.clear()
+		self.leds.clear()
+		self.profiletab.setEnabled(index > -1)
+		self.dpimappings.setEnabled(index > -1)
+		self.leds.setEnabled(index > -1)
 		if index == -1:
-			self.hzsel.setEnabled(0)
-			self.ressel.setEnabled(0)
 			self.fwVer.clear()
 			return
-		self.hzsel.setEnabled(1)
-		self.ressel.setEnabled(1)
 		self.mouse = self.mice[index]
 
-		self.hzsel.addItem(self.tr("Unknown"), QVariant(0))
-		freqList = razer.getSupportedFreqs(self.mouse)
-		curFreq = razer.getCurrentFreq(self.mouse)
-		for freq in freqList:
-			self.hzsel.addItem(self.tr("%d Hz" % freq), QVariant(freq))
-		index = self.hzsel.findData(QVariant(curFreq))
-		self.hzsel.setCurrentIndex(index)
+		profileIds = razer.getProfiles(self.mouse)
+		activeProfileId = razer.getActiveProfile(self.mouse)
+		activeWidget = None
+		for profileId in profileIds:
+			name = "Profile " + str(profileId + 1)
+			widget = MouseProfileWidget(self, profileId)
+			if profileId == activeProfileId:
+				name = ">" + name + "<"
+				activeWidget = widget
+			self.profiletab.addTab(widget, name)
+		if activeWidget:
+			self.profiletab.setCurrentWidget(activeWidget)
 
-		self.ressel.addItem(self.tr("Unknown"), QVariant(0))
-		resList = razer.getSupportedRes(self.mouse)
-		curRes = razer.getCurrentRes(self.mouse)
-		for res in resList:
-			self.ressel.addItem(self.tr("%d DPI" % res), QVariant(res))
-		index = self.ressel.findData(QVariant(curRes))
-		self.ressel.setCurrentIndex(index)
+		dpimappings = razer.getSupportedDpiMappings(self.mouse)
+		for dpimapping in dpimappings:
+			id = dpimapping[0]
+			resolution = dpimapping[1]
+			isMutable = dpimapping[2]
+			self.dpimappings.add(id, resolution, isMutable)
 
-		for led in razer.getLeds(self.mouse):
-			chk = LedCheckBox(self.mouse, led[0], led[1], self)
-			self.ledCheckboxes.append(chk)
-			self.ledsLayout.addWidget(chk)
+		leds = razer.getLeds(self.mouse)
+		for led in leds:
+			name = led[0]
+			state = led[1]
+			self.leds.add(name, state)
 
 		ver = razer.getFwVer(self.mouse)
 		self.fwVer.setText(self.tr("Firmware version: %u.%u" % (ver[0], ver[1])))
@@ -171,7 +258,7 @@ class MainWindow(QMainWindow):
 		self.scan()
 		self.pokeNotificationTimer()
 
-		self.resize(350, 350)
+		self.resize(450, 350)
 
 	def pokeNotificationTimer(self):
 		QTimer.singleShot(300, self.pollNotifications)
@@ -187,7 +274,10 @@ class MainWindow(QMainWindow):
 		razer.rescanMice()
 		mice = razer.getMice()
 		if len(mice) != len(self.mice):
-			self.statusBar().showMessage(self.tr("Found %d Razer mice" % len(mice)))
+			if (len(mice) == 1):
+				self.statusBar().showMessage(self.tr("Found one Razer mouse"))
+			elif (len(mice) > 1):
+				self.statusBar().showMessage(self.tr("Found %d Razer mice" % len(mice)))
 		self.mice = mice
 		self.mousewidget.update(mice)
 
