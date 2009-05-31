@@ -242,8 +242,8 @@ static int lachesis_commit(struct lachesis_private *priv)
 		return err;
 
 	/* Commit the DPI map. */
+	memset(&dpimap, 0, sizeof(dpimap));
 	for (i = 0; i < 5; i++) {
-		memset(&dpimap, 0, sizeof(dpimap));
 		dpimap.mappings[i].magic = LACHESIS_DPIMAPPING_MAGIC;
 		dpimap.mappings[i].dpival0 = (priv->dpimappings[i].res / 125) - 1;
 		dpimap.mappings[i].dpival1 = dpimap.mappings[i].dpival0;
