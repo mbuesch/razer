@@ -67,9 +67,10 @@ struct lachesis_buttonmapping {
 struct lachesis_profcfg_cmd {
 	be32_t magic;
 	uint8_t profile;
+	uint8_t _padding0;
 	uint8_t dpisel;
 	uint8_t freq;
-	uint8_t _padding0;
+	uint8_t _padding1;
 	struct lachesis_buttonmapping buttons[11];
 	le16_t checksum;
 } __attribute__((packed));
@@ -519,12 +520,14 @@ int razer_lachesis_init_struct(struct razer_mouse *m,
 
 	if (sizeof(struct lachesis_profcfg_cmd) != 0x18C) {
 		fprintf(stderr, "librazer: hw_lachesis: "
-			"Invalid struct lachesis_profcfg_cmd size.\n");
+			"Invalid struct lachesis_profcfg_cmd size (0x%X).\n",
+			(unsigned int)sizeof(struct lachesis_profcfg_cmd));
 		return -EINVAL;
 	}
-	if (sizeof(struct lachesis_dpimap_cmd) != 96) {
+	if (sizeof(struct lachesis_dpimap_cmd) != 0x60) {
 		fprintf(stderr, "librazer: hw_lachesis: "
-			"Invalid struct lachesis_dpimap_cmd size.\n");
+			"Invalid struct lachesis_dpimap_cmd size (0x%X).\n",
+			(unsigned int)sizeof(struct lachesis_dpimap_cmd));
 		return -EINVAL;
 	}
 
