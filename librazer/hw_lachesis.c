@@ -61,17 +61,17 @@ enum lachesis_phys_button {
 
 enum lachesis_button_function {
 	/* Logical button function IDs */
-	LACHESIS_BUTFUNC_LEFT = 0x01,	/* Left button */
-	LACHESIS_BUTFUNC_RIGHT,		/* Right button */
-	LACHESIS_BUTFUNC_MIDDLE,	/* Middle button */
-	LACHESIS_BUTFUNC_LFRONT,	/* Left side, front button */
-	LACHESIS_BUTFUNC_LBACK,		/* Left side, back button */
-	LACHESIS_BUTFUNC_RFRONT,	/* Right side, front button */
-	LACHESIS_BUTFUNC_RBACK,		/* Right side, back button */
-	LACHESIS_BUTFUNC_TFRONT,	/* Top side, front button */
-	LACHESIS_BUTFUNC_TBACK,		/* Top side, back button */
-	LACHESIS_BUTFUNC_SCROLLUP,	/* Scroll wheel up */
-	LACHESIS_BUTFUNC_SCROLLDOWN,	/* Scroll wheel down */
+	LACHESIS_BUTFUNC_LEFT		= 0x01, /* Left button */
+	LACHESIS_BUTFUNC_RIGHT		= 0x02, /* Right button */
+	LACHESIS_BUTFUNC_MIDDLE		= 0x03, /* Middle button */
+	LACHESIS_BUTFUNC_PROFDOWN	= 0x0A, /* Profile down */
+	LACHESIS_BUTFUNC_PROFUP		= 0x0B, /* Profile up */
+	LACHESIS_BUTFUNC_DPIUP		= 0x0C, /* DPI down */
+	LACHESIS_BUTFUNC_DPIDOWN	= 0x0D, /* DPI down */
+	LACHESIS_BUTFUNC_WIN5		= 0x1A, /* Windows button 5 */
+	LACHESIS_BUTFUNC_WIN4		= 0x1B, /* Windows button 4 */
+	LACHESIS_BUTFUNC_SCROLLUP	= 0x30, /* Scroll wheel up */
+	LACHESIS_BUTFUNC_SCROLLDOWN	= 0x31, /* Scroll wheel down */
 };
 
 struct lachesis_one_buttonmapping {
@@ -85,7 +85,8 @@ struct lachesis_buttonmappings {
 } __attribute__((packed));
 
 struct lachesis_profcfg_cmd {
-	be32_t magic;
+	le16_t packetlength;
+	le16_t magic;
 	uint8_t profile;
 	uint8_t _padding0;
 	uint8_t dpisel;
@@ -94,7 +95,7 @@ struct lachesis_profcfg_cmd {
 	struct lachesis_buttonmappings buttons;
 	le16_t checksum;
 } __attribute__((packed));
-#define LACHESIS_PROFCFG_MAGIC		cpu_to_be32(0x8C010200)
+#define LACHESIS_PROFCFG_MAGIC		cpu_to_le32(0x0002)
 
 struct lachesis_one_dpimapping {
 	uint8_t magic;
@@ -108,28 +109,12 @@ struct lachesis_dpimap_cmd {
 	uint8_t _padding[81];
 };
 
-#define DEFINE_DEFAULT_MAPPING(nr, name)				\
-	.mappings[nr] = { .physical = LACHESIS_PHYSBUT_##name,		\
-			    .logical = LACHESIS_BUTFUNC_##name,		\
-			}
-static const struct lachesis_buttonmappings default_buttonmappings = {
-	DEFINE_DEFAULT_MAPPING(0, LEFT),
-	DEFINE_DEFAULT_MAPPING(1, RIGHT),
-	DEFINE_DEFAULT_MAPPING(2, MIDDLE),
-	DEFINE_DEFAULT_MAPPING(3, LFRONT),
-	DEFINE_DEFAULT_MAPPING(4, LBACK),
-	DEFINE_DEFAULT_MAPPING(5, RFRONT),
-	DEFINE_DEFAULT_MAPPING(6, RBACK),
-	DEFINE_DEFAULT_MAPPING(7, TFRONT),
-	DEFINE_DEFAULT_MAPPING(8, TBACK),
-	DEFINE_DEFAULT_MAPPING(9, SCROLLUP),
-	DEFINE_DEFAULT_MAPPING(10, SCROLLDOWN),
-};
 
 /* Context data structure */
 struct lachesis_private {
 	bool claimed;
 	struct razer_usb_context usb;
+	uint16_t fw_version;
 
 	/* The currently set LED states. */
 	enum razer_led_state led_states[LACHESIS_NR_LEDS];
@@ -154,6 +139,20 @@ struct lachesis_private {
 
 #define LACHESIS_USB_TIMEOUT	3000
 
+/*XXX: read commands:
+ *
+ *	CLEAR_FEATURE
+ *		0x10:	Read DPI map
+ *		0x05:	LEDs
+ *		0x09:	cur profile
+ *		0x03:	profile config
+ *		0x02:	?busy flag?
+ *
+ *	write commands:
+ *	SET_CONFIG
+ *		0x0F:	? Data=0x01. Executed on startup
+ */
+
 static int lachesis_usb_write(struct lachesis_private *priv,
 			      int request, int command,
 			      void *buf, size_t size)
@@ -165,28 +164,58 @@ static int lachesis_usb_write(struct lachesis_private *priv,
 			      request, command, 0,
 			      buf, size,
 			      LACHESIS_USB_TIMEOUT);
-	if (err != size)
+	if (err != size) {
+		fprintf(stderr, "librazer: hw_lachesis: usb_write failed (%s)\n",
+			usb_strerror());
 		return err;
+	}
+
 	return 0;
 }
 
-#if 0
-static int lachesis_usb_read(struct lachesis_private *priv,
-			     int request, int command,
-			     char *buf, size_t size)
+static int lachesis_usb_read_withindex(struct lachesis_private *priv,
+				       int request, int command, int index,
+				       void *buf, size_t size)
 {
 	int err;
 
 	err = usb_control_msg(priv->usb.h,
 			      USB_ENDPOINT_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			      request, command, 0,
+			      request, command, index,
 			      buf, size,
 			      LACHESIS_USB_TIMEOUT);
-	if (err != size)
+	if (err != size) {
+		fprintf(stderr, "librazer: hw_lachesis: usb_read failed (%s)\n",
+			usb_strerror());
 		return err;
+	}
+
 	return 0;
 }
-#endif
+
+static int lachesis_usb_read(struct lachesis_private *priv,
+			     int request, int command,
+			     void *buf, size_t size)
+{
+	return lachesis_usb_read_withindex(priv, request, command, 0, buf, size);
+}
+
+static int lachesis_read_fw_ver(struct lachesis_private *priv)
+{
+	char buf[2];
+	uint16_t ver;
+	int err;
+
+	err = lachesis_usb_read(priv, USB_REQ_CLEAR_FEATURE,
+				0x06, buf, sizeof(buf));
+	if (err)
+		return -EIO;
+	ver = buf[0];
+	ver <<= 8;
+	ver |= buf[1];
+
+	return ver;
+}
 
 static int lachesis_commit(struct lachesis_private *priv)
 {
@@ -199,6 +228,7 @@ static int lachesis_commit(struct lachesis_private *priv)
 	/* Commit the profile configuration. */
 	for (i = 0; i < 5; i++) {
 		memset(&profcfg, 0, sizeof(profcfg));
+		profcfg.packetlength = cpu_to_le16(sizeof(profcfg));
 		profcfg.magic = LACHESIS_PROFCFG_MAGIC;
 		profcfg.profile = i + 1;
 		profcfg.dpisel = priv->cur_dpimapping[i]->nr + 1;
@@ -256,14 +286,102 @@ static int lachesis_commit(struct lachesis_private *priv)
 	return 0;
 }
 
+static int lachesis_read_config_from_hw(struct lachesis_private *priv)
+{
+	int err;
+	unsigned char value;
+	unsigned int i;
+	struct lachesis_dpimap_cmd dpimap;
+	struct lachesis_profcfg_cmd profcfg;
+
+#if 0
+value = 0x01;
+lachesis_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+		   0x0F, &value, sizeof(value));
+lachesis_usb_read(priv, USB_REQ_CLEAR_FEATURE,
+		  0x02, &value, sizeof(value));
+#endif
+
+printf("Read prof\n");
+	/* Get the current profile number */
+	err = lachesis_usb_read(priv, USB_REQ_CLEAR_FEATURE,
+				0x09, &value, sizeof(value));
+	if (err)
+		return err;
+	if (value < 1 || value > 5) {
+		fprintf(stderr, "librazer: hw_lachesis: "
+			"Read invalid profile number from device (%u)\n",
+			value);
+		return -EINVAL;
+	}
+	priv->cur_profile = &priv->profiles[value - 1];
+
+printf("Read prof conf\n");
+	/* Get the profile configuration */
+	err = lachesis_usb_read_withindex(priv, USB_REQ_CLEAR_FEATURE,
+					  0x03, 0, &profcfg, sizeof(profcfg));//FIXME index
+	if (err)
+		return err;
+	if (profcfg.dpisel < 1 || profcfg.dpisel > 5) {
+		fprintf(stderr, "librazer: hw_lachesis: "
+			"Read invalid DPI select value from device (%u)\n",
+			profcfg.dpisel);
+		return -EINVAL;
+	}
+printf("Got magic = 0x%04X, prof %u, freq %u\n", profcfg.magic, profcfg.profile, profcfg.freq);
+	//FIXME how to get all profiles?
+	for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
+		priv->cur_dpimapping[i] = &priv->dpimappings[profcfg.dpisel - 1];
+		switch (profcfg.freq) {
+		case 1:
+			priv->cur_freq[i] = RAZER_MOUSE_FREQ_1000HZ;
+			break;
+		case 2:
+			priv->cur_freq[i] = RAZER_MOUSE_FREQ_500HZ;
+			break;
+		case 3:
+			priv->cur_freq[i] = RAZER_MOUSE_FREQ_125HZ;
+			break;
+		default:
+			fprintf(stderr, "librazer: hw_lachesis: "
+				"Read invalid frequency value from device (%u)\n",
+				profcfg.freq);
+			return -EINVAL;
+		}
+		priv->buttons[i] = profcfg.buttons;
+	}
+
+	/* Get the LED states */
+	err = lachesis_usb_read(priv, USB_REQ_CLEAR_FEATURE,
+				0x05, &value, sizeof(value));
+	if (err)
+		return err;
+	priv->led_states[LACHESIS_LED_LOGO] = !!(value & 0x01);
+	priv->led_states[LACHESIS_LED_SCROLL] = !!(value & 0x02);
+
+	/* Get the DPI map */
+	err = lachesis_usb_read(priv, USB_REQ_CLEAR_FEATURE,
+				0x10, &dpimap, sizeof(dpimap));
+	if (err)
+		return err;
+	for (i = 0; i < LACHESIS_NR_DPIMAPPINGS; i++)
+		priv->dpimappings[i].res = (dpimap.mappings[i].dpival0 + 1) * 125;
+
+	return 0;
+}
+
 static int lachesis_claim(struct razer_mouse *m)
 {
 	struct lachesis_private *priv = m->internal;
-	int err;
+	int err, fwver;
 
 	err = razer_generic_usb_claim(&priv->usb);
 	if (err)
 		return err;
+	fwver = lachesis_read_fw_ver(priv);
+	if (fwver < 0)
+		return fwver;
+	priv->fw_version = fwver;
 	priv->claimed = 1;
 
 	return 0;
@@ -282,7 +400,12 @@ static void lachesis_release(struct razer_mouse *m)
 
 static int lachesis_get_fw_version(struct razer_mouse *m)
 {
-	return -EOPNOTSUPP;
+	struct lachesis_private *priv = m->internal;
+
+	/* Version is read on claim. */
+	if (!priv->claimed)
+		return -EBUSY;
+	return priv->fw_version;
 }
 
 static int lachesis_led_toggle(struct razer_led *led,
@@ -552,29 +675,6 @@ void razer_lachesis_assign_usb_device(struct razer_mouse *m,
 	priv->usb.dev = usbdev;
 }
 
-static void lachesis_init_profile_struct(struct razer_mouse_profile *p,
-					 struct razer_mouse *m,
-					 unsigned int nr)
-{
-	p->nr = nr;
-	p->get_freq = lachesis_get_freq;
-	p->set_freq = lachesis_set_freq;
-	p->get_dpimapping = lachesis_get_dpimapping;
-	p->set_dpimapping = lachesis_set_dpimapping;
-	p->mouse = m;
-}
-
-static void lachesis_init_dpimapping_struct(struct razer_mouse_dpimapping *d,
-					    struct razer_mouse *m,
-					    unsigned int nr,
-					    enum razer_mouse_res res)
-{
-	d->nr = nr;
-	d->res = res;
-	d->change = lachesis_dpimapping_modify;
-	d->mouse = m;
-}
-
 int razer_lachesis_init_struct(struct razer_mouse *m,
 			       struct usb_device *usbdev)
 {
@@ -600,44 +700,36 @@ int razer_lachesis_init_struct(struct razer_mouse *m,
 		return -ENOMEM;
 	memset(priv, 0, sizeof(*priv));
 	m->internal = priv;
-
-	for (i = 0; i < ARRAY_SIZE(priv->profiles); i++)
-		lachesis_init_profile_struct(&priv->profiles[i], m, i);
-	priv->cur_profile = &priv->profiles[2];
-
-	lachesis_init_dpimapping_struct(&priv->dpimappings[0], m, 0, RAZER_MOUSE_RES_250DPI);
-	lachesis_init_dpimapping_struct(&priv->dpimappings[1], m, 1, RAZER_MOUSE_RES_500DPI);
-	lachesis_init_dpimapping_struct(&priv->dpimappings[2], m, 2, RAZER_MOUSE_RES_1000DPI);
-	lachesis_init_dpimapping_struct(&priv->dpimappings[3], m, 3, RAZER_MOUSE_RES_2000DPI);
-	lachesis_init_dpimapping_struct(&priv->dpimappings[4], m, 4, RAZER_MOUSE_RES_4000DPI);
-	priv->cur_dpimapping[0] = &priv->dpimappings[0];
-	priv->cur_dpimapping[1] = &priv->dpimappings[1];
-	priv->cur_dpimapping[2] = &priv->dpimappings[2];
-	priv->cur_dpimapping[3] = &priv->dpimappings[3];
-	priv->cur_dpimapping[4] = &priv->dpimappings[4];
-
-	for (i = 0; i < ARRAY_SIZE(priv->cur_freq); i++)
-		priv->cur_freq[i] = RAZER_MOUSE_FREQ_1000HZ;
-
 	razer_lachesis_assign_usb_device(m, usbdev);
-	for (i = 0; i < LACHESIS_NR_LEDS; i++)
-		priv->led_states[i] = RAZER_LED_ON;
 
-	for (i = 0; i < LACHESIS_NR_PROFILES; i++)
-		priv->buttons[i] = default_buttonmappings;
+	for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
+		priv->profiles[i].nr = i;
+		priv->profiles[i].get_freq = lachesis_get_freq;
+		priv->profiles[i].set_freq = lachesis_set_freq;
+		priv->profiles[i].get_dpimapping = lachesis_get_dpimapping;
+		priv->profiles[i].set_dpimapping = lachesis_set_dpimapping;
+		priv->profiles[i].mouse = m;
+	}
+	for (i = 0; i < LACHESIS_NR_DPIMAPPINGS; i++) {
+		priv->dpimappings[i].nr = i;
+		priv->dpimappings[i].res = RAZER_MOUSE_RES_UNKNOWN;
+		priv->dpimappings[i].change = lachesis_dpimapping_modify;
+		priv->dpimappings[i].mouse = m;
+	}
 
 	err = lachesis_claim(m);
 	if (err) {
 		fprintf(stderr, "librazer: hw_lachesis: "
-			"Initial claim failed (%d)\n", err);
+			"Failed to initially claim the device\n");
 		free(priv);
 		return err;
 	}
-	err = lachesis_commit(priv);
+	err = lachesis_read_config_from_hw(priv);
+if (!err) lachesis_commit(priv);//XXX
 	lachesis_release(m);
 	if (err) {
 		fprintf(stderr, "librazer: hw_lachesis: "
-			"Initial configuration commit failed (%d)\n", err);
+			"Failed to read the configuration from hardware\n");
 		free(priv);
 		return err;
 	}
