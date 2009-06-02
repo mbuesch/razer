@@ -112,6 +112,28 @@ enum razer_mouse_type {
 	RAZER_MOUSETYPE_LACHESIS,
 };
 
+/** struct razer_button_function - A logical button function
+ *
+ * @id: A unique ID number for the function.
+ *
+ * @name: A unique and human readable name string for the function.
+ */
+struct razer_button_function {
+	unsigned int id;
+	const char *name;
+};
+
+/** struct razer_button - A physical button (physical = piece of hardware)
+ *
+ * @id: A unique ID number for this button.
+ *
+ * @name: A unique and human readable name string for the button.
+ */
+struct razer_button {
+	unsigned int id;
+	const char *name;
+};
+
 /** struct razer_mouse_dpimapping - Mouse scan resolution mapping.
  *
  * @nr: An ID number. Read only!
@@ -139,6 +161,10 @@ struct razer_mouse_dpimapping {
  * @get_dpimapping: Returns the active scan resolution mapping.
  *
  * @set_dpimapping: Sets the active scan resolution mapping.
+ *
+ * @get_button_function: Get the currently assigned function for a button.
+ *
+ * @set_button_function: Assign a new function to a button.
  */
 struct razer_mouse_profile {
 	unsigned int nr;
@@ -149,6 +175,12 @@ struct razer_mouse_profile {
 	struct razer_mouse_dpimapping * (*get_dpimapping)(struct razer_mouse_profile *p);
 	int (*set_dpimapping)(struct razer_mouse_profile *p,
 			      struct razer_mouse_dpimapping *d);
+
+	struct razer_button_function * (*get_button_function)(struct razer_mouse_profile *p,
+							      struct razer_button *b);
+	int (*set_button_function)(struct razer_mouse_profile *p,
+				   struct razer_button *b,
+				   struct razer_button_function *f);
 
 	struct razer_mouse *mouse;
 };
@@ -219,6 +251,15 @@ enum {
   *	The function return value is the positive list size or a negative
   *	error code.
   *
+  * @supported_buttons: Returns a list of physical buttons on the device
+  *	in res_ptr.
+  *	The function return value is the positive list size or a negative
+  *	error code.
+  *
+  * @supported_button_functions: Returns a list of possible function assignments
+  *	for the physical buttons in res_ptr.
+  *	The function return value is the positive list size or a negative
+  *	error code.
   */
 struct razer_mouse {
 	struct razer_mouse *next;
@@ -252,6 +293,10 @@ struct razer_mouse {
 			       enum razer_mouse_freq **freq_ptr);
 	int (*supported_dpimappings)(struct razer_mouse *m,
 				     struct razer_mouse_dpimapping **res_ptr);
+	int (*supported_buttons)(struct razer_mouse *m,
+				 struct razer_button **res_ptr);
+	int (*supported_button_functions)(struct razer_mouse *m,
+					  struct razer_button_function **res_ptr);
 
 	/* Do not touch these pointers. */
 	const struct razer_mouse_base_ops *base_ops;

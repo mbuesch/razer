@@ -246,8 +246,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 			return -EINVAL;
 		}
 
-		/* Translate the profile ID. */
-		//TODO
+		/* The profile ID. */
 		config.profile = 1;
 
 		/* Translate the LED states. */

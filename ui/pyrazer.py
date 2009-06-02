@@ -120,6 +120,10 @@ class Razer:
 	COMMAND_ID_GETPROFILES = 14	# Get a list of supported profiles.
 	COMMAND_ID_GETACTIVEPROF = 15	# Get the active profile.
 	COMMAND_ID_SETACTIVEPROF = 16	# Set the active profile.
+	COMMAND_ID_SUPPBUTTONS = 17	# Get a list of physical buttons.
+	COMMAND_ID_SUPPBUTFUNCS = 18	# Get a list of supported button functions.
+	COMMAND_ID_GETBUTFUNC = 19	# Get the current function of a button.
+	COMMAND_ID_SETBUTFUNC = 20	# Set the current function of a button.
 
 	COMMAND_PRIV_FLASHFW = 128	# Upload and flash a firmware image
 

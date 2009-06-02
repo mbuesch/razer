@@ -48,11 +48,11 @@ enum lachesis_phys_button {
 	LACHESIS_PHYSBUT_RIGHT,		/* Right button */
 	LACHESIS_PHYSBUT_MIDDLE,	/* Middle button */
 	LACHESIS_PHYSBUT_LFRONT,	/* Left side, front button */
-	LACHESIS_PHYSBUT_LBACK,		/* Left side, back button */
+	LACHESIS_PHYSBUT_LREAR,		/* Left side, rear button */
 	LACHESIS_PHYSBUT_RFRONT,	/* Right side, front button */
-	LACHESIS_PHYSBUT_RBACK,		/* Right side, back button */
+	LACHESIS_PHYSBUT_RREAR,		/* Right side, rear button */
 	LACHESIS_PHYSBUT_TFRONT,	/* Top side, front button */
-	LACHESIS_PHYSBUT_TBACK,		/* Top side, back button */
+	LACHESIS_PHYSBUT_TREAR,		/* Top side, rear button */
 	LACHESIS_PHYSBUT_SCROLLUP,	/* Scroll wheel up */
 	LACHESIS_PHYSBUT_SCROLLDOWN,	/* Scroll wheel down */
 
@@ -135,6 +135,38 @@ struct lachesis_private {
 	/* The active button mapping; per profile. */
 	struct lachesis_buttonmappings buttons[LACHESIS_NR_PROFILES];
 };
+
+
+/* A list of physical buttons on the device. */
+static struct razer_button lachesis_physical_buttons[] = {
+	{ .id = LACHESIS_PHYSBUT_LEFT,		.name = "Leftclick",		},
+	{ .id = LACHESIS_PHYSBUT_RIGHT,		.name = "Rightclick",		},
+	{ .id = LACHESIS_PHYSBUT_MIDDLE,	.name = "Middleclick",		},
+	{ .id = LACHESIS_PHYSBUT_LFRONT,	.name = "Leftside front",	},
+	{ .id = LACHESIS_PHYSBUT_LREAR,		.name = "Leftside rear",	},
+	{ .id = LACHESIS_PHYSBUT_RFRONT,	.name = "Rightside front",	},
+	{ .id = LACHESIS_PHYSBUT_RREAR,		.name = "Rightside rear",	},
+	{ .id = LACHESIS_PHYSBUT_TFRONT,	.name = "Top front",		},
+	{ .id = LACHESIS_PHYSBUT_TREAR,		.name = "Top rear",		},
+	{ .id = LACHESIS_PHYSBUT_SCROLLUP,	.name = "Scroll up",		},
+	{ .id = LACHESIS_PHYSBUT_SCROLLDOWN,	.name = "Scroll down",		},
+};
+
+/* A list of possible button functions. */
+static struct razer_button_function lachesis_button_functions[] = {
+	{ .id = LACHESIS_BUTFUNC_LEFT,		.name = "Leftclick",		},
+	{ .id = LACHESIS_BUTFUNC_RIGHT,		.name = "Rightclick",		},
+	{ .id = LACHESIS_BUTFUNC_MIDDLE,	.name = "Middleclick",		},
+	{ .id = LACHESIS_BUTFUNC_PROFDOWN,	.name = "Profile switch down",	},
+	{ .id = LACHESIS_BUTFUNC_PROFUP,	.name = "Profile switch up",	},
+	{ .id = LACHESIS_BUTFUNC_DPIUP,		.name = "DPI switch up",	},
+	{ .id = LACHESIS_BUTFUNC_DPIDOWN,	.name = "DPI switch down",	},
+	{ .id = LACHESIS_BUTFUNC_WIN5,		.name = "Windows Button 5",	},
+	{ .id = LACHESIS_BUTFUNC_WIN4,		.name = "Windows Button 4",	},
+	{ .id = LACHESIS_BUTFUNC_SCROLLUP,	.name = "Scroll up",		},
+	{ .id = LACHESIS_BUTFUNC_SCROLLDOWN,	.name = "Scroll down",		},
+};
+/* TODO: There are more functions */
 
 
 #define LACHESIS_USB_TIMEOUT	3000
@@ -654,6 +686,75 @@ static int lachesis_dpimapping_modify(struct razer_mouse_dpimapping *d,
 	return 0;
 }
 
+static int lachesis_supported_buttons(struct razer_mouse *m,
+				      struct razer_button **res_ptr)
+{
+	*res_ptr = lachesis_physical_buttons;
+	return ARRAY_SIZE(lachesis_physical_buttons);
+}
+
+static int lachesis_supported_button_functions(struct razer_mouse *m,
+					       struct razer_button_function **res_ptr)
+{
+	*res_ptr = lachesis_button_functions;
+	return ARRAY_SIZE(lachesis_button_functions);
+}
+
+static struct razer_button_function * lachesis_get_button_function(struct razer_mouse_profile *p,
+								   struct razer_button *b)
+{
+	struct lachesis_private *priv = p->mouse->internal;
+	struct lachesis_buttonmappings *m;
+	unsigned int i, j;
+
+	if (p->nr > ARRAY_SIZE(priv->buttons))
+		return NULL;
+	m = &priv->buttons[p->nr];
+
+	for (i = 0; i < ARRAY_SIZE(m->mappings); i++) {
+		if (m->mappings[i].physical == b->id) {
+			for (j = 0; j < ARRAY_SIZE(lachesis_button_functions); j++) {
+				if (lachesis_button_functions[j].id == m->mappings[i].logical)
+					return &lachesis_button_functions[j];
+			}
+		}
+	}
+
+	return NULL;
+}
+
+static int lachesis_set_button_function(struct razer_mouse_profile *p,
+					struct razer_button *b,
+					struct razer_button_function *f)
+{
+	struct lachesis_private *priv = p->mouse->internal;
+	struct lachesis_buttonmappings *m;
+	unsigned int i;
+	uint8_t oldlogical;
+	int err;
+
+	if (!priv->claimed)
+		return -EBUSY;
+	if (p->nr > ARRAY_SIZE(priv->buttons))
+		return -EINVAL;
+	m = &priv->buttons[p->nr];
+
+	for (i = 0; i < ARRAY_SIZE(m->mappings); i++) {
+		if (m->mappings[i].physical == b->id) {
+			oldlogical = m->mappings[i].logical;
+			m->mappings[i].logical = f->id;
+			err = lachesis_commit(priv);
+			if (err) {
+				m->mappings[i].logical = oldlogical;
+				return err;
+			}
+			return 0;
+		}
+	}
+
+	return -ENODEV;
+}
+
 void razer_lachesis_gen_idstr(struct usb_device *udev, char *buf)
 {
 	char devid[64];
@@ -713,6 +814,8 @@ int razer_lachesis_init_struct(struct razer_mouse *m,
 		priv->profiles[i].set_freq = lachesis_set_freq;
 		priv->profiles[i].get_dpimapping = lachesis_get_dpimapping;
 		priv->profiles[i].set_dpimapping = lachesis_set_dpimapping;
+		priv->profiles[i].get_button_function = lachesis_get_button_function;
+		priv->profiles[i].set_button_function = lachesis_set_button_function;
 		priv->profiles[i].mouse = m;
 	}
 	for (i = 0; i < LACHESIS_NR_DPIMAPPINGS; i++) {
@@ -753,6 +856,8 @@ if (!err) lachesis_commit(priv);//XXX
 	m->supported_resolutions = lachesis_supported_resolutions;
 	m->supported_freqs = lachesis_supported_freqs;
 	m->supported_dpimappings = lachesis_supported_dpimappings;
+	m->supported_buttons = lachesis_supported_buttons;
+	m->supported_button_functions = lachesis_supported_button_functions;
 
 	return 0;
 }

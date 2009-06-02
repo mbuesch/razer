@@ -103,6 +103,10 @@ enum {
 	COMMAND_ID_GETPROFILES,		/* Get a list of supported profiles. */
 	COMMAND_ID_GETACTIVEPROF,	/* Get the active profile. */
 	COMMAND_ID_SETACTIVEPROF,	/* Set the active profile. */
+	COMMAND_ID_SUPPBUTTONS,		/* Get a list of physical buttons. */
+	COMMAND_ID_SUPPBUTFUNCS,	/* Get a list of supported button functions. */
+	COMMAND_ID_GETBUTFUNC,		/* Get the current function of a button. */
+	COMMAND_ID_SETBUTFUNC,		/* Set the current function of a button. */
 
 	/* Privileged commands */
 	COMMAND_PRIV_FLASHFW = 128,	/* Upload and flash a firmware image */
@@ -179,6 +183,23 @@ struct command {
 		struct {
 			uint32_t profile_id;
 		} __attribute__((packed)) getfreq;
+
+		struct {
+		} __attribute__((packed)) suppbuttons;
+
+		struct {
+		} __attribute__((packed)) suppbutfuncs;
+
+		struct {
+			uint32_t profile_id;
+			uint32_t button_id;
+		} __attribute__((packed)) getbutfunc;
+
+		struct {
+			uint32_t profile_id;
+			uint32_t button_id;
+			uint32_t function_id;
+		} __attribute__((packed)) setbutfunc;
 
 		struct {
 			uint32_t imagesize;
@@ -1149,6 +1170,22 @@ error:
 	send_u32(client, errorcode);
 }
 
+static void command_suppbuttons(struct client *client, const struct command *cmd, unsigned int len)
+{//TODO
+}
+
+static void command_suppbutfuncs(struct client *client, const struct command *cmd, unsigned int len)
+{//TODO
+}
+
+static void command_getbutfunc(struct client *client, const struct command *cmd, unsigned int len)
+{//TODO
+}
+
+static void command_setbutfunc(struct client *client, const struct command *cmd, unsigned int len)
+{//TODO
+}
+
 static void command_flashfw(struct client *client, const struct command *cmd, unsigned int len)
 {
 	struct razer_mouse *mouse;
@@ -1259,6 +1296,18 @@ static void handle_received_command(struct client *client, const char *_cmd, uns
 		break;
 	case COMMAND_ID_GETFREQ:
 		command_getfreq(client, cmd, len);
+		break;
+	case COMMAND_ID_SUPPBUTTONS:
+		command_suppbuttons(client, cmd, len);
+		break;
+	case COMMAND_ID_SUPPBUTFUNCS:
+		command_suppbutfuncs(client, cmd, len);
+		break;
+	case COMMAND_ID_GETBUTFUNC:
+		command_getbutfunc(client, cmd, len);
+		break;
+	case COMMAND_ID_SETBUTFUNC:
+		command_setbutfunc(client, cmd, len);
 		break;
 	default:
 		/* Unknown command. */
