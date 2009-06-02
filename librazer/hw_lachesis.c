@@ -309,11 +309,15 @@ printf("Read prof\n");
 	if (err)
 		return err;
 	if (value < 1 || value > 5) {
+priv->cur_profile = &priv->profiles[0];
+for (i = 0; i < 5; i++)
+priv->cur_dpimapping[i] = &priv->dpimappings[0];
 		fprintf(stderr, "librazer: hw_lachesis: "
 			"Read invalid profile number from device (%u)\n",
 			value);
-		return -EINVAL;
+//		return -EINVAL;
 	}
+else{
 	priv->cur_profile = &priv->profiles[value - 1];
 
 printf("Read prof conf\n");
@@ -350,6 +354,7 @@ printf("Got magic = 0x%04X, prof %u, freq %u\n", profcfg.magic, profcfg.profile,
 		}
 		priv->buttons[i] = profcfg.buttons;
 	}
+}
 
 	/* Get the LED states */
 	err = lachesis_usb_read(priv, USB_REQ_CLEAR_FEATURE,

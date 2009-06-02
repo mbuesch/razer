@@ -100,25 +100,22 @@ class MouseProfileWidget(QWidget):
 		self.layout().addWidget(self.resSel, 2, 1)
 
 	def freqChanged(self, index):
-		if index == -1:
-			return
-		if index == 0: # "Unknown"
+		if index <= 0:
 			return
 		freq = self.freqSel.itemData(index).toUInt()[0]
-		razer.setFrequency(self.mouse, freq)
+		razer.setFrequency(self.mouseWidget.mouse, self.profileId, freq)
 
 	def resChanged(self, index):
-		if index == -1:
-			return
-		if index == 0: # "Unknown"
+		if index <= 0:
 			return
 		res = self.resSel.itemData(index).toUInt()[0]
-		razer.setResolution(self.mouse, res)
+		razer.setDpiMapping(self.mouseWidget.mouse, self.profileId, res)
 
 class OneDpiMapping(QWidget):
 	def __init__(self, dpiMappingsWidget, id, resolution, isMutable):
 		QWidget.__init__(self, dpiMappingsWidget)
 		self.dpiMappingsWidget = dpiMappingsWidget
+		self.mappingId = id
 
 		self.setLayout(QHBoxLayout(self))
 		self.layout().addWidget(QLabel(self.tr("Scan resolution %u" % (id+1)), self))
@@ -130,8 +127,17 @@ class OneDpiMapping(QWidget):
 		index = self.mappingSel.findData(QVariant(resolution))
 		if index >= 0:
 			self.mappingSel.setCurrentIndex(index)
+		self.connect(self.mappingSel, SIGNAL("currentIndexChanged(int)"),
+			     self.changed)
 		self.mappingSel.setEnabled(isMutable)
 		self.layout().addWidget(self.mappingSel)
+
+	def changed(self, index):
+		if index <= 0:
+			return
+		resolution = self.mappingSel.itemData(index).toUInt()[0]
+		razer.changeDpiMapping(self.dpiMappingsWidget.mouseWidget.mouse,
+				       self.mappingId, resolution)
 
 class MouseDpiMappingsWidget(QGroupBox):
 	def __init__(self, mouseWidget):
