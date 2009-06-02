@@ -60,6 +60,7 @@ class MouseProfileWidget(QWidget):
 		QWidget.__init__(self, mouseWidget)
 		self.mouseWidget = mouseWidget
 		self.profileId = profileId
+		self.reloading = False
 
 		self.setLayout(QGridLayout(self))
 
@@ -67,22 +68,34 @@ class MouseProfileWidget(QWidget):
 		self.layout().addWidget(self.profileActive, 0, 0)
 
 		self.layout().addWidget(QLabel(self.tr("Mouse scan frequency:"), self), 1, 0)
-		supportedFreqs = razer.getSupportedFreqs(self.mouseWidget.mouse)
-		curFreq = razer.getCurrentFreq(self.mouseWidget.mouse, profileId)
 		self.freqSel = QComboBox(self)
+		self.connect(self.freqSel, SIGNAL("currentIndexChanged(int)"), self.freqChanged)
+		self.layout().addWidget(self.freqSel, 1, 1)
+
+		self.layout().addWidget(QLabel(self.tr("Mouse scan resolution:"), self), 2, 0)
+		self.resSel = QComboBox(self)
+		self.connect(self.resSel, SIGNAL("currentIndexChanged(int)"), self.resChanged)
+		self.layout().addWidget(self.resSel, 2, 1)
+
+		self.reload()
+
+	def reload(self):
+		# Refetch the data from the daemon
+		self.reloading = True
+
+		self.freqSel.clear()
+		supportedFreqs = razer.getSupportedFreqs(self.mouseWidget.mouse)
+		curFreq = razer.getCurrentFreq(self.mouseWidget.mouse, self.profileId)
 		self.freqSel.addItem(self.tr("Unknown Hz"), QVariant(0))
 		for freq in supportedFreqs:
 			self.freqSel.addItem(self.tr("%u Hz" % freq), QVariant(freq))
 		index = self.freqSel.findData(QVariant(curFreq))
 		if index >= 0:
 			self.freqSel.setCurrentIndex(index)
-		self.connect(self.freqSel, SIGNAL("currentIndexChanged(int)"), self.freqChanged)
-		self.layout().addWidget(self.freqSel, 1, 1)
 
-		self.layout().addWidget(QLabel(self.tr("Mouse scan resolution:"), self), 2, 0)
+		self.resSel.clear()
 		supportedMappings = razer.getSupportedDpiMappings(self.mouseWidget.mouse)
-		curMapping = razer.getDpiMapping(self.mouseWidget.mouse, profileId)
-		self.resSel = QComboBox(self)
+		curMapping = razer.getDpiMapping(self.mouseWidget.mouse, self.profileId)
 		self.resSel.addItem(self.tr("Unknown mapping"), QVariant(0xFFFFFFFF))
 		for mapping in supportedMappings:
 			id = mapping[0]
@@ -96,17 +109,17 @@ class MouseProfileWidget(QWidget):
 		index = self.resSel.findData(QVariant(curMapping))
 		if index >= 0:
 			self.resSel.setCurrentIndex(index)
-		self.connect(self.resSel, SIGNAL("currentIndexChanged(int)"), self.resChanged)
-		self.layout().addWidget(self.resSel, 2, 1)
+
+		self.reloading = True
 
 	def freqChanged(self, index):
-		if index <= 0:
+		if self.reloading or index <= 0:
 			return
 		freq = self.freqSel.itemData(index).toUInt()[0]
 		razer.setFrequency(self.mouseWidget.mouse, self.profileId, freq)
 
 	def resChanged(self, index):
-		if index <= 0:
+		if self.reloading or index <= 0:
 			return
 		res = self.resSel.itemData(index).toUInt()[0]
 		razer.setDpiMapping(self.mouseWidget.mouse, self.profileId, res)
@@ -138,6 +151,7 @@ class OneDpiMapping(QWidget):
 		resolution = self.mappingSel.itemData(index).toUInt()[0]
 		razer.changeDpiMapping(self.dpiMappingsWidget.mouseWidget.mouse,
 				       self.mappingId, resolution)
+		self.dpiMappingsWidget.mouseWidget.reloadProfiles()
 
 class MouseDpiMappingsWidget(QGroupBox):
 	def __init__(self, mouseWidget):
@@ -172,6 +186,7 @@ class MouseWidget(QWidget):
 
 		self.profiletab = QTabWidget(self)
 		self.layout().addWidget(self.profiletab)
+		self.profileWidgets = []
 
 		self.dpimappings = MouseDpiMappingsWidget(self)
 		self.layout().addWidget(self.dpimappings)
@@ -194,6 +209,7 @@ class MouseWidget(QWidget):
 
 	def mouseChanged(self, index):
 		self.profiletab.clear()
+		self.profileWidgets = []
 		self.dpimappings.clear()
 		self.leds.clear()
 		self.profiletab.setEnabled(index > -1)
@@ -214,6 +230,7 @@ class MouseWidget(QWidget):
 				name = ">" + name + "<"
 				activeWidget = widget
 			self.profiletab.addTab(widget, name)
+			self.profileWidgets.append(widget)
 		if activeWidget:
 			self.profiletab.setCurrentWidget(activeWidget)
 
@@ -232,6 +249,10 @@ class MouseWidget(QWidget):
 
 		ver = razer.getFwVer(self.mouse)
 		self.fwVer.setText(self.tr("Firmware version: %u.%u" % (ver[0], ver[1])))
+
+	def reloadProfiles(self):
+		for prof in self.profileWidgets:
+			prof.reload()
 
 class StatusBar(QStatusBar):
 	def showMessage(self, msg):
