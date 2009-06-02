@@ -110,7 +110,7 @@ class MouseProfileWidget(QWidget):
 		if index >= 0:
 			self.resSel.setCurrentIndex(index)
 
-		self.reloading = True
+		self.reloading = False
 
 	def freqChanged(self, index):
 		if self.reloading or index <= 0:
