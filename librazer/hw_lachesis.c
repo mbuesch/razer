@@ -95,7 +95,7 @@ struct lachesis_profcfg_cmd {
 	struct lachesis_buttonmappings buttons;
 	le16_t checksum;
 } __attribute__((packed));
-#define LACHESIS_PROFCFG_MAGIC		cpu_to_le32(0x0002)
+#define LACHESIS_PROFCFG_MAGIC		cpu_to_le16(0x0002)
 
 struct lachesis_one_dpimapping {
 	uint8_t magic;
@@ -258,7 +258,7 @@ static int lachesis_commit(struct lachesis_private *priv)
 	struct lachesis_dpimap_cmd dpimap;
 
 	/* Commit the profile configuration. */
-	for (i = 0; i < 5; i++) {
+	for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
 		memset(&profcfg, 0, sizeof(profcfg));
 		profcfg.packetlength = cpu_to_le16(sizeof(profcfg));
 		profcfg.magic = LACHESIS_PROFCFG_MAGIC;
@@ -305,7 +305,7 @@ static int lachesis_commit(struct lachesis_private *priv)
 
 	/* Commit the DPI map. */
 	memset(&dpimap, 0, sizeof(dpimap));
-	for (i = 0; i < 5; i++) {
+	for (i = 0; i < LACHESIS_NR_DPIMAPPINGS; i++) {
 		dpimap.mappings[i].magic = LACHESIS_DPIMAPPING_MAGIC;
 		dpimap.mappings[i].dpival0 = (priv->dpimappings[i].res / 125) - 1;
 		dpimap.mappings[i].dpival1 = dpimap.mappings[i].dpival0;
@@ -327,8 +327,8 @@ static const struct lachesis_buttonmappings lachesis_default_buttonmap = {
 		DEFINE_DEF_BUTMAP(LEFT, LEFT),
 		DEFINE_DEF_BUTMAP(RIGHT, RIGHT),
 		DEFINE_DEF_BUTMAP(MIDDLE, MIDDLE),
-		DEFINE_DEF_BUTMAP(LFRONT, WIN4),
-		DEFINE_DEF_BUTMAP(LREAR, WIN5),
+		DEFINE_DEF_BUTMAP(LFRONT, WIN5),
+		DEFINE_DEF_BUTMAP(LREAR, WIN4),
 		DEFINE_DEF_BUTMAP(RFRONT, PROFUP),
 		DEFINE_DEF_BUTMAP(RREAR, PROFDOWN),
 		DEFINE_DEF_BUTMAP(TFRONT, DPIUP),

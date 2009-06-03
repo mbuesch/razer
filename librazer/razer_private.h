@@ -116,5 +116,11 @@ static inline le32_t cpu_to_le32(uint32_t v)
 
 le16_t razer_xor16_checksum(const void *buffer, size_t size);
 
+#ifdef DEBUG
+void razer_dump(const char *prefix, const void *buf, size_t size);
+#else
+static inline void razer_dump(const char *p, const void *b, size_t s) { }
+#endif
+
 
 #endif /* RAZER_PRIVATE_H_ */

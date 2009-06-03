@@ -688,11 +688,11 @@ out:
 
 le16_t razer_xor16_checksum(const void *_buffer, size_t size)
 {
-	const char *buffer = _buffer;
+	const unsigned char *buffer = _buffer;
 	uint16_t sum = 0;
 	size_t i;
 
-	for (i = 0; i < size; i++) {
+	for (i = 0; i < size; i += 2) {
 		sum ^= buffer[i] & 0xFF;
 		if (i < size - 1)
 			sum ^= ((uint16_t)(buffer[i + 1])) << 8;
@@ -700,3 +700,21 @@ le16_t razer_xor16_checksum(const void *_buffer, size_t size)
 
 	return cpu_to_le16(sum);
 }
+
+#ifdef DEBUG
+void razer_dump(const char *prefix, const void *_buf, size_t size)
+{
+	const unsigned char *buf = _buf;
+	size_t i;
+
+	for (i = 0; i < size; i++) {
+		if (i % 16 == 0) {
+			if (i != 0)
+				printf("\n");
+			printf("%s-[%04X]:  ", prefix, i);
+		}
+		printf("%02X%s", buf[i], (i % 2) ? " " : "");
+	}
+	printf("\n\n");
+}
+#endif

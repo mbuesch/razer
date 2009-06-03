@@ -1,5 +1,5 @@
 EESchema Schematic File Version 1
-LIBS:power,device,conn,linear,regul,74xx,cmos4000,adc-dac,memory,xilinx,special,microcontrollers,dsp,microchip,analog_switches,motorola,texas,intel,audio,interface,digital-audio,philips,display,cypress,siliconi,contrib,valves,./parport_issp.cache
+LIBS:power,device,conn,linear,regul,74xx,cmos4000,adc-dac,memory,xilinx,special,microcontrollers,dsp,microchip,analog_switches,motorola,texas,intel,audio,interface,digital-audio,philips,display,cypress,siliconi,contrib,valves
 EELAYER 23  0
 EELAYER END
 $Descr A4 11700 8267
@@ -13,6 +13,135 @@ Comment2 ""
 Comment3 ""
 Comment4 ""
 $EndDescr
+Wire Wire Line
+	5550 2700 5650 2700
+Connection ~ 6200 2950
+Wire Wire Line
+	6200 2400 6200 3450
+Wire Wire Line
+	6200 2400 5950 2400
+Wire Wire Line
+	5950 2400 5950 2500
+Wire Wire Line
+	6200 2950 6650 2950
+Wire Wire Line
+	6200 3450 6300 3450
+Wire Wire Line
+	6950 2750 7050 2750
+Wire Wire Line
+	7050 2750 7050 4000
+Wire Wire Line
+	7050 4000 7900 4000
+Connection ~ 5600 4300
+Wire Wire Line
+	5600 4300 5600 3200
+Wire Wire Line
+	5600 3200 4200 3200
+Wire Wire Line
+	5350 4300 5900 4300
+Wire Wire Line
+	7900 4200 6750 4200
+Wire Wire Line
+	6750 4200 6750 4100
+Wire Wire Line
+	6750 4100 6400 4100
+Connection ~ 6750 4300
+Wire Wire Line
+	6750 4450 6750 4300
+Wire Wire Line
+	4400 5200 4200 5200
+Wire Wire Line
+	4400 4800 4200 4800
+Wire Wire Line
+	4400 4400 4200 4400
+Wire Wire Line
+	4200 4000 4400 4000
+Wire Wire Line
+	4200 3800 4400 3800
+Wire Wire Line
+	4200 4200 4400 4200
+Wire Wire Line
+	4200 4600 4400 4600
+Wire Wire Line
+	4200 5000 4400 5000
+Wire Wire Line
+	6400 4300 7900 4300
+Wire Wire Line
+	6750 4950 6750 5050
+Wire Wire Line
+	6950 4100 7900 4100
+Wire Wire Line
+	4950 4300 4750 4300
+Wire Wire Line
+	4750 4300 4750 3100
+Wire Wire Line
+	4750 3100 4200 3100
+Wire Wire Line
+	4200 3300 5800 3300
+Wire Wire Line
+	5800 3300 5800 4100
+Wire Wire Line
+	5800 4100 5900 4100
+Wire Wire Line
+	7900 3900 6950 3900
+Wire Wire Line
+	6950 3900 6950 3150
+Wire Wire Line
+	6800 3450 6950 3450
+Connection ~ 6950 3450
+Wire Wire Line
+	5950 3000 5950 2900
+Wire Wire Line
+	5050 2700 4950 2700
+Wire Wire Line
+	4950 2700 4950 3500
+Wire Wire Line
+	4950 3500 4200 3500
+$Comp
+L R R?
+U 1 1 4A23E4A1
+P 5300 2700
+F 0 "R?" V 5380 2700 50  0000 C C
+F 1 "R" V 5300 2700 50  0000 C C
+	1    5300 2700
+	0    1    1    0   
+$EndComp
+$Comp
+L GND #PWR?
+U 1 1 4A23E488
+P 5950 3000
+F 0 "#PWR?" H 5950 3000 30  0001 C C
+F 1 "GND" H 5950 2930 30  0001 C C
+	1    5950 3000
+	1    0    0    -1  
+$EndComp
+$Comp
+L NPN Q?
+U 1 1 4A23E465
+P 5850 2700
+F 0 "Q?" H 6000 2700 50  0000 C C
+F 1 "NPN" H 5752 2850 50  0000 C C
+	1    5850 2700
+	1    0    0    -1  
+$EndComp
+$Comp
+L R R?
+U 1 1 4A23E3FD
+P 6550 3450
+F 0 "R?" V 6630 3450 50  0000 C C
+F 1 "1k" V 6550 3450 50  0000 C C
+	1    6550 3450
+	0    1    1    0   
+$EndComp
+$Comp
+L MOSFET_P Q?
+U 1 1 4A23DDD8
+P 6850 2950
+F 0 "Q?" H 6850 3140 60  0000 R C
+F 1 "MOSFET_P" H 6850 2770 60  0000 R C
+	1    6850 2950
+	1    0    0    -1  
+$EndComp
 Text Label 4300 3300 0    40   ~
 SCLK
 Text Label 4300 3200 0    40   ~
@@ -21,117 +150,6 @@ Text Label 4300 3100 0    40   ~
 SDATA ->
 Text Label 4300 3500 0    40   ~
 POR
-Wire Wire Line
-	5950 3000 5900 3000
-Wire Wire Line
-	5900 3000 5900 3500
-Wire Wire Line
-	5900 3500 4200 3500
-Wire Wire Line
-	6050 3350 6150 3350
-Wire Wire Line
-	7900 4000 6850 4000
-Wire Wire Line
-	6850 4000 6850 3200
-Wire Wire Line
-	5900 4100 5800 4100
-Wire Wire Line
-	5800 4100 5800 3300
-Wire Wire Line
-	5800 3300 4200 3300
-Wire Wire Line
-	4200 3100 4750 3100
-Wire Wire Line
-	4750 3100 4750 4300
-Wire Wire Line
-	4750 4300 4950 4300
-Wire Wire Line
-	6950 4100 7900 4100
-Wire Wire Line
-	6750 4950 6750 5050
-Wire Wire Line
-	6400 4300 7900 4300
-Wire Wire Line
-	4200 5000 4400 5000
-Wire Wire Line
-	4200 4600 4400 4600
-Wire Wire Line
-	4200 4200 4400 4200
-Wire Wire Line
-	4200 3800 4400 3800
-Wire Wire Line
-	7900 3900 7100 3900
-Wire Wire Line
-	4200 4000 4400 4000
-Wire Wire Line
-	4400 4400 4200 4400
-Wire Wire Line
-	4400 4800 4200 4800
-Wire Wire Line
-	4400 5200 4200 5200
-Wire Wire Line
-	6750 4450 6750 4300
-Connection ~ 6750 4300
-Wire Wire Line
-	6400 4100 6750 4100
-Wire Wire Line
-	6750 4100 6750 4200
-Wire Wire Line
-	6750 4200 7900 4200
-Wire Wire Line
-	5350 4300 5900 4300
-Wire Wire Line
-	4200 3200 5600 3200
-Wire Wire Line
-	5600 3200 5600 4300
-Connection ~ 5600 4300
-Wire Wire Line
-	6850 2800 6850 2700
-Wire Wire Line
-	6850 2700 7100 2700
-Wire Wire Line
-	7100 2700 7100 3900
-Wire Wire Line
-	6650 3350 6850 3350
-Connection ~ 6850 3350
-Wire Wire Line
-	6450 3000 6550 3000
-$Comp
-L GND #PWR9
-U 1 1 4A19241D
-P 6050 3350
-F 0 "#PWR9" H 6050 3350 30  0001 C C
-F 1 "GND" H 6050 3280 30  0001 C C
-	1    6050 3350
-	0    1    1    0   
-$EndComp
-$Comp
-L R R4
-U 1 1 4A1923C7
-P 6400 3350
-F 0 "R4" V 6480 3350 50  0000 C C
-F 1 "4.7k" V 6400 3350 50  0000 C C
-	1    6400 3350
-	0    1    1    0   
-$EndComp
-$Comp
-L R R3
-U 1 1 4A192356
-P 6200 3000
-F 0 "R3" V 6280 3000 50  0000 C C
-F 1 "1k" V 6200 3000 50  0000 C C
-	1    6200 3000
-	0    1    1    0   
-$EndComp
-$Comp
-L NPN Q1
-U 1 1 4A1922BB
-P 6750 3000
-F 0 "Q1" H 6900 3000 50  0000 C C
-F 1 "BC547" H 6652 3150 50  0000 C C
-	1    6750 3000
-	1    0    0    -1  
-$EndComp
 NoConn ~ 4200 5300
 NoConn ~ 4200 5100
 NoConn ~ 4200 4900
@@ -268,7 +286,7 @@ L R R5
 U 1 1 4A191C1E
 P 6750 4700
 F 0 "R5" V 6830 4700 50  0000 C C
-F 1 "1.5k" V 6750 4700 50  0000 C C
+F 1 "1k" V 6750 4700 50  0000 C C
 	1    6750 4700
 	1    0    0    -1  
 $EndComp
@@ -277,7 +295,7 @@ L R R2
 U 1 1 4A191C1A
 P 6150 4300
 F 0 "R2" V 6230 4300 50  0000 C C
-F 1 "1.5k" V 6150 4300 50  0000 C C
+F 1 "1k" V 6150 4300 50  0000 C C
 	1    6150 4300
 	0    1    1    0   
 $EndComp
@@ -286,7 +304,7 @@ L R R1
 U 1 1 4A191C15
 P 6150 4100
 F 0 "R1" V 6230 4100 50  0000 C C
-F 1 "1.5k" V 6150 4100 50  0000 C C
+F 1 "1k" V 6150 4100 50  0000 C C
 	1    6150 4100
 	0    1    1    0   
 $EndComp
