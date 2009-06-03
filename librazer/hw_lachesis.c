@@ -318,75 +318,97 @@ static int lachesis_commit(struct lachesis_private *priv)
 	return 0;
 }
 
+#define DEFINE_DEF_BUTMAP(phys, func)		\
+	{ .physical = LACHESIS_PHYSBUT_##phys,	\
+	  .logical = LACHESIS_BUTFUNC_##func,	\
+	}
+static const struct lachesis_buttonmappings lachesis_default_buttonmap = {
+	.mappings = {
+		DEFINE_DEF_BUTMAP(LEFT, LEFT),
+		DEFINE_DEF_BUTMAP(RIGHT, RIGHT),
+		DEFINE_DEF_BUTMAP(MIDDLE, MIDDLE),
+		DEFINE_DEF_BUTMAP(LFRONT, WIN4),
+		DEFINE_DEF_BUTMAP(LREAR, WIN5),
+		DEFINE_DEF_BUTMAP(RFRONT, PROFUP),
+		DEFINE_DEF_BUTMAP(RREAR, PROFDOWN),
+		DEFINE_DEF_BUTMAP(TFRONT, DPIUP),
+		DEFINE_DEF_BUTMAP(TREAR, DPIDOWN),
+		DEFINE_DEF_BUTMAP(SCROLLUP, SCROLLUP),
+		DEFINE_DEF_BUTMAP(SCROLLDOWN, SCROLLDOWN),
+	},
+};
+
 static int lachesis_read_config_from_hw(struct lachesis_private *priv)
 {
+	bool ok;
 	int err;
 	unsigned char value;
 	unsigned int i;
 	struct lachesis_dpimap_cmd dpimap;
 	struct lachesis_profcfg_cmd profcfg;
 
+	/* Assign sane defaults for config values that might fail. */
+	priv->cur_profile = &priv->profiles[0];
+	for (i = 0; i < LACHESIS_NR_DPIMAPPINGS; i++)
+		priv->cur_dpimapping[i] = &priv->dpimappings[0];
+	for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
+		priv->cur_freq[i] = RAZER_MOUSE_FREQ_1000HZ;
+		priv->buttons[i] = lachesis_default_buttonmap;
+	}
+
 #if 0
 value = 0x01;
 lachesis_usb_write(priv, USB_REQ_SET_CONFIGURATION,
 		   0x0F, &value, sizeof(value));
-lachesis_usb_read(priv, USB_REQ_CLEAR_FEATURE,
-		  0x02, &value, sizeof(value));
 #endif
 
 printf("Read prof\n");
 	/* Get the current profile number */
-	err = lachesis_usb_read(priv, USB_REQ_CLEAR_FEATURE,
-				0x09, &value, sizeof(value));
-	if (err)
-		return err;
-	if (value < 1 || value > 5) {
-priv->cur_profile = &priv->profiles[0];
-for (i = 0; i < 5; i++)
-priv->cur_dpimapping[i] = &priv->dpimappings[0];
-		fprintf(stderr, "librazer: hw_lachesis: "
-			"Read invalid profile number from device (%u)\n",
-			value);
-//		return -EINVAL;
-	}
-else{
-	priv->cur_profile = &priv->profiles[value - 1];
-
-printf("Read prof conf\n");
-	/* Get the profile configuration */
-	err = lachesis_usb_read_withindex(priv, USB_REQ_CLEAR_FEATURE,
-					  0x03, 0, &profcfg, sizeof(profcfg));//FIXME index
-	if (err)
-		return err;
-	if (profcfg.dpisel < 1 || profcfg.dpisel > 5) {
-		fprintf(stderr, "librazer: hw_lachesis: "
-			"Read invalid DPI select value from device (%u)\n",
-			profcfg.dpisel);
-		return -EINVAL;
-	}
-printf("Got magic = 0x%04X, prof %u, freq %u\n", profcfg.magic, profcfg.profile, profcfg.freq);
-	//FIXME how to get all profiles?
-	for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
-		priv->cur_dpimapping[i] = &priv->dpimappings[profcfg.dpisel - 1];
-		switch (profcfg.freq) {
-		case 1:
-			priv->cur_freq[i] = RAZER_MOUSE_FREQ_1000HZ;
+	ok = 0;
+	for (i = 0; i < 2; i++) {
+		err = lachesis_usb_read(priv, USB_REQ_CLEAR_FEATURE,
+					0x09, &value, sizeof(value));
+		if (err)
+			return err;
+		if (value >= 1 && value <= LACHESIS_NR_PROFILES) {
+			ok = 1;
 			break;
-		case 2:
-			priv->cur_freq[i] = RAZER_MOUSE_FREQ_500HZ;
-			break;
-		case 3:
-			priv->cur_freq[i] = RAZER_MOUSE_FREQ_125HZ;
-			break;
-		default:
-			fprintf(stderr, "librazer: hw_lachesis: "
-				"Read invalid frequency value from device (%u)\n",
-				profcfg.freq);
-			return -EINVAL;
 		}
-		priv->buttons[i] = profcfg.buttons;
 	}
-}
+	if (ok) {
+		/* Got a valid current profile number. */
+		priv->cur_profile = &priv->profiles[value - 1];
+printf("Read prof conf\n");
+		/* Get the profile configuration */
+		/*FIXME how to get all profile data? */
+		err = lachesis_usb_read_withindex(priv, USB_REQ_CLEAR_FEATURE,
+						  0x03, 0, &profcfg, sizeof(profcfg));//FIXME index
+		if (err)
+			return err;
+		if (profcfg.dpisel >= 1 && profcfg.dpisel <= LACHESIS_NR_DPIMAPPINGS) {
+printf("Got magic = 0x%04X, prof %u, freq %u\n", profcfg.magic, profcfg.profile, profcfg.freq);
+			for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
+				priv->cur_dpimapping[i] = &priv->dpimappings[profcfg.dpisel - 1];
+				switch (profcfg.freq) {
+				case 1:
+					priv->cur_freq[i] = RAZER_MOUSE_FREQ_1000HZ;
+					break;
+				case 2:
+					priv->cur_freq[i] = RAZER_MOUSE_FREQ_500HZ;
+					break;
+				case 3:
+					priv->cur_freq[i] = RAZER_MOUSE_FREQ_125HZ;
+					break;
+				default:
+					fprintf(stderr, "librazer: hw_lachesis: "
+						"Read invalid frequency value from device (%u)\n",
+						profcfg.freq);
+					return -EINVAL;
+				}
+				priv->buttons[i] = profcfg.buttons;
+			}
+		}
+	}
 
 	/* Get the LED states */
 	err = lachesis_usb_read(priv, USB_REQ_CLEAR_FEATURE,
@@ -833,7 +855,8 @@ int razer_lachesis_init_struct(struct razer_mouse *m,
 		return err;
 	}
 	err = lachesis_read_config_from_hw(priv);
-if (!err) lachesis_commit(priv);//XXX
+	if (!err)
+		err = lachesis_commit(priv);
 	lachesis_release(m);
 	if (err) {
 		fprintf(stderr, "librazer: hw_lachesis: "
