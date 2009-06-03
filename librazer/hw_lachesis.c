@@ -297,7 +297,7 @@ static int lachesis_commit(struct lachesis_private *priv)
 		return err;
 
 	/* Commit the active profile selection. */
-	value = priv->cur_profile->nr;
+	value = priv->cur_profile->nr + 1;
 	err = lachesis_usb_write(priv, USB_REQ_SET_CONFIGURATION,
 				 0x08, &value, sizeof(value));
 	if (err)
@@ -380,11 +380,16 @@ printf("Read prof\n");
 		priv->cur_profile = &priv->profiles[value - 1];
 printf("Read prof conf\n");
 		/* Get the profile configuration */
-		/*FIXME how to get all profile data? */
+		/*FIXME This is completely broken...
+		 * how to get all profile data? */
 		err = lachesis_usb_read_withindex(priv, USB_REQ_CLEAR_FEATURE,
-						  0x03, 0, &profcfg, sizeof(profcfg));//FIXME index
-		if (err)
-			return err;
+						  0x03, 1, &profcfg, sizeof(profcfg));
+		if (err) {
+			err = lachesis_usb_read_withindex(priv, USB_REQ_CLEAR_FEATURE,
+							  0x03, 0, &profcfg, sizeof(profcfg));
+			if (err)
+				return err;
+		}
 		if (profcfg.dpisel >= 1 && profcfg.dpisel <= LACHESIS_NR_DPIMAPPINGS) {
 printf("Got magic = 0x%04X, prof %u, freq %u\n", profcfg.magic, profcfg.profile, profcfg.freq);
 			for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
