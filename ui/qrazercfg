@@ -60,11 +60,12 @@ class MouseProfileWidget(QWidget):
 		QWidget.__init__(self, mouseWidget)
 		self.mouseWidget = mouseWidget
 		self.profileId = profileId
-		self.reloading = False
+		self.recurseProtect = False
 
 		self.setLayout(QGridLayout(self))
 
 		self.profileActive = QRadioButton(self.tr("Profile active"), self)
+		self.connect(self.profileActive, SIGNAL("toggled(bool)"), self.activeChanged)
 		self.layout().addWidget(self.profileActive, 0, 0)
 
 		self.layout().addWidget(QLabel(self.tr("Mouse scan frequency:"), self), 1, 0)
@@ -81,7 +82,7 @@ class MouseProfileWidget(QWidget):
 
 	def reload(self):
 		# Refetch the data from the daemon
-		self.reloading = True
+		self.recurseProtect = True
 
 		self.freqSel.clear()
 		supportedFreqs = razer.getSupportedFreqs(self.mouseWidget.mouse)
@@ -110,16 +111,31 @@ class MouseProfileWidget(QWidget):
 		if index >= 0:
 			self.resSel.setCurrentIndex(index)
 
-		self.reloading = False
+		activeProf = razer.getActiveProfile(self.mouseWidget.mouse)
+		self.profileActive.setChecked(activeProf == self.profileId)
+
+		self.recurseProtect = False
+
+	def activeChanged(self, checked):
+		if self.recurseProtect:
+			return
+		if not checked:
+			# Cannot disable
+			self.recurseProtect = True
+			self.profileActive.setChecked(1)
+			self.recurseProtect = False
+			return
+		razer.setActiveProfile(self.mouseWidget.mouse, self.profileId)
+		self.mouseWidget.reloadProfiles()
 
 	def freqChanged(self, index):
-		if self.reloading or index <= 0:
+		if self.recurseProtect or index <= 0:
 			return
 		freq = self.freqSel.itemData(index).toUInt()[0]
 		razer.setFrequency(self.mouseWidget.mouse, self.profileId, freq)
 
 	def resChanged(self, index):
-		if self.reloading or index <= 0:
+		if self.recurseProtect or index <= 0:
 			return
 		res = self.resSel.itemData(index).toUInt()[0]
 		razer.setDpiMapping(self.mouseWidget.mouse, self.profileId, res)
