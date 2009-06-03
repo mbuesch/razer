@@ -78,8 +78,6 @@ class MouseProfileWidget(QWidget):
 		self.connect(self.resSel, SIGNAL("currentIndexChanged(int)"), self.resChanged)
 		self.layout().addWidget(self.resSel, 2, 1)
 
-		self.reload()
-
 	def reload(self):
 		# Refetch the data from the daemon
 		self.recurseProtect = True
@@ -240,13 +238,12 @@ class MouseWidget(QWidget):
 		activeProfileId = razer.getActiveProfile(self.mouse)
 		activeWidget = None
 		for profileId in profileIds:
-			name = "Profile " + str(profileId + 1)
 			widget = MouseProfileWidget(self, profileId)
 			if profileId == activeProfileId:
-				name = ">" + name + "<"
 				activeWidget = widget
-			self.profiletab.addTab(widget, name)
+			self.profiletab.addTab(widget, str(profileId + 1))
 			self.profileWidgets.append(widget)
+		self.reloadProfiles()
 		if activeWidget:
 			self.profiletab.setCurrentWidget(activeWidget)
 
@@ -269,6 +266,13 @@ class MouseWidget(QWidget):
 	def reloadProfiles(self):
 		for prof in self.profileWidgets:
 			prof.reload()
+		activeProf = razer.getActiveProfile(self.mouse)
+		for i in range(0, self.profiletab.count()):
+			id = self.profiletab.widget(i).profileId
+			name = "Profile " + str(id + 1)
+			if activeProf == id:
+				name = ">" + name + "<"
+			self.profiletab.setTabText(i, name)
 
 class StatusBar(QStatusBar):
 	def showMessage(self, msg):
