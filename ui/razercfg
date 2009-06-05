@@ -20,6 +20,8 @@ import time
 from ConfigParser import *
 from pyrazer import *
 
+print "The razercfg commandline tool is currently broken. Please use the graphical qrazercfg tool for now."
+sys.exit(1)
 
 class OpSleep:
 	def __init__(self, seconds):
