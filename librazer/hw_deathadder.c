@@ -47,7 +47,7 @@ struct deathadder_125_cfg {
 } __attribute__((packed));
 
 struct deathadder_private {
-	bool claimed;
+	unsigned int claimed;
 	/* Firmware version number. */
 	uint16_t fw_version;
 	struct razer_usb_context usb;
@@ -300,14 +300,16 @@ static int deathadder_claim(struct razer_mouse *m)
 	struct deathadder_private *priv = m->internal;
 	int err, fwver;
 
-	err = razer_generic_usb_claim(&priv->usb);
-	if (err)
-		return err;
-	fwver = deathadder_read_fw_ver(priv);
-	if (fwver < 0)
-		return fwver;
-	priv->fw_version = fwver;
-	priv->claimed = 1;
+	if (!priv->claimed) {
+		err = razer_generic_usb_claim(&priv->usb);
+		if (err)
+			return err;
+		fwver = deathadder_read_fw_ver(priv);
+		if (fwver < 0)
+			return fwver;
+		priv->fw_version = fwver;
+	}
+	priv->claimed++;
 
 	return 0;
 }
@@ -316,11 +318,9 @@ static void deathadder_release(struct razer_mouse *m)
 {
 	struct deathadder_private *priv = m->internal;
 
+	priv->claimed--;
 	if (!priv->claimed)
-		return;
-
-	razer_generic_usb_release(&priv->usb);
-	priv->claimed = 0;
+		razer_generic_usb_release(&priv->usb);
 }
 
 static int deathadder_get_fw_version(struct razer_mouse *m)

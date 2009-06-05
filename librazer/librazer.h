@@ -212,6 +212,8 @@ enum {
   *
   * @claim: Claim and open the backend device (USB).
   * 	As long as the device is claimed, it is not operable by the user!
+  *	Claim can be called multiple times before release, but it must always
+  *	pair up with the corresponding number of release calls.
   *
   * @release: Release a claimed backend device.
   *

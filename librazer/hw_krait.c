@@ -30,7 +30,7 @@
 
 
 struct krait_private {
-	bool claimed;
+	unsigned int claimed;
 	struct razer_usb_context usb;
 	struct razer_mouse_dpimapping *cur_dpimapping;
 	struct razer_mouse_profile profile;
@@ -78,10 +78,12 @@ static int krait_claim(struct razer_mouse *m)
 	struct krait_private *priv = m->internal;
 	int err;
 
-	err = razer_generic_usb_claim(&priv->usb);
-	if (err)
-		return err;
-	priv->claimed = 1;
+	if (!priv->claimed) {
+		err = razer_generic_usb_claim(&priv->usb);
+		if (err)
+			return err;
+	}
+	priv->claimed++;
 
 	return 0;
 }
@@ -90,39 +92,9 @@ static void krait_release(struct razer_mouse *m)
 {
 	struct krait_private *priv = m->internal;
 
+	priv->claimed--;
 	if (!priv->claimed)
-		return;
-
-	razer_generic_usb_release(&priv->usb);
-	priv->claimed = 0;
-}
-
-static int krait_get_fw_version(struct razer_mouse *m)
-{
-	return -EOPNOTSUPP;
-}
-
-static int krait_get_leds(struct razer_mouse *m,
-			  struct razer_led **leds_list)
-{
-	return 0; /* No LEDs */
-}
-
-static int krait_supported_freqs(struct razer_mouse *m,
-				 enum razer_mouse_freq **freq_list)
-{
-	enum razer_mouse_freq *list;
-	const int count = 1;
-
-	list = malloc(sizeof(*list) * count);
-	if (!list)
-		return -ENOMEM;
-
-	list[0] = RAZER_MOUSE_FREQ_UNKNOWN;
-
-	*freq_list = list;
-
-	return count;
+		razer_generic_usb_release(&priv->usb);
 }
 
 static int krait_supported_resolutions(struct razer_mouse *m,
@@ -263,14 +235,10 @@ int razer_krait_init_struct(struct razer_mouse *m,
 
 	m->claim = krait_claim;
 	m->release = krait_release;
-	m->get_fw_version = krait_get_fw_version;
-	m->get_leds = krait_get_leds;
-	m->supported_freqs = krait_supported_freqs;
 	m->nr_profiles = 1;
 	m->get_profiles = krait_get_profiles;
 	m->get_active_profile = krait_get_active_profile;
 	m->supported_resolutions = krait_supported_resolutions;
-	m->supported_freqs = krait_supported_freqs;
 	m->supported_dpimappings = krait_supported_dpimappings;
 
 	return 0;

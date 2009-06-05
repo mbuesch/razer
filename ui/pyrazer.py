@@ -21,7 +21,7 @@
 import socket
 import select
 
-RAZER_VERSION	= "0.03"
+RAZER_VERSION	= "0.04"
 
 
 
@@ -126,6 +126,8 @@ class Razer:
 	COMMAND_ID_SETBUTFUNC = 20	# Set the current function of a button.
 
 	COMMAND_PRIV_FLASHFW = 128	# Upload and flash a firmware image
+	COMMAND_PRIV_CLAIM = 129	# Claim the device.
+	COMMAND_PRIV_RELEASE = 130	# Release the device.
 
 	# Replies to commands
 	REPLY_ID_U32 = 0		# An unsigned 32bit integer.
@@ -387,3 +389,55 @@ class Razer:
 		self.__sendPrivilegedCommand(self.COMMAND_PRIV_FLASHFW, idstr, payload)
 		self.__sendBulkPrivileged(image)
 		return self.__recvU32Privileged()
+
+	def getSupportedButtons(self, idstr):
+		"Get a list of supported buttons. Each entry is a tuple (id, name)."
+		self.__sendCommand(self.COMMAND_ID_SUPPBUTTONS, idstr)
+		buttons = []
+		count = self.__recvU32()
+		for i in range(0, count):
+			id = self.__recvU32()
+			name = self.__recvString()
+			buttons.append( (id, name) )
+		return buttons
+
+	def getSupportedButtonFunctions(self, idstr):
+		"Get a list of possible button functions. Each entry is a tuple (id, name)."
+		self.__sendCommand(self.COMMAND_ID_SUPPBUTFUNCS, idstr)
+		funcs = []
+		count = self.__recvU32()
+		for i in range(0, count):
+			id = self.__recvU32()
+			name = self.__recvString()
+			funcs.append( (id, name) )
+		return funcs
+
+	def getButtonFunction(self, idstr, profileId, buttonId):
+		"Get a button function. Returns a tuple (id, name)."
+		payload = razer_int_to_be32(profileId) + razer_int_to_be32(buttonId)
+		self.__sendCommand(self.COMMAND_ID_GETBUTFUNC, idstr, payload)
+		id = self.__recvU32()
+		name = self.__recvString()
+		return (id, name)
+
+	def setButtonFunction(self, idstr, profileId, buttonId, functionId):
+		"Set a button function."
+		payload = razer_int_to_be32(profileId) +\
+			  razer_int_to_be32(buttonId) +\
+			  razer_int_to_be32(functionId)
+		self.__sendCommand(self.COMMAND_ID_SETBUTFUNC, idstr, payload)
+		return self.__recvU32()
+
+class RazerConfigFile:
+	DEFAULT_PATH = "/etc/razer.conf"
+
+	def __init__(self, path = DEFAULT_PATH):
+		self.path = path
+
+	def save(self, razer):
+		"Save the data of a 'class Razer' instance to the config file."
+		#TODO
+
+	def load(self, razer):
+		"Load the data from the config file to the specified 'class Razer'"
+		#TODO

@@ -112,7 +112,7 @@ struct lachesis_dpimap_cmd {
 
 /* Context data structure */
 struct lachesis_private {
-	bool claimed;
+	unsigned int claimed;
 	struct razer_usb_context usb;
 	uint16_t fw_version;
 
@@ -183,6 +183,8 @@ static struct razer_button_function lachesis_button_functions[] = {
  *	write commands:
  *	SET_CONFIG
  *		0x0F:	? Data=0x01. Executed on startup
+ *
+ * TODO: react to profile/dpi/whatever changes via hw buttons. need to poll?
  */
 
 static int lachesis_usb_write(struct lachesis_private *priv,
@@ -439,14 +441,16 @@ static int lachesis_claim(struct razer_mouse *m)
 	struct lachesis_private *priv = m->internal;
 	int err, fwver;
 
-	err = razer_generic_usb_claim(&priv->usb);
-	if (err)
-		return err;
-	fwver = lachesis_read_fw_ver(priv);
-	if (fwver < 0)
-		return fwver;
-	priv->fw_version = fwver;
-	priv->claimed = 1;
+	if (!priv->claimed) {
+		err = razer_generic_usb_claim(&priv->usb);
+		if (err)
+			return err;
+		fwver = lachesis_read_fw_ver(priv);
+		if (fwver < 0)
+			return fwver;
+		priv->fw_version = fwver;
+	}
+	priv->claimed++;
 
 	return 0;
 }
@@ -455,11 +459,9 @@ static void lachesis_release(struct razer_mouse *m)
 {
 	struct lachesis_private *priv = m->internal;
 
+	priv->claimed--;
 	if (!priv->claimed)
-		return;
-
-	razer_generic_usb_release(&priv->usb);
-	priv->claimed = 0;
+		razer_generic_usb_release(&priv->usb);
 }
 
 static int lachesis_get_fw_version(struct razer_mouse *m)

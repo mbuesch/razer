@@ -110,6 +110,8 @@ enum {
 
 	/* Privileged commands */
 	COMMAND_PRIV_FLASHFW = 128,	/* Upload and flash a firmware image */
+	COMMAND_PRIV_CLAIM,		/* Claim the device. */
+	COMMAND_PRIV_RELEASE,		/* Release the device. */
 };
 
 enum {
@@ -204,6 +206,12 @@ struct command {
 		struct {
 			uint32_t imagesize;
 		} __attribute__((packed)) flashfw;
+
+		struct {
+		} __attribute__((packed)) claim;
+
+		struct {
+		} __attribute__((packed)) release;
 
 	} __attribute__((packed));
 } __attribute__((packed));
@@ -689,6 +697,8 @@ static struct razer_mouse_profile * find_mouse_profile(struct razer_mouse *mouse
 	struct razer_mouse_profile *list;
 	unsigned int i;
 
+	if (!mouse->get_profiles)
+		return NULL;
 	list = mouse->get_profiles(mouse);
 	if (!list)
 		return NULL;
@@ -706,11 +716,51 @@ static struct razer_mouse_dpimapping * find_mouse_dpimapping(struct razer_mouse 
 	struct razer_mouse_dpimapping *list;
 	int i, count;
 
+	if (!mouse->supported_dpimappings)
+		return NULL;
 	count = mouse->supported_dpimappings(mouse, &list);
 	if (count <= 0)
 		return NULL;
 	for (i = 0; i < count; i++) {
 		if (list[i].nr == mapping_id)
+			return &list[i];
+	}
+
+	return NULL;
+}
+
+static struct razer_button * find_mouse_button(struct razer_mouse *mouse,
+					       unsigned int button_id)
+{
+	struct razer_button *list;
+	int i, count;
+
+	if (!mouse->supported_buttons)
+		return NULL;
+	count = mouse->supported_buttons(mouse, &list);
+	if (count <= 0)
+		return NULL;
+	for (i = 0; i < count; i++) {
+		if (list[i].id == button_id)
+			return &list[i];
+	}
+
+	return NULL;
+}
+
+static struct razer_button_function * find_mouse_button_function(struct razer_mouse *mouse,
+								 unsigned int button_id)
+{
+	struct razer_button_function *list;
+	int i, count;
+
+	if (!mouse->supported_button_functions)
+		return NULL;
+	count = mouse->supported_button_functions(mouse, &list);
+	if (count <= 0)
+		return NULL;
+	for (i = 0; i < count; i++) {
+		if (list[i].id == button_id)
 			return &list[i];
 	}
 
@@ -742,7 +792,7 @@ static void command_getfwver(struct client *client, const struct command *cmd, u
 	if (len < CMD_SIZE(getfwver))
 		goto out;
 	mouse = razer_mouse_list_find(mice, cmd->idstr);
-	if (!mouse)
+	if (!mouse || !mouse->get_fw_version)
 		goto out;
 	err = mouse->claim(mouse);
 	if (err)
@@ -785,7 +835,7 @@ static void command_suppfreqs(struct client *client, const struct command *cmd, 
 	if (len < CMD_SIZE(suppfreqs))
 		goto error;
 	mouse = razer_mouse_list_find(mice, cmd->idstr);
-	if (!mouse)
+	if (!mouse || !mouse->supported_freqs)
 		goto error;
 	count = mouse->supported_freqs(mouse, &freq_list);
 	if (count <= 0)
@@ -811,7 +861,7 @@ static void command_suppresol(struct client *client, const struct command *cmd, 
 	if (len < CMD_SIZE(suppresol))
 		goto error;
 	mouse = razer_mouse_list_find(mice, cmd->idstr);
-	if (!mouse)
+	if (!mouse || !mouse->supported_resolutions)
 		goto error;
 	count = mouse->supported_resolutions(mouse, &res_list);
 	if (count <= 0)
@@ -837,7 +887,7 @@ static void command_suppdpimappings(struct client *client, const struct command 
 	if (len < CMD_SIZE(suppdpimappings))
 		goto error;
 	mouse = razer_mouse_list_find(mice, cmd->idstr);
-	if (!mouse)
+	if (!mouse || !mouse->supported_dpimappings)
 		goto error;
 	count = mouse->supported_dpimappings(mouse, &list);
 	if (count <= 0)
@@ -977,7 +1027,7 @@ static void command_getleds(struct client *client, const struct command *cmd, un
 	if (len < CMD_SIZE(getleds))
 		goto error;
 	mouse = razer_mouse_list_find(mice, cmd->idstr);
-	if (!mouse)
+	if (!mouse || !mouse->get_leds)
 		goto error;
 	count = mouse->get_leds(mouse, &leds_list);
 	if (count <= 0)
@@ -1171,19 +1221,136 @@ error:
 }
 
 static void command_suppbuttons(struct client *client, const struct command *cmd, unsigned int len)
-{//TODO
+{
+	struct razer_mouse *mouse;
+	struct razer_button *list;
+	int count, i;
+
+	if (len < CMD_SIZE(suppbuttons))
+		goto error;
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse || !mouse->supported_buttons)
+		goto error;
+	count = mouse->supported_buttons(mouse, &list);
+	if (count <= 0)
+		goto error;
+
+	send_u32(client, count);
+	for (i = 0; i < count; i++) {
+		send_u32(client, list[i].id);
+		send_string(client, list[i].name);
+	}
+
+	return;
+error:
+	send_u32(client, 0);
 }
 
 static void command_suppbutfuncs(struct client *client, const struct command *cmd, unsigned int len)
-{//TODO
+{
+	struct razer_mouse *mouse;
+	struct razer_button_function *list;
+	int count, i;
+
+	if (len < CMD_SIZE(suppbutfuncs))
+		goto error;
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse || !mouse->supported_button_functions)
+		goto error;
+	count = mouse->supported_button_functions(mouse, &list);
+	if (count <= 0)
+		goto error;
+
+	send_u32(client, count);
+	for (i = 0; i < count; i++) {
+		send_u32(client, list[i].id);
+		send_string(client, list[i].name);
+	}
+
+	return;
+error:
+	send_u32(client, 0);
+
 }
 
 static void command_getbutfunc(struct client *client, const struct command *cmd, unsigned int len)
-{//TODO
+{
+	struct razer_mouse *mouse;
+	struct razer_mouse_profile *profile;
+	struct razer_button_function *func;
+	struct razer_button *button;
+
+	if (len < CMD_SIZE(getbutfunc))
+		goto error;
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse)
+		goto error;
+	button = find_mouse_button(mouse, be32_to_cpu(cmd->getbutfunc.button_id));
+	if (!button)
+		goto error;
+	profile = find_mouse_profile(mouse, be32_to_cpu(cmd->getbutfunc.profile_id));
+	if (!profile || !profile->get_button_function)
+		goto error;
+	func = profile->get_button_function(profile, button);
+	if (!func)
+		goto error;
+
+	send_u32(client, func->id);
+	send_string(client, func->name);
+
+	return;
+error:
+	send_u32(client, 0);
+	send_string(client, "");
 }
 
 static void command_setbutfunc(struct client *client, const struct command *cmd, unsigned int len)
-{//TODO
+{
+	struct razer_mouse *mouse;
+	struct razer_mouse_profile *profile;
+	struct razer_button_function *func;
+	struct razer_button *button;
+	uint32_t errorcode = ERR_NONE;
+	int err;
+
+	if (len < CMD_SIZE(setbutfunc)) {
+		errorcode = ERR_CMDSIZE;
+		goto error;
+	}
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse) {
+		errorcode = ERR_NOMOUSE;
+		goto error;
+	}
+	button = find_mouse_button(mouse, be32_to_cpu(cmd->setbutfunc.button_id));
+	if (!button) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+	func = find_mouse_button_function(mouse, be32_to_cpu(cmd->setbutfunc.function_id));
+	if (!func) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+	profile = find_mouse_profile(mouse, be32_to_cpu(cmd->setbutfunc.profile_id));
+	if (!profile || !profile->set_button_function) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+
+	err = mouse->claim(mouse);
+	if (err) {
+		errorcode = ERR_CLAIM;
+		goto error;
+	}
+	err = profile->set_button_function(profile, button, func);
+	mouse->release(mouse);
+	if (err) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+error:
+	send_u32(client, errorcode);
 }
 
 static void command_flashfw(struct client *client, const struct command *cmd, unsigned int len)
@@ -1237,6 +1404,51 @@ static void command_flashfw(struct client *client, const struct command *cmd, un
 error:
 	send_u32(client, errorcode);
 	free(image);
+}
+
+static void command_claim(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	uint32_t errorcode = ERR_NONE;
+	int err;
+
+	if (len < CMD_SIZE(claim)) {
+		errorcode = ERR_CMDSIZE;
+		goto error;
+	}
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse) {
+		errorcode = ERR_NOMOUSE;
+		goto error;
+	}
+	err = mouse->claim(mouse);
+	if (err) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+
+error:
+	send_u32(client, errorcode);
+}
+
+static void command_release(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	uint32_t errorcode = ERR_NONE;
+
+	if (len < CMD_SIZE(release)) {
+		errorcode = ERR_CMDSIZE;
+		goto error;
+	}
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse) {
+		errorcode = ERR_NOMOUSE;
+		goto error;
+	}
+	mouse->release(mouse);
+
+error:
+	send_u32(client, errorcode);
 }
 
 static void handle_received_command(struct client *client, const char *_cmd, unsigned int len)
@@ -1325,6 +1537,12 @@ static void handle_received_privileged_command(struct client *client,
 	switch (cmd->hdr.id) {
 	case COMMAND_PRIV_FLASHFW:
 		command_flashfw(client, cmd, len);
+		break;
+	case COMMAND_PRIV_CLAIM:
+		command_claim(client, cmd, len);
+		break;
+	case COMMAND_PRIV_RELEASE:
+		command_release(client, cmd, len);
 		break;
 	default:
 		/* Unknown command. */

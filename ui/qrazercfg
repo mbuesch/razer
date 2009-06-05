@@ -20,6 +20,12 @@ from PyQt4.QtGui import *
 from pyrazer import *
 
 
+class ButtonConfDialog(QDialog):
+	def __init__(self, profileWidget):
+		QDialog.__init__(self, profileWidget)
+
+		#TODO
+
 class LedCheckBox(QCheckBox):
 	def __init__(self, ledsWidget, ledname, ledstate):
 		text = ledname
@@ -49,6 +55,7 @@ class LedsWidget(QGroupBox):
 		for led in self.leds:
 			led.deleteLater()
 		self.leds = []
+		self.hide()
 
 	def add(self, name, state):
 		led = LedCheckBox(self, name, state)
@@ -77,6 +84,12 @@ class MouseProfileWidget(QWidget):
 		self.resSel = QComboBox(self)
 		self.connect(self.resSel, SIGNAL("currentIndexChanged(int)"), self.resChanged)
 		self.layout().addWidget(self.resSel, 2, 1)
+
+		funcs = razer.getSupportedButtonFunctions(self.mouseWidget.mouse)
+		if funcs:
+			self.buttonConf = QPushButton(self.tr("Configure buttons"), self)
+			self.connect(self.buttonConf, SIGNAL("clicked(bool)"), self.showButtonConf)
+			self.layout().addWidget(self.buttonConf, 3, 0, 1, 2)
 
 	def reload(self):
 		# Refetch the data from the daemon
@@ -137,6 +150,10 @@ class MouseProfileWidget(QWidget):
 			return
 		res = self.resSel.itemData(index).toUInt()[0]
 		razer.setDpiMapping(self.mouseWidget.mouse, self.profileId, res)
+
+	def showButtonConf(self, checked):
+		bconf = ButtonConfDialog(self)
+		bconf.exec_()
 
 class OneDpiMapping(QWidget):
 	def __init__(self, dpiMappingsWidget, id, resolution, isMutable):
@@ -259,9 +276,14 @@ class MouseWidget(QWidget):
 			name = led[0]
 			state = led[1]
 			self.leds.add(name, state)
+			self.leds.show()
 
 		ver = razer.getFwVer(self.mouse)
-		self.fwVer.setText(self.tr("Firmware version: %u.%u" % (ver[0], ver[1])))
+		if ver[0] == 0xFF and ver[1] == 0xFF:
+			self.fwVer.hide()
+		else:
+			self.fwVer.setText(self.tr("Firmware version: %u.%u" % (ver[0], ver[1])))
+			self.fwVer.show()
 
 	def reloadProfiles(self):
 		for prof in self.profileWidgets:
