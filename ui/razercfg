@@ -20,8 +20,6 @@ import time
 from ConfigParser import *
 from pyrazer import *
 
-print "The razercfg commandline tool is currently broken. Please use the graphical qrazercfg tool for now."
-sys.exit(1)
 
 class OpSleep:
 	def __init__(self, seconds):
@@ -39,24 +37,30 @@ class OpGetFwVer:
 class OpGetFreq:
 	def run(self, idstr):
 		freqs = razer.getSupportedFreqs(idstr)
-		curFreq = razer.getCurrentFreq(idstr)
-		for freq in freqs:
-			if freq == curFreq:
-				sys.stdout.write("[%d Hz], " % freq)
-			else:
-				sys.stdout.write("%d Hz, " % freq)
-		print ""
+		profiles = razer.getProfiles(idstr)
+		for profile in profiles:
+			sys.stdout.write("Profile %u:   " % (profile + 1))
+			curFreq = razer.getCurrentFreq(idstr, profile)
+			for freq in freqs:
+				if freq == curFreq:
+					sys.stdout.write(">>%u Hz<<,  " % freq)
+				else:
+					sys.stdout.write("%u Hz,  " % freq)
+			print ""
 
 class OpGetRes:
 	def run(self, idstr):
-		resList = razer.getSupportedRes(idstr)
-		curRes = razer.getCurrentRes(idstr)
-		for res in resList:
-			if res == curRes:
-				sys.stdout.write("[%d DPI], " % res)
-			else:
-				sys.stdout.write("%d DPI, " % res)
-		print ""
+		mappings = razer.getSupportedDpiMappings(idstr)
+		profiles = razer.getProfiles(idstr)
+		for profile in profiles:
+			sys.stdout.write("Profile %u:   " % (profile + 1))
+			curMapping = razer.getDpiMapping(idstr, profile)
+			for mapping in mappings:
+				if mapping[0] == curMapping:
+					sys.stdout.write(">>%u (%u DPI)<<,  " % (mapping[0] + 1, mapping[1]))
+				else:
+					sys.stdout.write("%u (%u DPI),  " % (mapping[0] + 1, mapping[1]))
+			print ""
 
 class OpPrintLeds:
 	def run(self, idstr):
@@ -97,34 +101,42 @@ class OpSetLed:
 			print "Failed to set LED state. Error code is %d" % error
 
 class OpSetRes:
-	def __init__(self, resolution):
-		self.resolution = resolution
+	def __init__(self, param):
+		self.param = param
 
 	def run(self, idstr):
 		try:
-			resolution = int(self.resolution)
+			p = self.param.split(":")
+			if len(p) != 2:
+				raise ValueError
+			profile = int(p[0])
+			mapping = int(p[1])
 		except ValueError:
 			print "Invalid parameter to --res option"
 			exit(1)
-		error = razer.setResolution(idstr, resolution)
+		error = razer.setDpiMapping(idstr, profile - 1, mapping - 1)
 		if error:
-			print "Failed to set resolution to %d DPI (error=%d)" %\
-				(resolution, error)
+			print "Failed to set resolution to %u (error=%d)" %\
+				(mapping, error)
 
 class OpSetFreq:
-	def __init__(self, frequency):
-		self.frequency = frequency
+	def __init__(self, param):
+		self.param = param
 
 	def run(self, idstr):
 		try:
-			frequency = int(self.frequency)
+			p = self.param.split(":")
+			if len(p) != 2:
+				raise ValueError
+			profile = int(p[0])
+			freq = int(p[1])
 		except ValueError:
 			print "Invalid parameter to --freq option"
 			exit(1)
-		error = razer.setFrequency(idstr, frequency)
+		error = razer.setFrequency(idstr, profile - 1, freq)
 		if error:
 			print "Failed to set frequency to %d Hz (error=%d)" %\
-				(frequency, error)
+				(freq, error)
 
 class OpFlashFw:
 	def __init__(self, filename):
@@ -196,14 +208,14 @@ def usage():
 	print "These options apply to the device that is specified with -d"
 	print ""
 	print "Options for mice:"
-	print "-V|--fwver           Print the firmware version number"
-	print "-r|--res DPI         Changes the scan resolution to DPI"
-	print "-R|--getres          Prints the current and supported resolutions"
-	print "-f|--freq FREQ       Changes the scan frequency to FREQ"
-	print "-F|--getfreq         Prints the current and supported frequencies"
-	print "-L|--leds            Print the identifiers of the LEDs on the device"
-	print "-l|--setled LED:off  Toggle the LED with the identifier \"LED\" ON or OFF"
-	print "-X|--flashfw FILE    Flash a firmware image to the device"
+	print "-V|--fwver              Print the firmware version number"
+	print "-r|--res profile:DPI    Changes the scan resolution"
+	print "-R|--getres             Prints the resolutions"
+	print "-f|--freq profile:FREQ  Changes the scan frequency"
+	print "-F|--getfreq            Prints the frequencies"
+	print "-L|--leds               Print the identifiers of the LEDs on the device"
+	print "-l|--setled LED:off     Toggle the LED with the identifier \"LED\" ON or OFF"
+	print "-X|--flashfw FILE       Flash a firmware image to the device"
 
 def parse_args():
 	devOpsList = []
@@ -241,17 +253,8 @@ def parse_args():
 				devOpsList.append(currentDevOps)
 			currentDevOps = DevOps(v)
 			continue
-		if o in ("-c", "--config"):
-			try:
-				c = Config(v)
-			except IOError:
-				exit(1)
-			ops = currentDevOps
-			if not currentDevOps:
-				ops = DevOps(None)
-			ops.add(OpApplyConfig(c))
-			if not currentDevOps:
-				devOpsList.append(ops)
+#		if o in ("-c", "--config"):
+#			pass#TODO
 		if o in ("-r", "--res"):
 			if not currentDevOps:
 				print "Must specify a device (-d) before -r|--res"
