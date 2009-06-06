@@ -788,6 +788,7 @@ void razer_lachesis_gen_idstr(struct usb_device *udev, char *buf)
 {
 	char devid[64];
 
+//FIXME the device does not reconnect, right?
 	/* We can't include the USB device number, because that changes on the
 	 * automatic reconnects the device firmware does.
 	 * The serial number is zero, so that's not very useful, too.

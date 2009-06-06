@@ -20,6 +20,7 @@
 #include "hw_deathadder.h"
 #include "hw_krait.h"
 #include "hw_lachesis.h"
+#include "hw_copperhead.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -91,6 +92,14 @@ static const struct razer_mouse_base_ops razer_lachesis_base_ops = {
 	.assign_usb_device	= razer_lachesis_assign_usb_device,
 };
 
+static const struct razer_mouse_base_ops razer_copperhead_base_ops = {
+	.type			= RAZER_MOUSETYPE_COPPERHEAD,
+	.gen_idstr		= razer_copperhead_gen_idstr,
+	.init			= razer_copperhead_init_struct,
+	.release		= razer_copperhead_release,
+	.assign_usb_device	= razer_copperhead_assign_usb_device,
+};
+
 
 #define USBVENDOR_ANY	0xFFFF
 #define USBPRODUCT_ANY	0xFFFF
@@ -105,6 +114,7 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 	USB_MOUSE(0x1532, 0x0007, &razer_deathadder_base_ops),
 	USB_MOUSE(0x1532, 0x0003, &razer_krait_base_ops),
 	USB_MOUSE(0x1532, 0x000C, &razer_lachesis_base_ops),
+	USB_MOUSE(0x1532, 0x0101, &razer_copperhead_base_ops),
 	{ 0, }, /* List end */
 };
 #undef USB_MOUSE

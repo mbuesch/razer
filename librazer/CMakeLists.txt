@@ -3,6 +3,7 @@ include("${razer_SOURCE_DIR}/cmake.global")
 add_library(razer SHARED
 	    librazer.c
 	    cypress_bootloader.c
+	    hw_copperhead.c
 	    hw_deathadder.c
 	    hw_krait.c
 	    hw_lachesis.c)

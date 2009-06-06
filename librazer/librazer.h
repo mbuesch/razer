@@ -93,6 +93,7 @@ enum razer_mouse_res {
 	RAZER_MOUSE_RES_400DPI		= 400,
 	RAZER_MOUSE_RES_450DPI		= 450,
 	RAZER_MOUSE_RES_500DPI		= 500,
+	RAZER_MOUSE_RES_800DPI		= 800,
 	RAZER_MOUSE_RES_900DPI		= 900,
 	RAZER_MOUSE_RES_1000DPI		= 1000,
 	RAZER_MOUSE_RES_1600DPI		= 1600,
@@ -105,11 +106,13 @@ enum razer_mouse_res {
   * @RAZER_MOUSETYPE_DEATHADDER: A "DeathAdder" mouse
   * @RAZER_MOUSETYPE_KRAIT: A "Krait" mouse
   * @RAZER_MOUSETYPE_LACHESIS: A "Lachesis" mouse
+  * @RAZER_MOUSETYPE_LACHESIS: A "Copperhead" mouse
   */
 enum razer_mouse_type {
 	RAZER_MOUSETYPE_DEATHADDER,
 	RAZER_MOUSETYPE_KRAIT,
 	RAZER_MOUSETYPE_LACHESIS,
+	RAZER_MOUSETYPE_COPPERHEAD,
 };
 
 /** struct razer_button_function - A logical button function
