@@ -71,6 +71,8 @@ class RazerDevId:
 			bus = id[2].split('-')
 			self.bustype = bus[0]
 			self.buspos = bus[1]
+			if len(bus) >= 3:
+				self.buspos += "-" + bus[2]
 			self.devid = id[3]
 		except IndexError:
 			pass

@@ -28,6 +28,16 @@ static inline int noprintf(const char *t, ...) { return 0; }
 
 
 typedef _Bool bool;
+#undef min
+#undef max
+#undef offsetof
+#define offsetof(type, member)	((size_t)&((type *)0)->member)
+#define min(x, y)		({ __typeof__(x) __x = (x); \
+				   __typeof__(y) __y = (y); \
+				   __x < __y ? __x : __y; })
+#define max(x, y)		({ __typeof__(x) __x = (x); \
+				   __typeof__(y) __y = (y); \
+				   __x > __y ? __x : __y; })
 
 struct razer_usb_context {
 	/* Device pointer. */
@@ -121,6 +131,8 @@ void razer_dump(const char *prefix, const void *buf, size_t size);
 #else
 static inline void razer_dump(const char *p, const void *b, size_t s) { }
 #endif
+
+#define BUILD_BUG_ON(x)		((void)sizeof(char[1 - 2 * !!(x)]))
 
 
 #endif /* RAZER_PRIVATE_H_ */

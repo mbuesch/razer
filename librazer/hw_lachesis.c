@@ -818,18 +818,8 @@ int razer_lachesis_init_struct(struct razer_mouse *m,
 	unsigned int i;
 	int err;
 
-	if (sizeof(struct lachesis_profcfg_cmd) != 0x18C) {
-		fprintf(stderr, "librazer: hw_lachesis: "
-			"Invalid struct lachesis_profcfg_cmd size (0x%X).\n",
-			(unsigned int)sizeof(struct lachesis_profcfg_cmd));
-		return -EINVAL;
-	}
-	if (sizeof(struct lachesis_dpimap_cmd) != 0x60) {
-		fprintf(stderr, "librazer: hw_lachesis: "
-			"Invalid struct lachesis_dpimap_cmd size (0x%X).\n",
-			(unsigned int)sizeof(struct lachesis_dpimap_cmd));
-		return -EINVAL;
-	}
+	BUILD_BUG_ON(sizeof(struct lachesis_profcfg_cmd) != 0x18C);
+	BUILD_BUG_ON(sizeof(struct lachesis_dpimap_cmd) != 0x60);
 
 	priv = malloc(sizeof(struct lachesis_private));
 	if (!priv)
