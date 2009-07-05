@@ -156,11 +156,6 @@ static const struct copperhead_buttonmappings copperhead_default_buttonmap = {
 	DEFINE_DEF_BUTMAP(rrear, RREAR, DPIDOWN),
 };
 
-/* XXX commands
- *
- *	read
- *		CLEAR_FEATURE, 0x01		= read profile number
- */
 
 #define COPPERHEAD_USB_TIMEOUT		3000
 
@@ -200,8 +195,8 @@ static int copperhead_usb_write_withindex(struct copperhead_private *priv,
 			      COPPERHEAD_USB_TIMEOUT);
 	if (err != size) {
 		fprintf(stderr, "razer-copperhead: "
-			"USB write 0x%02X 0x%02X failed: %d\n",
-			request, command, err);
+			"USB write 0x%02X 0x%02X 0x%02X failed: %d\n",
+			request, command, index, err);
 		return err;
 	}
 	return 0;
@@ -227,8 +222,8 @@ static int copperhead_usb_read_withindex(struct copperhead_private *priv,
 			      COPPERHEAD_USB_TIMEOUT);
 	if (err != size) {
 		fprintf(stderr, "razer-copperhead: "
-			"USB read 0x%02X 0x%02X failed: %d\n",
-			request, command, err);
+			"USB read 0x%02X 0x%02X 0x%02X failed: %d\n",
+			request, command, index, err);
 		return err;
 	}
 	return 0;
@@ -277,6 +272,7 @@ static int copperhead_commit(struct copperhead_private *priv)
 		return err;
 #endif
 
+for (int x = 0; x < 1; x++) {
 	/* Upload the profile config */
 	memset(&profcfg, 0, sizeof(profcfg));
 	profcfg.packetlength = cpu_to_le16(sizeof(profcfg));
@@ -326,6 +322,20 @@ razer_dump("chunk", chunk, 64);
 		if (err)
 			return err;
 	}
+{
+char buf[0x156];
+
+/* 2109 0200 0300 0100 01 */
+//buf[0] = 1;
+//razer_msleep(500);
+//copperhead_usb_write_withindex(priv, USB_REQ_SET_CONFIGURATION,
+//			       0x02, 0x03, buf, 1);
+copperhead_usb_read(priv, USB_REQ_CLEAR_FEATURE,
+		    0x01, buf, sizeof(buf));
+razer_dump("reply", buf, sizeof(buf));
+}
+//razer_msleep(500);
+}
 
 	//TODO
 
@@ -335,6 +345,8 @@ razer_dump("chunk", chunk, 64);
 static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 {
 	unsigned int i;
+	unsigned char value;
+	int err;
 
 	/* Assign sane defaults. */
 	for (i = 0; i < COPPERHEAD_NR_PROFILES; i++) {
@@ -343,6 +355,40 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 		priv->cur_dpimapping[i] = &priv->dpimappings[0];
 	}
 	priv->cur_profile = &priv->profiles[0];
+
+	/* Poke the device */
+printf("Poke dev\n");
+	while (1) {//FIXME timeout
+		err = copperhead_usb_write(priv, USB_REQ_GET_INTERFACE,
+					   0x00, NULL, 0);
+		if (!err)
+			break;
+	}
+printf("Dev poked\n");
+
+	/* Read the current profile number. It's currently unused, though. */
+	err = copperhead_usb_read(priv, USB_REQ_CLEAR_FEATURE,
+				  0x01, &value, sizeof(value));
+	if (err)
+		return err;
+
+	for (i = 0; i < 64; i++) {
+		char buf[0x156];
+
+		value = 1;
+		err = copperhead_usb_write_withindex(priv, USB_REQ_SET_CONFIGURATION,
+						     0x02, 0x03, &value, sizeof(value));
+		if (!err)
+			printf("OK\n");
+//			return err;
+		razer_msleep(100);
+		err = copperhead_usb_read(priv, USB_REQ_CLEAR_FEATURE,
+					  0x01, buf, sizeof(buf));
+		if (!err)
+			printf("OK2\n");
+//			return err;
+		razer_msleep(100);
+	}
 
 	//TODO
 

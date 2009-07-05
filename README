@@ -80,6 +80,37 @@ udev notification:
   udevadm control --reload_rules
 
 
+X11-WINDOW (X.ORG) CONFIGURATION
+================================
+
+The X-server must _not_ be configured to a specific mouse device like /dev/input/mouse0,
+because on configuration events razerd has to temporarly unregister the mouse from the
+system. This will confuse the X-server, if it's configured to a specific device.
+Configure it to the generic /dev/input/mice device instead. This will enable the X-server
+to pick up the mouse again after a configuration event from razerd.
+
+Example xorg.conf snippet:
+...
+  Section "InputDevice"
+    Identifier	"Mouse"
+    Driver	"mouse"
+    Option	"Device" "/dev/input/mice"
+  EndSection
+...
+
+Alternatively do not specify a "Device" at all. The X-server will autodetect
+the device then:
+...
+  Section "InputDevice"
+    Identifier	"Mouse"
+    Driver	"mouse"
+  EndSection
+...
+
+In any case, do _NOT_ use:
+    Option	"Device" "/dev/input/mouseX"
+
+
 USING THE TOOLS
 ===============
 

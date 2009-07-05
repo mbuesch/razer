@@ -21,7 +21,7 @@
 import socket
 import select
 
-RAZER_VERSION	= "0.04"
+RAZER_VERSION	= "0.05"
 
 
 
