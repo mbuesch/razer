@@ -20,11 +20,88 @@ from PyQt4.QtGui import *
 from pyrazer import *
 
 
+class OneButtonConfig(QWidget):
+	def __init__(self, id, name, supportedFunctions, buttonConfWidget):
+		QWidget.__init__(self, buttonConfWidget)
+		self.buttonConfWidget = buttonConfWidget
+
+		self.id = id
+		self.name = name
+
+		self.setLayout(QHBoxLayout(self))
+
+		self.nameLabel = QLabel(name, self)
+		self.layout().addWidget(self.nameLabel)
+		self.layout().addStretch()
+		l = QLabel(self.tr("button is assigned to function"), self)
+		self.layout().addWidget(l)
+
+		self.funcCombo = QComboBox(self)
+		for func in supportedFunctions:
+			self.funcCombo.addItem(func[1], QVariant(func[0]))
+		curFunc = razer.getButtonFunction(buttonConfWidget.profileWidget.mouseWidget.mouse,
+						  buttonConfWidget.profileWidget.profileId,
+						  id)
+		self.initialFunc = curFunc[0]
+		index = self.funcCombo.findData(QVariant(curFunc[0]))
+		if index >= 0:
+			self.funcCombo.setCurrentIndex(index)
+		self.layout().addWidget(self.funcCombo)
+
+	def getId(self):
+		return self.id
+
+	def getSelectedFunction(self):
+		index = self.funcCombo.currentIndex()
+		return self.funcCombo.itemData(index).toUInt()[0]
+
+	def getInitialFunction(self):
+		return self.initialFunc
+
 class ButtonConfDialog(QDialog):
 	def __init__(self, profileWidget):
 		QDialog.__init__(self, profileWidget)
+		self.profileWidget = profileWidget
+		self.setWindowTitle(self.tr("Configure buttons"))
 
-		#TODO
+		self.setLayout(QVBoxLayout(self))
+
+		h = QHBoxLayout()
+		l = QLabel(self.tr("Physical button"), self)
+		h.addWidget(l)
+		h.addStretch()
+		l = QLabel(self.tr("Assigned function"), self)
+		h.addWidget(l)
+		self.layout().addLayout(h)
+
+		funcs = razer.getSupportedButtonFunctions(profileWidget.mouseWidget.mouse)
+		self.buttons = []
+		for b in razer.getSupportedButtons(profileWidget.mouseWidget.mouse):
+			button = OneButtonConfig(b[0], b[1], funcs, self)
+			self.layout().addWidget(button)
+			self.buttons.append(button)
+
+		h = QHBoxLayout()
+		self.applyButton = QPushButton(self.tr("Apply"), self)
+		self.connect(self.applyButton, SIGNAL("clicked()"), self.apply)
+		h.addWidget(self.applyButton)
+		self.cancelButton = QPushButton(self.tr("Cancel"), self)
+		self.connect(self.cancelButton, SIGNAL("clicked()"), self.cancel)
+		h.addWidget(self.cancelButton)
+		self.layout().addLayout(h)
+
+	def cancel(self):
+		self.done(0)
+
+	def apply(self):
+		for button in self.buttons:
+			func = button.getSelectedFunction()
+			if func != button.getInitialFunction():
+				razer.setButtonFunction(self.profileWidget.mouseWidget.mouse,
+							self.profileWidget.profileId,
+							button.getId(),
+							func)
+		self.done(1)
 
 class LedCheckBox(QCheckBox):
 	def __init__(self, ledsWidget, ledname, ledstate):
