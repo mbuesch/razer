@@ -66,13 +66,18 @@ struct deathadder_private {
 
 #define DEATHADDER_USB_TIMEOUT		3000
 #define DADD_FW(major, minor)		(((major) << 8) | (minor))
-#define DEATHADDER_FW_IMAGE_SIZE	0x8000
+#define DEATHADDER_FW_IMAGE_SIZE	0x4000
 
 static int deathadder_usb_write(struct deathadder_private *priv,
 				int request, int command,
 				const void *buf, size_t size)
 {
 	int err;
+
+	if (is_cypress_bootloader(priv->usb.dev)) {
+		/* Deathadder firmware is down and we're in the bootloader. */
+		return 0;
+	}
 
 	err = usb_control_msg(priv->usb.h,
 			      USB_ENDPOINT_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
@@ -93,6 +98,12 @@ static int deathadder_usb_read(struct deathadder_private *priv,
 			       void *buf, size_t size)
 {
 	int err;
+
+	if (is_cypress_bootloader(priv->usb.dev)) {
+		/* Deathadder firmware is down and we're in the bootloader. */
+		memset(buf, 0, size);
+		return 0;
+	}
 
 	err = usb_control_msg(priv->usb.h,
 			      USB_ENDPOINT_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
@@ -466,12 +477,16 @@ static int deathadder_supported_resolutions(struct razer_mouse *m,
 	return count;
 }
 
-static struct usb_device * wait_for_usbdev(uint16_t vendor_id,
+static struct usb_device * wait_for_usbdev(struct usb_device *dev,
+					   uint16_t vendor_id,
 					   uint16_t product_id)
 {
 	struct usb_bus *bus, *buslist;
-	struct usb_device *dev;
 	unsigned int i;
+
+	if (dev->descriptor.idVendor == vendor_id &&
+	    dev->descriptor.idProduct == product_id)
+		return dev;
 
 	for (i = 0; i < 100; i++) {
 		usb_find_busses();
@@ -497,8 +512,6 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 {
 	struct deathadder_private *priv = m->internal;
 	int err;
-	uint16_t checksum, expected_checksum;
-	unsigned int i;
 	char value;
 	struct usb_device *cydev;
 	struct cypress cy;
@@ -508,28 +521,12 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 	if (!priv->claimed)
 		return -EBUSY;
 
-	/* Firmware needs to be image plus 2 bytes checksum. */
-	if (len != DEATHADDER_FW_IMAGE_SIZE /*+ 2*/) {//FIXME
+	if (len != DEATHADDER_FW_IMAGE_SIZE) {
 		fprintf(stderr, "razer-deathadder: "
 			"Firmware image has wrong size %u (expected %u).\n",
 			(unsigned int)len,
-			(unsigned int)(DEATHADDER_FW_IMAGE_SIZE + 2));
+			(unsigned int)DEATHADDER_FW_IMAGE_SIZE);
 		return -EINVAL;
-	}
-	/* Verify the checksum. */
-	checksum = 0;
-	for (i = 0; i < DEATHADDER_FW_IMAGE_SIZE; i += 2) {
-		checksum ^= (((uint16_t)(data[i + 0])) << 8) |
-			     ((uint16_t)(data[i + 1]));
-	}
-	expected_checksum = (((uint16_t)(data[DEATHADDER_FW_IMAGE_SIZE + 0])) << 8) |
-			     ((uint16_t)(data[DEATHADDER_FW_IMAGE_SIZE + 1]));
-	if (checksum != expected_checksum) {
-		fprintf(stderr, "razer-deathadder: "
-			"Firmware image has invalid checksum. "
-			"(was: 0x%02X, expected: 0x%02X)\n",
-			checksum, expected_checksum);
-//FIXME		return -EINVAL;
 	}
 
 	/* Enter bootloader mode */
@@ -542,7 +539,7 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 		return err;
 	}
 	/* Wait for the cypress device to appear. */
-	cydev = wait_for_usbdev(CYPRESS_BOOT_VENDORID, CYPRESS_BOOT_PRODUCTID);
+	cydev = wait_for_usbdev(priv->usb.dev, CYPRESS_BOOT_VENDORID, CYPRESS_BOOT_PRODUCTID);
 	if (!cydev) {
 		fprintf(stderr, "razer-deathadder: Cypress device didn't appear.\n");
 		return -1;
@@ -552,7 +549,7 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 	err = cypress_open(&cy, cydev);
 	if (err)
 		return err;
-	err = cypress_upload_image(&cy, data, DEATHADDER_FW_IMAGE_SIZE);
+	err = cypress_upload_image(&cy, data, len);
 	cypress_close(&cy);
 	if (err)
 		return err;
@@ -656,11 +653,13 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 
 	razer_deathadder_assign_usb_device(m, usbdev);
 
-	err = razer_usb_force_reinit(&priv->usb);
-	if (err) {
-		fprintf(stderr, "hw_deathadder: Failed to reinit USB device\n");
-		free(priv);
-		return err;
+	if (!is_cypress_bootloader(priv->usb.dev)) {
+		err = razer_usb_force_reinit(&priv->usb);
+		if (err) {
+			fprintf(stderr, "hw_deathadder: Failed to reinit USB device\n");
+			free(priv);
+			return err;
+		}
 	}
 
 	priv->frequency = RAZER_MOUSE_FREQ_1000HZ;
