@@ -20,6 +20,7 @@
 
 import socket
 import select
+import md5
 
 RAZER_VERSION	= "0.05"
 
@@ -443,3 +444,116 @@ class RazerConfigFile:
 	def load(self, razer):
 		"Load the data from the config file to the specified 'class Razer'"
 		#TODO
+
+class IHEXParser:
+	TYPE_DATA = 0
+	TYPE_EOF  = 1
+	TYPE_ESAR = 2
+	TYPE_SSAR = 3
+	TYPE_ELAR = 4
+	TYPE_SLAR = 5
+
+	def __init__(self, ihex):
+		self.ihex = ihex
+
+	def parse(self):
+		bin = []
+		try:
+			lines = self.ihex.splitlines()
+			hiAddr = 0
+			for line in lines:
+				line = line.strip()
+				if len(line) == 0:
+					continue
+				if len(line) < 11 or (len(line) - 1) % 2 != 0:
+					raise RazerEx("Invalid firmware file format (IHEX length error)")
+				if line[0] != ':':
+					raise RazerEx("Invalid firmware file format (IHEX magic error)")
+				count = int(line[1:3], 16)
+				if len(line) != count * 2 + 11:
+					raise RazerEx("Invalid firmware file format (IHEX count error)")
+				addr = (int(line[3:5], 16) << 8) | int(line[5:7], 16)
+				addr |= hiAddr << 16
+				type = int(line[7:9], 16)
+				checksum = 0
+				for i in range(1, len(line), 2):
+					byte = int(line[i:i+2], 16)
+					checksum = (checksum + byte) & 0xFF
+				checksum = checksum & 0xFF
+				if checksum != 0:
+					raise RazerEx("Invalid firmware file format (IHEX checksum error)")
+
+				if type == self.TYPE_EOF:
+					break
+				if type == self.TYPE_ELAR:
+					if count != 2:
+						raise RazerEx("Invalid firmware file format (IHEX inval ELAR)")
+					hiAddr = (int(line[9:11], 16) << 8) | int(line[11:13], 16)
+					continue
+				if type == self.TYPE_DATA:
+					if len(bin) < addr + count: # Reallocate
+						bin += ['\0'] * (addr + count - len(bin))
+					for i in range(9, 9 + count * 2, 2):
+						byte = chr(int(line[i:i+2], 16))
+						if bin[(i - 9) / 2 + addr] != '\0':
+							raise RazerEx("Invalid firmware file format (IHEX corruption)")
+						bin[(i - 9) / 2 + addr] = byte
+					continue
+				raise RazerEx("Invalid firmware file format (IHEX unsup type %d)" % type)
+		except ValueError:
+			raise RazerEx("Invalid firmware file format (IHEX digit format)")
+		return "".join(bin)
+
+class SRECParser:
+	def __init__(self, srec):
+		self.srec = srec
+
+	def parse(self):
+		return ""#TODO
+
+class RazerFirmwareParser:
+	class Descriptor:
+		def __init__(self, startOffset, endOffset, parser, binTruncate):
+			# startOffset: The offset where the ihex/srec/etc starts
+			# endOffset: The offset where the ihex/srec/etc ends
+			# parser: ihex/srec/etc parser
+			# binTruncate: Number of bytes to truncate the binary to
+			self.start = startOffset
+			self.len = endOffset - startOffset + 1
+			self.parser = parser
+			self.binTruncate = binTruncate
+
+	DUMP = 0 # Set to 1 to dump all images to /tmp
+
+	FWLIST = {
+		# Deathadder 1.27
+		"92d7f44637858405a83c0f192c61388c" : Descriptor(0x14B28, 0x1D8F4, IHEXParser, 0x4000)
+	}
+
+	def __init__(self, filepath):
+		try:
+			self.data = file(filepath, "rb").read()
+		except IOError, e:
+			raise RazerEx("Could not read file: %s" % e.strerror)
+		md5sum = md5.md5(self.data).hexdigest().lower()
+		try:
+			descriptor = self.FWLIST[md5sum]
+		except KeyError:
+			raise RazerEx("Unsupported firmware file")
+		try:
+			rawFwData = self.data[descriptor.start : descriptor.start+descriptor.len]
+			if self.DUMP:
+				file("/tmp/razer.dump", "wb").write(rawFwData)
+			fwImage = descriptor.parser(rawFwData).parse()
+			if self.DUMP:
+				file("/tmp/razer.dump.image", "wb").write(fwImage)
+			if descriptor.binTruncate:
+				fwImage = fwImage[:descriptor.binTruncate]
+			if self.DUMP:
+				file("/tmp/razer.dump.image.trunc", "wb").write(fwImage)
+		except IndexError:
+			raise RazerEx("Invalid firmware file format")
+		self.fwImage = fwImage
+
+	def getImage(self):
+		return self.fwImage

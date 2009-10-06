@@ -87,41 +87,34 @@ typedef uint32_t	be32_t;
 typedef uint16_t	le16_t;
 typedef uint32_t	le32_t;
 
-static inline be16_t cpu_to_be16(uint16_t v)
-{
 #ifdef BIG_ENDIAN_HOST
-	return v;
+# define RAZER_HOST_BE	1
 #else
-	return bswap_16(v);
+# define RAZER_HOST_BE	0
 #endif
+
+static inline uint16_t cond_swap16(uint16_t v, bool to_from_bigendian)
+{
+	if ((unsigned int)to_from_bigendian ^ RAZER_HOST_BE)
+		return bswap_16(v);
+	return v;
 }
 
-static inline be32_t cpu_to_be32(uint32_t v)
+static inline uint32_t cond_swap32(uint32_t v, bool to_from_bigendian)
 {
-#ifdef BIG_ENDIAN_HOST
+	if ((unsigned int)to_from_bigendian ^ RAZER_HOST_BE)
+		return bswap_32(v);
 	return v;
-#else
-	return bswap_32(v);
-#endif
 }
 
-static inline le16_t cpu_to_le16(uint16_t v)
-{
-#ifndef BIG_ENDIAN_HOST
-	return v;
-#else
-	return bswap_16(v);
-#endif
-}
-
-static inline le32_t cpu_to_le32(uint32_t v)
-{
-#ifndef BIG_ENDIAN_HOST
-	return v;
-#else
-	return bswap_32(v);
-#endif
-}
+static inline be16_t cpu_to_be16(uint16_t v) { return (be16_t)cond_swap16(v, 1);   }
+static inline uint16_t be16_to_cpu(be16_t v) { return cond_swap16((uint16_t)v, 1); }
+static inline be32_t cpu_to_be32(uint32_t v) { return (be32_t)cond_swap32(v, 1);   }
+static inline uint32_t be32_to_cpu(be32_t v) { return cond_swap32((uint32_t)v, 1); }
+static inline le16_t cpu_to_le16(uint16_t v) { return (le16_t)cond_swap16(v, 0);   }
+static inline uint16_t le16_to_cpu(le16_t v) { return cond_swap16((uint16_t)v, 0); }
+static inline le32_t cpu_to_le32(uint32_t v) { return (le32_t)cond_swap32(v, 0);   }
+static inline uint32_t le32_to_cpu(le32_t v) { return cond_swap32((uint32_t)v, 0); }
 
 
 le16_t razer_xor16_checksum(const void *buffer, size_t size);

@@ -123,6 +123,7 @@ enum {
 	ERR_CLAIM,
 	ERR_FAIL,
 	ERR_PAYLOAD,
+	ERR_NOTSUPP,
 };
 
 struct command_hdr {
@@ -1386,6 +1387,10 @@ static void command_flashfw(struct client *client, const struct command *cmd, un
 	mouse = razer_mouse_list_find(mice, cmd->idstr);
 	if (!mouse) {
 		errorcode = ERR_NOMOUSE;
+		goto error;
+	}
+	if (!mouse->flash_firmware) {
+		errorcode = ERR_NOTSUPP;
 		goto error;
 	}
 	err = mouse->claim(mouse);

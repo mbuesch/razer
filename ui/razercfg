@@ -143,12 +143,8 @@ class OpFlashFw:
 		self.filename = filename
 
 	def run(self, idstr):
-		try:
-			data = file(self.filename, "rb").read()
-		except IOError, e:
-			print "Failed to read firmware file %s: %s" %\
-				(self.filename, e.strerror)
-			exit(1)
+		p = RazerFirmwareParser(self.filename)
+		data = p.getImage()
 		print "Flashing firmware on %s ..." % idstr
 		print "!!! DO NOT DISCONNECT ANY DEVICE !!!"
 		print "Sending %d bytes..." % len(data)
