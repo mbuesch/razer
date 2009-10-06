@@ -14,6 +14,12 @@ struct cypress {
 #define CYPRESS_BOOT_PRODUCTID	0xE006
 
 
+static inline bool is_cypress_bootloader(struct usb_device *dev)
+{
+	return (dev->descriptor.idVendor == CYPRESS_BOOT_VENDORID &&
+		dev->descriptor.idProduct == CYPRESS_BOOT_PRODUCTID);
+}
+
 int cypress_open(struct cypress *c, struct usb_device *dev);
 void cypress_close(struct cypress *c);
 

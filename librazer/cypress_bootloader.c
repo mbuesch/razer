@@ -47,37 +47,42 @@ struct cypress_status {
 #define CYPRESS_STAT_COMCHK	0x10 /* Comm checksum error */
 #define CYPRESS_STAT_INVALKEY	0x40 /* Invalid bootloader key */
 #define CYPRESS_STAT_INVALCMD	0x80 /* Invalid command error */
+#define CYPRESS_STAT_ALL	0xFF
 
 
 static int cypress_send_command(struct cypress *c,
 				const struct cypress_command *command,
-				size_t command_size)
+				size_t command_size, uint8_t status_mask)
 {
 	struct cypress_status status;
 	int res;
+	uint8_t stat;
 
-printf("cmd = 0x%02X\n", be16_to_cpu(command->command));
+//printf("cmd = 0x%02X\n", be16_to_cpu(command->command));
 	res = usb_bulk_write(c->usb.h, c->ep_out, (const char *)command, command_size,
 			     CYPRESS_USB_TIMEOUT);
 	if (res != command_size) {
 		fprintf(stderr, "cypress: Failed to send command 0x%02X: %s\n",
 			be16_to_cpu(command->command), usb_strerror());
-//FIXME		return -1;
+		return -1;
 	}
-	razer_msleep(20);
+	razer_msleep(25);
 	res = usb_bulk_read(c->usb.h, c->ep_in, (char *)&status, sizeof(status),
 			    CYPRESS_USB_TIMEOUT);
 	if (res != sizeof(status)) {
 		fprintf(stderr, "cypress: Failed to receive status report: %s\n",
 			usb_strerror());
-//FIXME		return -1;
+		return -1;
 	}
-	if ((status.status1 | CYPRESS_STAT_BOOTOK) !=
-	    (CYPRESS_STAT_BLMODE | CYPRESS_STAT_BOOTOK)) {
-		fprintf(stderr, "cypress: Command 0x%02X failed with 0x%02X 0x%02X\n",
+	status_mask |= CYPRESS_STAT_BLMODE; /* Always check the blmode bit */
+	status_mask &= ~CYPRESS_STAT_BOOTOK; /* Always ignore the bootok bit */
+	stat = (status.status0 | status.status1) & status_mask;
+	if (stat != CYPRESS_STAT_BLMODE) {
+		fprintf(stderr, "cypress: Command 0x%02X failed with "
+			"status0=0x%02X status1=0x%02X\n",
 			be16_to_cpu(command->command),
 			status.status0, status.status1);
-//FIXME		return -1;
+		return -1;
 	}
 
 	return 0;
@@ -103,7 +108,9 @@ static int cypress_cmd_enterbl(struct cypress *c)
 	cmd.command = CYPRESS_CMD_ENTERBL;
 	cmd_set_key(&cmd);
 
-	return cypress_send_command(c, &cmd, sizeof(cmd));
+	return cypress_send_command(c, &cmd, sizeof(cmd),
+				    CYPRESS_STAT_INVALKEY |
+				    CYPRESS_STAT_INVALCMD);
 }
 
 static int cypress_cmd_exitbl(struct cypress *c)
@@ -114,7 +121,8 @@ static int cypress_cmd_exitbl(struct cypress *c)
 	cmd.command = CYPRESS_CMD_EXITBL;
 	cmd_set_key(&cmd);
 
-	return cypress_send_command(c, &cmd, sizeof(cmd));
+	return cypress_send_command(c, &cmd, sizeof(cmd),
+				    CYPRESS_STAT_ALL);
 }
 
 static int cypress_cmd_verifyfl(struct cypress *c)
@@ -125,7 +133,8 @@ static int cypress_cmd_verifyfl(struct cypress *c)
 	cmd.command = CYPRESS_CMD_VERIFYFL;
 	cmd_set_key(&cmd);
 
-	return cypress_send_command(c, &cmd, sizeof(cmd));
+	return cypress_send_command(c, &cmd, sizeof(cmd),
+				    CYPRESS_STAT_ALL);
 }
 
 static void cmd_writefl_add_checksum(struct cypress_command *_cmd)
@@ -154,7 +163,8 @@ static int cypress_cmd_writefl(struct cypress *c, uint16_t blocknr,
 
 	cmd_writefl_add_checksum(&cmd);
 
-	return cypress_send_command(c, &cmd, sizeof(cmd));
+	return cypress_send_command(c, &cmd, sizeof(cmd),
+				    CYPRESS_STAT_ALL);
 }
 
 static int cypress_writeflash(struct cypress *c,
@@ -172,19 +182,22 @@ static int cypress_writeflash(struct cypress *c,
 		/* First 32 bytes */
 		err = cypress_cmd_writefl(c, block, 0, image);
 		if (err) {
-			fprintf(stderr, "cypress: Failed to write image (segment 0)\n");
+			fprintf(stderr, "cypress: Failed to write image "
+				"(block %u, segment 0)\n",
+				block);
 			return -1;
 		}
 		image += 32;
 		/* Last 32 bytes */
 		err = cypress_cmd_writefl(c, block, 1, image);
 		if (err) {
-			fprintf(stderr, "cypress: Failed to write image (segment 1)\n");
+			fprintf(stderr, "cypress: Failed to write image "
+				"(block %u, segment 1)\n",
+				block);
 			return -1;
 		}
 		image += 32;
 	}
-//FIXME last block is special!
 
 	return 0;
 }
@@ -257,33 +270,24 @@ int cypress_upload_image(struct cypress *c,
 		return -1;
 	}
 
-return 0;
-#if 0
-printf("EXIT\n");
-err = cypress_cmd_verifyfl(c);
-printf("DONE %d\n", err);
-return 0;
-#endif
 	err = cypress_cmd_enterbl(c);
 	if (err) {
 		fprintf(stderr, "cypress: Failed to enter bootloader\n");
 		result = -1;
-//		goto out;
-goto exitbl;
+		goto out;
 	}
 	err = cypress_writeflash(c, image, len);
 	if (err) {
 		fprintf(stderr, "cypress: Failed to write flash image\n");
 		result = -1;
-		goto exitbl;
+		goto out;
 	}
 /*	err = cypress_cmd_verifyfl(c);
 	if (err) {
 		fprintf(stderr, "cypress: Failed to verify the flash\n");
 		result = -1;
-		goto exitbl;
+		goto out;
 	}*/
-exitbl:
 	err = cypress_cmd_exitbl(c);
 	if (err) {
 		fprintf(stderr, "cypress: Failed to exit bootloader\n");
