@@ -22,7 +22,7 @@
 #define CYPRESS_USB_TIMEOUT	1000
 
 struct cypress_command {
-	uint16_t command;
+	be16_t command;
 	uint8_t key[8];
 	uint8_t payload[54];
 } __attribute__((packed));
@@ -275,15 +275,6 @@ int cypress_open(struct cypress *c, struct usb_device *dev,
 		razer_generic_usb_release(&c->usb);
 		return -1;
 	}
-#if 0
-	err = usb_clear_halt(c->usb.h, c->ep_in);
-	err |= usb_clear_halt(c->usb.h, c->ep_out);
-	if (err) {
-		fprintf(stderr, "cypress: Failed to clear halt\n");
-		razer_generic_usb_release(&c->usb);
-		return -1;
-	}
-#endif
 
 	return 0;
 }
