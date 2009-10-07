@@ -546,7 +546,7 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 	}
 	razer_msleep(100);
 
-	err = cypress_open(&cy, cydev);
+	err = cypress_open(&cy, cydev, cypress_assign_default_key);
 	if (err)
 		return err;
 	err = cypress_upload_image(&cy, data, len);

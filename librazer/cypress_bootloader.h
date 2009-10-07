@@ -8,21 +8,36 @@ struct cypress {
 	struct razer_usb_context usb;
 	unsigned int ep_in;
 	unsigned int ep_out;
+	void (*assign_key)(uint8_t *key);
 };
 
 #define CYPRESS_BOOT_VENDORID	0x04B4
 #define CYPRESS_BOOT_PRODUCTID	0xE006
 
 
+/** is_cypress_bootloader - Check whether an USB device is a cypress bootloader. */
 static inline bool is_cypress_bootloader(struct usb_device *dev)
 {
 	return (dev->descriptor.idVendor == CYPRESS_BOOT_VENDORID &&
 		dev->descriptor.idProduct == CYPRESS_BOOT_PRODUCTID);
 }
 
-int cypress_open(struct cypress *c, struct usb_device *dev);
+/** cypress_assign_default_key - assign_key function, which uses the default key. */
+void cypress_assign_default_key(uint8_t *key);
+
+/** cypress_open - Open a device.
+ * @c: context structure.
+ * @dev: USB device to use (must be a cypress bootloader device).
+ * @assign_key: Callback function to assign the 8-byte bootloader key.
+ */
+int cypress_open(struct cypress *c, struct usb_device *dev,
+		 void (*assign_key)(uint8_t *key));
+
+/** cypress_close - Close a device. */
 void cypress_close(struct cypress *c);
 
+/** cypress_upload_image - Upload a firmware image to the device.
+ * The device must be opened. */
 int cypress_upload_image(struct cypress *c,
 			 const char *image, size_t len);
 

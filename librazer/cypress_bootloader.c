@@ -50,6 +50,36 @@ struct cypress_status {
 #define CYPRESS_STAT_ALL	0xFF
 
 
+static void cypress_print_one_status(int *ctx, FILE *fd, const char *message)
+{
+	if (*ctx)
+		fprintf(fd, ", ");
+	fprintf(fd, message);
+	(*ctx)++;
+}
+
+static void cypress_print_status(FILE *fd, uint8_t status)
+{
+	int ctx = 0;
+
+	fprintf(fd, "(");
+	if (!(status & CYPRESS_STAT_BLMODE))
+		cypress_print_one_status(&ctx, fd, "Not in bootloader mode");
+	if (status & CYPRESS_STAT_IMAGERR)
+		cypress_print_one_status(&ctx, fd, "Image verify error");
+	if (status & CYPRESS_STAT_FLCHK)
+		cypress_print_one_status(&ctx, fd, "Flash checksum error");
+	if (status & CYPRESS_STAT_FLPROT)
+		cypress_print_one_status(&ctx, fd, "Flash protection error");
+	if (status & CYPRESS_STAT_COMCHK)
+		cypress_print_one_status(&ctx, fd, "Comm checksum error");
+	if (status & CYPRESS_STAT_INVALKEY)
+		cypress_print_one_status(&ctx, fd, "Invalid bootloader key");
+	if (status & CYPRESS_STAT_INVALCMD)
+		cypress_print_one_status(&ctx, fd, "Invalid command");
+	fprintf(fd, ")");
+}
+
 static int cypress_send_command(struct cypress *c,
 				const struct cypress_command *command,
 				size_t command_size, uint8_t status_mask)
@@ -79,25 +109,23 @@ static int cypress_send_command(struct cypress *c,
 	stat = (status.status0 | status.status1) & status_mask;
 	if (stat != CYPRESS_STAT_BLMODE) {
 		fprintf(stderr, "cypress: Command 0x%02X failed with "
-			"status0=0x%02X status1=0x%02X\n",
+			"status0=0x%02X status1=0x%02X ",
 			be16_to_cpu(command->command),
 			status.status0, status.status1);
+		cypress_print_status(stderr, stat);
+		fprintf(stderr, "\n");
 		return -1;
 	}
 
 	return 0;
 }
 
-static void cmd_set_key(struct cypress_command *cmd)
+void cypress_assign_default_key(uint8_t *key)
 {
-	cmd->key[0] = 0;
-	cmd->key[1] = 1;
-	cmd->key[2] = 2;
-	cmd->key[3] = 3;
-	cmd->key[4] = 4;
-	cmd->key[5] = 5;
-	cmd->key[6] = 6;
-	cmd->key[7] = 7;
+	unsigned int i;
+
+	for (i = 0; i < 8; i++)
+		key[i] = i;
 }
 
 static int cypress_cmd_enterbl(struct cypress *c)
@@ -106,7 +134,7 @@ static int cypress_cmd_enterbl(struct cypress *c)
 
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.command = CYPRESS_CMD_ENTERBL;
-	cmd_set_key(&cmd);
+	c->assign_key(cmd.key);
 
 	return cypress_send_command(c, &cmd, sizeof(cmd),
 				    CYPRESS_STAT_INVALKEY |
@@ -119,7 +147,7 @@ static int cypress_cmd_exitbl(struct cypress *c)
 
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.command = CYPRESS_CMD_EXITBL;
-	cmd_set_key(&cmd);
+	c->assign_key(cmd.key);
 
 	return cypress_send_command(c, &cmd, sizeof(cmd),
 				    CYPRESS_STAT_ALL);
@@ -131,7 +159,7 @@ static int cypress_cmd_verifyfl(struct cypress *c)
 
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.command = CYPRESS_CMD_VERIFYFL;
-	cmd_set_key(&cmd);
+	c->assign_key(cmd.key);
 
 	return cypress_send_command(c, &cmd, sizeof(cmd),
 				    CYPRESS_STAT_ALL);
@@ -154,7 +182,7 @@ static int cypress_cmd_writefl(struct cypress *c, uint16_t blocknr,
 
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.command = CYPRESS_CMD_WRITEFL;
-	cmd_set_key(&cmd);
+	c->assign_key(cmd.key);
 
 	cmd.payload[0] = blocknr >> 8;
 	cmd.payload[1] = blocknr;
@@ -202,7 +230,8 @@ static int cypress_writeflash(struct cypress *c,
 	return 0;
 }
 
-int cypress_open(struct cypress *c, struct usb_device *dev)
+int cypress_open(struct cypress *c, struct usb_device *dev,
+		 void (*assign_key)(uint8_t *key))
 {
 	int err;
 	unsigned int i;
@@ -212,6 +241,12 @@ int cypress_open(struct cypress *c, struct usb_device *dev)
 
 	BUILD_BUG_ON(sizeof(struct cypress_command) != 64);
 	BUILD_BUG_ON(sizeof(struct cypress_status) != 64);
+
+	if (!assign_key) {
+		fprintf(stderr, "cypress_open: assign_key must not be NULL\n");
+		return -1;
+	}
+	c->assign_key = assign_key;
 
 	c->usb.dev = dev;
 	err = razer_generic_usb_claim(&c->usb);
@@ -256,6 +291,7 @@ int cypress_open(struct cypress *c, struct usb_device *dev)
 void cypress_close(struct cypress *c)
 {
 	razer_generic_usb_release(&c->usb);
+	c->assign_key = NULL;
 }
 
 int cypress_upload_image(struct cypress *c,
