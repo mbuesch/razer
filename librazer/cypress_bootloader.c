@@ -44,7 +44,7 @@ struct cypress_status {
 #define CYPRESS_STAT_IMAGERR	0x02 /* Image verify error */
 #define CYPRESS_STAT_FLCHK	0x04 /* Flash checksum error */
 #define CYPRESS_STAT_FLPROT	0x08 /* Flash protection error */
-#define CYPRESS_STAT_COMCHK	0x10 /* Comm checksum error */
+#define CYPRESS_STAT_COMCHK	0x10 /* Communication checksum error */
 #define CYPRESS_STAT_INVALKEY	0x40 /* Invalid bootloader key */
 #define CYPRESS_STAT_INVALCMD	0x80 /* Invalid command error */
 #define CYPRESS_STAT_ALL	0xFF
@@ -72,7 +72,7 @@ static void cypress_print_status(FILE *fd, uint8_t status)
 	if (status & CYPRESS_STAT_FLPROT)
 		cypress_print_one_status(&ctx, fd, "Flash protection error");
 	if (status & CYPRESS_STAT_COMCHK)
-		cypress_print_one_status(&ctx, fd, "Comm checksum error");
+		cypress_print_one_status(&ctx, fd, "Communication checksum error");
 	if (status & CYPRESS_STAT_INVALKEY)
 		cypress_print_one_status(&ctx, fd, "Invalid bootloader key");
 	if (status & CYPRESS_STAT_INVALCMD)
@@ -80,13 +80,25 @@ static void cypress_print_status(FILE *fd, uint8_t status)
 	fprintf(fd, ")");
 }
 
+static void cmd_checksum(struct cypress_command *_cmd)
+{
+	char *cmd = (char *)_cmd;
+	unsigned int i, sum = 0;
+
+	for (i = 0; i < 45; i++)
+		sum += cmd[i];
+	cmd[45] = sum & 0xFF;
+}
+
 static int cypress_send_command(struct cypress *c,
-				const struct cypress_command *command,
+				struct cypress_command *command,
 				size_t command_size, uint8_t status_mask)
 {
 	struct cypress_status status;
 	int res;
 	uint8_t stat;
+
+	cmd_checksum(command);//XXX
 
 //printf("cmd = 0x%02X\n", be16_to_cpu(command->command));
 	res = usb_bulk_write(c->usb.h, c->ep_out, (const char *)command, command_size,
@@ -96,7 +108,7 @@ static int cypress_send_command(struct cypress *c,
 			be16_to_cpu(command->command), usb_strerror());
 		return -1;
 	}
-	razer_msleep(25);
+	razer_msleep(100);
 	res = usb_bulk_read(c->usb.h, c->ep_in, (char *)&status, sizeof(status),
 			    CYPRESS_USB_TIMEOUT);
 	if (res != sizeof(status)) {
@@ -165,16 +177,6 @@ static int cypress_cmd_verifyfl(struct cypress *c)
 				    CYPRESS_STAT_ALL);
 }
 
-static void cmd_writefl_add_checksum(struct cypress_command *_cmd)
-{
-	char *cmd = (char *)_cmd;
-	unsigned int i, sum = 0;
-
-	for (i = 0; i < 45; i++)
-		sum += cmd[i];
-	cmd[45] = sum & 0xFF;
-}
-
 static int cypress_cmd_writefl(struct cypress *c, uint16_t blocknr,
 			       uint8_t segment, const char *data)
 {
@@ -188,8 +190,6 @@ static int cypress_cmd_writefl(struct cypress *c, uint16_t blocknr,
 	cmd.payload[1] = blocknr;
 	cmd.payload[2] = segment;
 	memcpy(&cmd.payload[3], data, 32);
-
-	cmd_writefl_add_checksum(&cmd);
 
 	return cypress_send_command(c, &cmd, sizeof(cmd),
 				    CYPRESS_STAT_ALL);
@@ -216,6 +216,7 @@ static int cypress_writeflash(struct cypress *c,
 			return -1;
 		}
 		image += 32;
+fprintf(stderr, ".");
 		/* Last 32 bytes */
 		err = cypress_cmd_writefl(c, block, 1, image);
 		if (err) {
@@ -225,6 +226,7 @@ static int cypress_writeflash(struct cypress *c,
 			return -1;
 		}
 		image += 32;
+fprintf(stderr, ".");
 	}
 
 	return 0;
