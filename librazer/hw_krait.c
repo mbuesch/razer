@@ -177,14 +177,33 @@ static int krait_set_dpimapping(struct razer_mouse_profile *p,
 void razer_krait_gen_idstr(struct usb_device *udev, char *buf)
 {
 	char devid[64];
-	char buspos[1024];
+	char serial[64];
+	char buspos[512];
+	unsigned int serial_index;
+	int err;
+	struct razer_usb_context usbctx = { .dev = udev, };
 
-	snprintf(devid, sizeof(devid), "%04X-%04X-%02X",
+	err = -EINVAL;
+	serial_index = udev->descriptor.iSerialNumber;
+	if (serial_index) {
+		err = razer_generic_usb_claim(&usbctx);
+		if (err) {
+			fprintf(stderr, "Failed to claim device for serial fetching.\n");
+		} else {
+			err = usb_get_string_simple(usbctx.h, serial_index,
+						    serial, sizeof(serial));
+			razer_generic_usb_release(&usbctx);
+		}
+	}
+	if (err <= 0)
+		strcpy(serial, "0");
+
+	snprintf(devid, sizeof(devid), "%04X-%04X-%s",
 		 udev->descriptor.idVendor,
-		 udev->descriptor.idProduct,
-		 udev->descriptor.iSerialNumber);
+		 udev->descriptor.idProduct, serial);
 	snprintf(buspos, sizeof(buspos), "%s-%s",
 		 udev->bus->dirname, udev->filename);
+
 	razer_create_idstr(buf, BUSTYPESTR_USB, buspos,
 			   DEVTYPESTR_MOUSE, "Krait", devid);
 }

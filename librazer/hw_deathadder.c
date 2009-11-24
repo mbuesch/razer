@@ -615,6 +615,25 @@ static int deathadder_set_dpimapping(struct razer_mouse_profile *p,
 void razer_deathadder_gen_idstr(struct usb_device *udev, char *buf)
 {
 	char devid[64];
+	char serial[64];
+	unsigned int serial_index;
+	int err;
+	struct razer_usb_context usbctx = { .dev = udev, };
+
+	err = -EINVAL;
+	serial_index = udev->descriptor.iSerialNumber;
+	if (serial_index && !is_cypress_bootloader(udev)) {
+		err = razer_generic_usb_claim(&usbctx);
+		if (err) {
+			fprintf(stderr, "Failed to claim device for serial fetching.\n");
+		} else {
+			err = usb_get_string_simple(usbctx.h, serial_index,
+						    serial, sizeof(serial));
+			razer_generic_usb_release(&usbctx);
+		}
+	}
+	if (err <= 0)
+		strcpy(serial, "0");
 
 	/* We can't include the USB device number, because that changes on the
 	 * automatic reconnects the device firmware does.
@@ -622,10 +641,9 @@ void razer_deathadder_gen_idstr(struct usb_device *udev, char *buf)
 	 * Basically, that means we have a pretty bad ID string due to
 	 * major design faults in the hardware. :(
 	 */
-	snprintf(devid, sizeof(devid), "%04X-%04X-%02X",
+	snprintf(devid, sizeof(devid), "%04X-%04X-%s",
 		 udev->descriptor.idVendor,
-		 udev->descriptor.idProduct,
-		 udev->descriptor.iSerialNumber);
+		 udev->descriptor.idProduct, serial);
 	razer_create_idstr(buf, BUSTYPESTR_USB, udev->bus->dirname,
 			   DEVTYPESTR_MOUSE, "DeathAdder", devid);
 }
