@@ -20,7 +20,7 @@
 
 import socket
 import select
-import md5
+import hashlib
 
 RAZER_VERSION	= "0.05"
 
@@ -535,7 +535,7 @@ class RazerFirmwareParser:
 			self.data = file(filepath, "rb").read()
 		except IOError, e:
 			raise RazerEx("Could not read file: %s" % e.strerror)
-		md5sum = md5.md5(self.data).hexdigest().lower()
+		md5sum = hashlib.md5(self.data).hexdigest().lower()
 		try:
 			descriptor = self.FWLIST[md5sum]
 		except KeyError:
