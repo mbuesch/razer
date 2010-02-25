@@ -3,8 +3,8 @@ set -e
 
 project="razercfg"
 
+origin="$PWD/$(dirname $0)"
 
-origin="$(pwd)"
 version="$(cat $origin/ui/pyrazer.py | grep -e RAZER_VERSION | head -n1 | cut -d'"' -f2)"
 if [ -z "$version" ]; then
 	echo "Could not determine version!"
@@ -12,6 +12,8 @@ if [ -z "$version" ]; then
 fi
 release_name="$project-$version"
 tarball="$release_name.tar.bz2"
+tagname="release-$version"
+tagmsg="$project-$version release"
 
 export GIT_DIR="$origin/.git"
 
@@ -39,6 +41,11 @@ make
 echo "removing testbuild"
 cd ..
 rm -R "$release_name"
+
+
+echo "Tagging GIT"
+cd "$origin"
+git tag -m "$tagmsg" -a "$tagname"
 
 echo
 echo "built release $version"
