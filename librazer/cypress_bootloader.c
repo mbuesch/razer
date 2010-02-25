@@ -244,6 +244,8 @@ int cypress_open(struct cypress *c, struct usb_device *dev,
 	BUILD_BUG_ON(sizeof(struct cypress_command) != 64);
 	BUILD_BUG_ON(sizeof(struct cypress_status) != 64);
 
+return -1; //FIXME: Does not work, yet.
+
 	if (!assign_key) {
 		fprintf(stderr, "cypress_open: assign_key must not be NULL\n");
 		return -1;
