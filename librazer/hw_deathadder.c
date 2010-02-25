@@ -50,6 +50,7 @@ struct deathadder_private {
 	unsigned int claimed;
 	/* Firmware version number. */
 	uint16_t fw_version;
+	/* USB context */
 	struct razer_usb_context usb;
 	/* The currently set LED states. */
 	bool led_states[DEATHADDER_NR_LEDS];
@@ -61,7 +62,7 @@ struct deathadder_private {
 	struct razer_mouse_dpimapping *cur_dpimapping;
 
 	struct razer_mouse_profile profile;
-	struct razer_mouse_dpimapping dpimapping[3];
+	struct razer_mouse_dpimapping dpimapping[4];
 };
 
 #define DEATHADDER_USB_TIMEOUT		3000
@@ -242,19 +243,39 @@ static int deathadder_commit(struct deathadder_private *priv)
 		}
 
 		/* Translate resolution setting. */
-		switch (priv->cur_dpimapping->res) {
-		case RAZER_MOUSE_RES_450DPI:
-			config.res = 3;
-			break;
-		case RAZER_MOUSE_RES_900DPI:
-			config.res = 2;
-			break;
-		case RAZER_MOUSE_RES_1800DPI:
-		case RAZER_MOUSE_RES_UNKNOWN:
-			config.res = 1;
-			break;
-		default:
-			return -EINVAL;
+		if (priv->fw_version >= DADD_FW(2,0)) {
+			switch (priv->cur_dpimapping->res) {
+			case RAZER_MOUSE_RES_450DPI:
+				config.res = 4;
+				break;
+			case RAZER_MOUSE_RES_900DPI:
+				config.res = 3;
+				break;
+			case RAZER_MOUSE_RES_1800DPI:
+				config.res = 2;
+				break;
+			case RAZER_MOUSE_RES_3500DPI:
+			case RAZER_MOUSE_RES_UNKNOWN:
+				config.res = 1;
+				break;
+			default:
+				return -EINVAL;
+			}
+		} else {
+			switch (priv->cur_dpimapping->res) {
+			case RAZER_MOUSE_RES_450DPI:
+				config.res = 3;
+				break;
+			case RAZER_MOUSE_RES_900DPI:
+				config.res = 2;
+				break;
+			case RAZER_MOUSE_RES_1800DPI:
+			case RAZER_MOUSE_RES_UNKNOWN:
+				config.res = 1;
+				break;
+			default:
+				return -EINVAL;
+			}
 		}
 
 		/* The profile ID. */
@@ -309,16 +330,12 @@ static int deathadder_commit(struct deathadder_private *priv)
 static int deathadder_claim(struct razer_mouse *m)
 {
 	struct deathadder_private *priv = m->internal;
-	int err, fwver;
+	int err;
 
 	if (!priv->claimed) {
 		err = razer_generic_usb_claim(&priv->usb);
 		if (err)
 			return err;
-		fwver = deathadder_read_fw_ver(priv);
-		if (fwver < 0)
-			return fwver;
-		priv->fw_version = fwver;
 	}
 	priv->claimed++;
 
@@ -338,9 +355,6 @@ static int deathadder_get_fw_version(struct razer_mouse *m)
 {
 	struct deathadder_private *priv = m->internal;
 
-	/* Version is read on claim. */
-	if (!priv->claimed)
-		return -EBUSY;
 	return priv->fw_version;
 }
 
@@ -461,8 +475,9 @@ static int deathadder_set_freq(struct razer_mouse_profile *p,
 static int deathadder_supported_resolutions(struct razer_mouse *m,
 					    enum razer_mouse_res **res_list)
 {
+	struct deathadder_private *priv = m->internal;
 	enum razer_mouse_res *list;
-	const int count = 3;
+	const int count = (priv->fw_version >= DADD_FW(2,0)) ? 4 : 3;
 
 	list = malloc(sizeof(*list) * count);
 	if (!list)
@@ -471,6 +486,8 @@ static int deathadder_supported_resolutions(struct razer_mouse *m,
 	list[0] = RAZER_MOUSE_RES_450DPI;
 	list[1] = RAZER_MOUSE_RES_900DPI;
 	list[2] = RAZER_MOUSE_RES_1800DPI;
+	if (priv->fw_version >= DADD_FW(2,0))
+		list[3] = RAZER_MOUSE_RES_3500DPI;
 
 	*res_list = list;
 
@@ -580,7 +597,9 @@ static int deathadder_supported_dpimappings(struct razer_mouse *m,
 
 	*res_ptr = &priv->dpimapping[0];
 
-	return ARRAY_SIZE(priv->dpimapping);
+	if (priv->fw_version >= DADD_FW(2,0))
+		return ARRAY_SIZE(priv->dpimapping);
+	return ARRAY_SIZE(priv->dpimapping) - 1;
 }
 
 static struct razer_mouse_dpimapping * deathadder_get_dpimapping(struct razer_mouse_profile *p)
@@ -661,7 +680,7 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 {
 	struct deathadder_private *priv;
 	unsigned int i;
-	int err;
+	int err, fwver;
 
 	priv = malloc(sizeof(struct deathadder_private));
 	if (!priv)
@@ -679,6 +698,18 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 			return err;
 		}
 	}
+
+	/* Fetch firmware version */
+	deathadder_claim(m);
+	fwver = deathadder_read_fw_ver(priv);
+	if (fwver < 0) {
+		fprintf(stderr, "hw_deathadder: Failed to get firmware version\n");
+		deathadder_release(m);
+		free(priv);
+		return fwver;
+	}
+	priv->fw_version = fwver;
+	deathadder_release(m);
 
 	priv->frequency = RAZER_MOUSE_FREQ_1000HZ;
 	priv->old_frequency = priv->frequency;
@@ -707,7 +738,15 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 	priv->dpimapping[2].change = NULL;
 	priv->dpimapping[2].mouse = m;
 
-	priv->cur_dpimapping = &priv->dpimapping[2];
+	if (priv->fw_version >= DADD_FW(2,0)) {
+		priv->dpimapping[3].nr = 3;
+		priv->dpimapping[3].res = RAZER_MOUSE_RES_3500DPI;
+		priv->dpimapping[3].change = NULL;
+		priv->dpimapping[3].mouse = m;
+
+		priv->cur_dpimapping = &priv->dpimapping[3];
+	} else
+		priv->cur_dpimapping = &priv->dpimapping[2];
 
 	m->type = RAZER_MOUSETYPE_DEATHADDER;
 	razer_deathadder_gen_idstr(usbdev, m->idstr);
