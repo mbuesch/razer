@@ -18,6 +18,7 @@
 #include "razer_private.h"
 
 #include "hw_deathadder.h"
+#include "hw_naga.h"
 #include "hw_krait.h"
 #include "hw_lachesis.h"
 #include "hw_copperhead.h"
@@ -76,6 +77,14 @@ static const struct razer_mouse_base_ops razer_deathadder_base_ops = {
 	.assign_usb_device	= razer_deathadder_assign_usb_device,
 };
 
+static const struct razer_mouse_base_ops razer_naga_base_ops = {
+	.type			= RAZER_MOUSETYPE_NAGA,
+	.gen_idstr		= razer_naga_gen_idstr,
+	.init			= razer_naga_init_struct,
+	.release		= razer_naga_release,
+	.assign_usb_device	= razer_naga_assign_usb_device,
+};
+
 static const struct razer_mouse_base_ops razer_krait_base_ops = {
 	.type			= RAZER_MOUSETYPE_KRAIT,
 	.gen_idstr		= razer_krait_gen_idstr,
@@ -115,6 +124,7 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 	USB_MOUSE(0x1532, 0x0016, &razer_deathadder_base_ops),
 	USB_MOUSE(0x1532, 0x0003, &razer_krait_base_ops),
 	USB_MOUSE(0x1532, 0x000C, &razer_lachesis_base_ops),
+//	USB_MOUSE(0x1532, 0x0015, &razer_naga_base_ops),
 //FIXME	USB_MOUSE(0x1532, 0x0101, &razer_copperhead_base_ops),
 	{ 0, }, /* List end */
 };

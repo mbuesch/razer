@@ -6,7 +6,8 @@ add_library(razer SHARED
 	    hw_copperhead.c
 	    hw_deathadder.c
 	    hw_krait.c
-	    hw_lachesis.c)
+	    hw_lachesis.c
+	    hw_naga.c)
 
 set_target_properties(razer PROPERTIES
 		      COMPILE_FLAGS "-std=c99 -Wall")
