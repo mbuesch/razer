@@ -276,6 +276,11 @@ static void razer_free_mice(struct razer_mouse *mouse_list)
 	}
 }
 
+struct new_razer_usb_device {
+	const struct razer_usb_device *id;
+	struct usb_device *udev;
+};
+
 struct razer_mouse * razer_rescan_mice(void)
 {
 	struct usb_bus *bus, *buslist;
@@ -284,6 +289,8 @@ struct razer_mouse * razer_rescan_mice(void)
 	const struct razer_usb_device *id;
 	char idstr[RAZER_IDSTR_MAX_SIZE + 1] = { 0, };
 	struct razer_mouse *mouse, *new_list = NULL;
+	struct new_razer_usb_device new_usb_devices[64];
+	unsigned int i, nr_new_usb_devices = 0;
 
 	usb_find_busses();
 	usb_find_devices();
@@ -300,18 +307,29 @@ struct razer_mouse * razer_rescan_mice(void)
 			id->u.mouse_ops->gen_idstr(dev, idstr);
 			mouse = razer_mouse_list_find(mice_list, idstr);
 			if (mouse) {
-				/* We already have this mouse. Delete it from the global
-				 * mice list. It will be added back later. */
+				/* We already have this mouse. */
 				mouse_list_del(&mice_list, mouse);
 				mouse->base_ops->assign_usb_device(mouse, dev);
+				mouse_list_add(&new_list, mouse);
 			} else {
 				/* We don't have this mouse, yet. Create a new one. */
-				mouse = mouse_new(id, dev);
-				if (!mouse)
-					continue;
+				if (nr_new_usb_devices < ARRAY_SIZE(new_usb_devices)) {
+					new_usb_devices[nr_new_usb_devices].id = id;
+					new_usb_devices[nr_new_usb_devices].udev = dev;
+					nr_new_usb_devices++;
+				} else {
+					fprintf(stderr, "librazer: razer_rescan_nice: "
+						"new device array overflow\n");
+				}
 			}
-			mouse_list_add(&new_list, mouse);
 		}
+	}
+	/* Register all new mice */
+	for (i = 0; i < nr_new_usb_devices; i++) {
+		mouse = mouse_new(new_usb_devices[i].id,
+				  new_usb_devices[i].udev);
+		if (mouse)
+			mouse_list_add(&new_list, mouse);
 	}
 	/* Kill the remaining entries in the old list.
 	 * They are not connected to the machine anymore. */
@@ -504,6 +522,7 @@ int razer_usb_force_reinit(struct razer_usb_context *device_ctx)
 	if (err) {
 		fprintf(stderr, "razer_usb_force_reinit: "
 			"Failed to discover the reconnected device\n");
+		return err;
 	}
 
 	return 0;
