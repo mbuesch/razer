@@ -338,6 +338,8 @@ static int create_pidfile(void)
 	if (!cmdargs.pidfile)
 		return 0;
 
+	if (cmdargs.force)
+		unlink(cmdargs.pidfile);
 	fd = open(cmdargs.pidfile, O_RDWR | O_CREAT | O_TRUNC, 0444);
 	if (fd < 0) {
 		logerr("Failed to create PID-file %s: %s\n",
