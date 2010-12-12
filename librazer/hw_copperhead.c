@@ -240,15 +240,15 @@ static int copperhead_read_fw_ver(struct copperhead_private *priv)
 {
 	char buf[2];
 	uint16_t ver;
-	int err;
+//	int err;
 
 //FIXME this is wrong
 //	err = copperhead_usb_read(priv, USB_REQ_CLEAR_FEATURE,
 //				  0x05, buf, sizeof(buf));
 buf[0]=0;
 buf[1]=0;
-	if (err)
-		return err;
+//	if (err)
+//		return err;
 	ver = buf[0];
 	ver <<= 8;
 	ver |= buf[1];
@@ -261,7 +261,7 @@ static int copperhead_commit(struct copperhead_private *priv)
 	struct copperhead_profcfg_cmd profcfg;
 	unsigned int i;
 	int err;
-	unsigned char value;
+//	unsigned char value;
 
 #if 0
 	/* Select the profile */
