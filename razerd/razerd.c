@@ -63,6 +63,7 @@ struct commandline_args {
 	bool background;
 	const char *pidfile;
 	int loglevel;
+	bool force;
 } cmdargs = {
 #ifdef DEBUG
 	.loglevel	= LOGLEVEL_DEBUG,
@@ -434,11 +435,15 @@ static int setup_var_run(void)
 	create_pidfile();
 
 	/* Create the control socket. */
+	if (cmdargs.force)
+		unlink(SOCKPATH);
 	ctlsock = create_socket(SOCKPATH, 0666, 25);
 	if (ctlsock == -1)
 		goto err_remove_pidfile;
 
 	/* Create the socket for privileged operations. */
+	if (cmdargs.force)
+		unlink(PRIV_SOCKPATH);
 	privsock = create_socket(PRIV_SOCKPATH, 0660, 15);
 	if (privsock == -1)
 		goto err_remove_ctlsock;
@@ -1679,6 +1684,7 @@ static void usage(FILE *fd, int argc, char **argv)
 	fprintf(fd, "  -P|--pidfile PATH         Create a PID-file\n");
 	fprintf(fd, "  -l|--loglevel LEVEL       Set the loglevel\n");
 	fprintf(fd, "                            0=error, 1=warning, 2=info(default), 3=debug\n");
+	fprintf(fd, "  -f|--force                Force remove sockets before starting up\n");
 	fprintf(fd, "\n");
 	fprintf(fd, "  -h|--help                 Print this help text\n");
 	fprintf(fd, "  -v|--version              Print the version number\n");
@@ -1692,13 +1698,14 @@ static int parse_args(int argc, char **argv)
 		{ "background", no_argument, 0, 'B', },
 		{ "pidfile", required_argument, 0, 'P', },
 		{ "loglevel", required_argument, 0, 'l', },
+		{ "force", no_argument, 0, 'f', },
 		{ 0, },
 	};
 
 	int c, idx;
 
 	while (1) {
-		c = getopt_long(argc, argv, "hvBP:l:",
+		c = getopt_long(argc, argv, "hvBP:l:f",
 				long_options, &idx);
 		if (c == -1)
 			break;
@@ -1720,6 +1727,9 @@ static int parse_args(int argc, char **argv)
 				fprintf(stderr, "Failed to parse --loglevel argument\n");
 				return -1;
 			}
+			break;
+		case 'f':
+			cmdargs.force = 1;
 			break;
 		default:
 			return -1;
