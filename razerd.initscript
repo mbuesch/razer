@@ -1,22 +1,22 @@
 #!/bin/sh
-#
-# Razer device configuration tool
-# Generic init script
-#
-# Copyright (c) 2009 Michael Buesch
-#
+### BEGIN INIT INFO
+# Provides:          razerd
+# Required-Start:    $local_fs
+# Required-Stop:     $local_fs
+# Default-Start:     S 2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: razerd daemon
+# Description:       Razer device state daemon
+### END INIT INFO
 
 # Path to the PID-file
 PIDFILE="/var/run/razerd/razerd.pid"
 
 export PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 
-
 case "$1" in
 	start)
-		razerd -B -P $PIDFILE
-		res=$?
-		if [ $res -eq 0 ]; then
+		if razerd -f -B -P "$PIDFILE"; then
 			echo "Service razerd started."
 		else
 			echo "Failed to start razerd."
