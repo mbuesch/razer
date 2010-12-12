@@ -598,7 +598,7 @@ static struct usb_device * guard_find_usb_dev(const struct usb_device_descriptor
 {
 	struct usb_bus *bus, *buslist;
 	struct usb_device *dev;
-	unsigned int dev_filename;
+	unsigned int dev_filename, i;
 	int res;
 
 	usb_find_busses();
@@ -607,6 +607,7 @@ static struct usb_device * guard_find_usb_dev(const struct usb_device_descriptor
 	buslist = usb_get_busses();
 	for_each_usbbus(bus, buslist) {
 		for_each_usbdev(dev, bus->devices) {
+printf("reconn: %s %s\n", dev->bus->dirname, dev->filename);
 			if (memcmp(desc, &dev->descriptor, sizeof(*desc)) != 0)
 				continue;
 			if (strncmp(dev->bus->dirname, dirname, PATH_MAX) != 0)
@@ -617,14 +618,18 @@ static struct usb_device * guard_find_usb_dev(const struct usb_device_descriptor
 				return NULL;
 			}
 			if (hub_reset) {
-				if (dev_filename < filename)
-					continue;
+				for (i = 0; i < 32; i++) {
+					if (dev_filename == ((filename + i) & 0x7F)) {
+						/* found it! */
+						return dev;
+					}
+				}
 			} else {
-				if (dev_filename != filename)
-					continue;
+				if (dev_filename == filename) {
+					/* found it! */
+					return dev;
+				}
 			}
-			/* found it! */
-			return dev;
 		}
 	}
 
@@ -678,15 +683,14 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard, bool
 				"Didn't disconnect, huh?\n");
 			goto reclaim;
 		}
-		razer_msleep(10);
+		razer_msleep(50);
 	}
 
 	/* Construct the filename the device will reconnect on.
 	 * On a device reset the new filename will match reconn_filename.
 	 * In case of a hub_reset, the new filename will be >= reconn_filename.
-	 * FIXME: The 7bit(?) number will wrap.
 	 */
-	reconn_filename = old_filename_nr + 1;
+	reconn_filename = (old_filename_nr + 1) & 0x7F;
 
 	/* Wait for the device to reconnect. */
 	gettimeofday(&now, NULL);
@@ -708,7 +712,7 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard, bool
 			errorcode = -EBUSY;
 			goto out;
 		}
-		razer_msleep(1);
+		razer_msleep(50);
 	}
 	/* Update the USB context. */
 	guard->ctx->dev = dev;
