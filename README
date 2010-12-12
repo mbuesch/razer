@@ -78,7 +78,7 @@ This should work on most distributions.
 Please reboot the machine or enter the following command to activate the
 udev notification:
 
-  udevadm control --reload_rules
+  udevadm control --reload-rules
 
 
 X11-WINDOW (X.ORG) CONFIGURATION

@@ -15,11 +15,20 @@
 #   GNU General Public License for more details.
 
 import sys
+import os
 import getopt
 import time
 from ConfigParser import *
 from pyrazer import *
 
+
+razer = None
+
+def getRazer():
+	global razer
+	if razer is None:
+		razer = Razer()
+	return razer
 
 class OpSleep:
 	def __init__(self, seconds):
@@ -30,17 +39,17 @@ class OpSleep:
 
 class OpGetFwVer:
 	def run(self, idstr):
-		verTuple = razer.getFwVer(idstr)
+		verTuple = getRazer().getFwVer(idstr)
 		print "The firmware version for the mouse %s is: %d.%d" %\
 			(idstr, verTuple[0], verTuple[1])
 
 class OpGetFreq:
 	def run(self, idstr):
-		freqs = razer.getSupportedFreqs(idstr)
-		profiles = razer.getProfiles(idstr)
+		freqs = getRazer().getSupportedFreqs(idstr)
+		profiles = getRazer().getProfiles(idstr)
 		for profile in profiles:
 			sys.stdout.write("Profile %u:   " % (profile + 1))
-			curFreq = razer.getCurrentFreq(idstr, profile)
+			curFreq = getRazer().getCurrentFreq(idstr, profile)
 			for freq in freqs:
 				if freq == curFreq:
 					sys.stdout.write(">>%u Hz<<,  " % freq)
@@ -50,11 +59,11 @@ class OpGetFreq:
 
 class OpGetRes:
 	def run(self, idstr):
-		mappings = razer.getSupportedDpiMappings(idstr)
-		profiles = razer.getProfiles(idstr)
+		mappings = getRazer().getSupportedDpiMappings(idstr)
+		profiles = getRazer().getProfiles(idstr)
 		for profile in profiles:
 			sys.stdout.write("Profile %u:   " % (profile + 1))
-			curMapping = razer.getDpiMapping(idstr, profile)
+			curMapping = getRazer().getDpiMapping(idstr, profile)
 			for mapping in mappings:
 				if mapping[0] == curMapping:
 					sys.stdout.write(">>%u (%u DPI)<<,  " % (mapping[0] + 1, mapping[1]))
@@ -64,7 +73,7 @@ class OpGetRes:
 
 class OpPrintLeds:
 	def run(self, idstr):
-		leds = razer.getLeds(idstr)
+		leds = getRazer().getLeds(idstr)
 		print "LEDs on mouse %s:" % idstr
 		for led in leds:
 			if led[1] == 0:
@@ -96,7 +105,7 @@ class OpSetLed:
 		except (IndexError, ValueError):
 			print "Invalid parameter to --setled option"
 			exit(1)
-		error = razer.setLed(idstr, ledName, newState)
+		error = getRazer().setLed(idstr, ledName, newState)
 		if error:
 			print "Failed to set LED state. Error code is %d" % error
 
@@ -114,7 +123,7 @@ class OpSetRes:
 		except ValueError:
 			print "Invalid parameter to --res option"
 			exit(1)
-		error = razer.setDpiMapping(idstr, profile - 1, mapping - 1)
+		error = getRazer().setDpiMapping(idstr, profile - 1, mapping - 1)
 		if error:
 			print "Failed to set resolution to %u (error=%d)" %\
 				(mapping, error)
@@ -133,7 +142,7 @@ class OpSetFreq:
 		except ValueError:
 			print "Invalid parameter to --freq option"
 			exit(1)
-		error = razer.setFrequency(idstr, profile - 1, freq)
+		error = getRazer().setFrequency(idstr, profile - 1, freq)
 		if error:
 			print "Failed to set frequency to %d Hz (error=%d)" %\
 				(freq, error)
@@ -148,7 +157,7 @@ class OpFlashFw:
 		print "Flashing firmware on %s ..." % idstr
 		print "!!! DO NOT DISCONNECT ANY DEVICE !!!"
 		print "Sending %d bytes..." % len(data)
-		error = razer.flashFirmware(idstr, data)
+		error = getRazer().flashFirmware(idstr, data)
 		if error:
 			print "Failed to flash firmware (error=%d)" % error
 		else:
@@ -171,10 +180,14 @@ class DevOps:
 			print "Razer device access exception:", e
 
 def scanDevices():
-	razer.rescanMice()
-	mice = razer.getMice()
+	getRazer().rescanMice()
+	mice = getRazer().getMice()
 	for mouse in mice:
 		print mouse
+
+def backgroundRescan():
+	if os.fork() == 0:
+		getRazer().rescanMice()
 
 def exit(exitcode):
 	sys.exit(exitcode)
@@ -220,7 +233,7 @@ def parse_args():
 	try:
 		(opts, args) = getopt.getopt(sys.argv[1:],
 			"hvsd:r:Rf:FLl:Vc:S:X:",
-			[ "help", "version", "scan", "device=", "res=",
+			[ "help", "version", "scan", "bg-rescan", "device=", "res=",
 			  "getres", "freq=", "getfreq", "leds", "setled=",
 			  "fwver", "config=", "sleep=", "flashfw=", ])
 	except getopt.GetoptError:
@@ -237,10 +250,13 @@ def parse_args():
 		if o in ("-s", "--scan"):
 			scanDevices()
 			exit(0)
+		if o in ("--bg-rescan", ):
+			backgroundRescan()
+			exit(0)
 		if o in ("-d", "--device"):
 			if v == "mouse": # magic; select the first mouse
-				razer.rescanMice()
-				mice = razer.getMice()
+				getRazer().rescanMice()
+				mice = getRazer().getMice()
 				if not mice:
 					print "No Razer mouse found on your system"
 					exit(1)
@@ -321,10 +337,6 @@ def parse_args():
 
 def main():
 	try:
-		global razer
-
-		razer = Razer()
-
 		devOpsList = parse_args()
 		if not devOpsList:
 			exit(1)
