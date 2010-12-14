@@ -697,6 +697,7 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 			free(priv);
 			return err;
 		}
+		usbdev = priv->usb.dev;
 	}
 
 	/* Fetch firmware version */
