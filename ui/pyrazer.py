@@ -319,6 +319,7 @@ class Razer:
 
 	def setLed(self, idstr, ledName, newState):
 		"Set a LED to a new state."
+		ledName = ledName.strip()
 		if len(ledName) > self.RAZER_LEDNAME_MAX_SIZE:
 			raise RazerEx("LED name string too long")
 		payload = ledName

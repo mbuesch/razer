@@ -92,7 +92,7 @@ class OpSetLed:
 	def run(self, idstr):
 		cfgStr = self.cfgStr.split(":")
 		try:
-			newState = cfgStr[-1].lower()
+			newState = cfgStr[-1].strip().lower()
 			ledName = ":".join(cfgStr[:-1])
 			if not ledName:
 				raise ValueError()
@@ -117,8 +117,8 @@ class OpSetRes:
 			p = self.param.split(":")
 			if len(p) != 2:
 				raise ValueError
-			profile = int(p[0])
-			mapping = int(p[1])
+			profile = int(p[0].strip())
+			mapping = int(p[1].strip())
 		except ValueError:
 			raise RazerEx("Invalid parameter to --res option")
 		error = getRazer().setDpiMapping(idstr, profile - 1, mapping - 1)
@@ -135,8 +135,8 @@ class OpSetFreq:
 			p = self.param.split(":")
 			if len(p) != 2:
 				raise ValueError
-			profile = int(p[0])
-			freq = int(p[1])
+			profile = int(p[0].strip())
+			freq = int(p[1].strip())
 		except ValueError:
 			raise RazerEx("Invalid parameter to --freq option")
 		error = getRazer().setFrequency(idstr, profile - 1, freq)

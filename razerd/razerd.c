@@ -1060,7 +1060,7 @@ static struct razer_led * razer_mouse_find_led(struct razer_led *leds_list,
 	struct razer_led *led;
 
 	for (led = leds_list; led; led = led->next) {
-		if (strncmp(led->name, led_name, RAZER_LEDNAME_MAX_SIZE) == 0)
+		if (strncasecmp(led->name, led_name, RAZER_LEDNAME_MAX_SIZE) == 0)
 			return led;
 	}
 
