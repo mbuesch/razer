@@ -103,11 +103,10 @@ class OpSetLed:
 			else:
 				raise ValueError()
 		except (IndexError, ValueError):
-			print "Invalid parameter to --setled option"
-			exit(1)
+			raise RazerEx("Invalid parameter to --setled option")
 		error = getRazer().setLed(idstr, ledName, newState)
 		if error:
-			print "Failed to set LED state. Error code is %d" % error
+			raise RazerEx("Failed to set LED state. Error code is %d" % error)
 
 class OpSetRes:
 	def __init__(self, param):
@@ -121,12 +120,11 @@ class OpSetRes:
 			profile = int(p[0])
 			mapping = int(p[1])
 		except ValueError:
-			print "Invalid parameter to --res option"
-			exit(1)
+			raise RazerEx("Invalid parameter to --res option")
 		error = getRazer().setDpiMapping(idstr, profile - 1, mapping - 1)
 		if error:
-			print "Failed to set resolution to %u (error=%d)" %\
-				(mapping, error)
+			raise RazerEx("Failed to set resolution to %u (error=%d)" %\
+					(mapping, error))
 
 class OpSetFreq:
 	def __init__(self, param):
@@ -140,12 +138,11 @@ class OpSetFreq:
 			profile = int(p[0])
 			freq = int(p[1])
 		except ValueError:
-			print "Invalid parameter to --freq option"
-			exit(1)
+			raise RazerEx("Invalid parameter to --freq option")
 		error = getRazer().setFrequency(idstr, profile - 1, freq)
 		if error:
-			print "Failed to set frequency to %d Hz (error=%d)" %\
-				(freq, error)
+			raise RazerEx("Failed to set frequency to %d Hz (error=%d)" %\
+					(freq, error))
 
 class OpFlashFw:
 	def __init__(self, filename):
@@ -159,9 +156,8 @@ class OpFlashFw:
 		print "Sending %d bytes..." % len(data)
 		error = getRazer().flashFirmware(idstr, data)
 		if error:
-			print "Failed to flash firmware (error=%d)" % error
-		else:
-			print "Firmware successfully flashed."
+			raise RazerEx("Failed to flash firmware (error=%d)" % error)
+		print "Firmware successfully flashed."
 
 # Operations on a device
 class DevOps:
@@ -173,11 +169,8 @@ class DevOps:
 		self.ops.append(op)
 
 	def runAll(self):
-		try:
-			for op in self.ops:
-				op.run(self.idstr)
-		except RazerEx, e:
-			print "Razer device access exception:", e
+		for op in self.ops:
+			op.run(self.idstr)
 
 def scanDevices():
 	getRazer().rescanMice()
@@ -226,6 +219,16 @@ def usage():
 	print "-l|--setled LED:off     Toggle the LED with the identifier \"LED\" ON or OFF"
 	print "-X|--flashfw FILE       Flash a firmware image to the device"
 
+def findDevice(deviceType=None):
+	if deviceType is None or deviceType == "mouse":
+		getRazer().rescanMice()
+		mice = getRazer().getMice()
+		if mice:
+			return mice[0] # Return the first idstr
+		if deviceType:
+			raise RazerEx("No Razer mouse found in the system")
+	raise RazerEx("No Razer device found in the system")
+
 def parse_args():
 	devOpsList = []
 	currentDevOps = None
@@ -255,12 +258,7 @@ def parse_args():
 			exit(0)
 		if o in ("-d", "--device"):
 			if v == "mouse": # magic; select the first mouse
-				getRazer().rescanMice()
-				mice = getRazer().getMice()
-				if not mice:
-					print "No Razer mouse found on your system"
-					exit(1)
-				v = mice[0]
+				v = findDevice("mouse")
 			if currentDevOps and currentDevOps.ops:
 				devOpsList.append(currentDevOps)
 			currentDevOps = DevOps(v)
@@ -269,44 +267,37 @@ def parse_args():
 #			pass#TODO
 		if o in ("-r", "--res"):
 			if not currentDevOps:
-				print "Must specify a device (-d) before -r|--res"
-				exit(1)
+				currentDevOps = DevOps(findDevice())
 			currentDevOps.add(OpSetRes(v))
 			continue
 		if o in ("-R", "--getres"):
 			if not currentDevOps:
-				print "Must specify a device (-d) before -R|--getres"
-				exit(1)
+				currentDevOps = DevOps(findDevice())
 			currentDevOps.add(OpGetRes())
 			continue
 		if o in ("-f", "--freq"):
 			if not currentDevOps:
-				print "Must specify a device (-d) before -f|--freq"
-				exit(1)
+				currentDevOps = DevOps(findDevice())
 			currentDevOps.add(OpSetFreq(v))
 			continue
 		if o in ("-F", "--getfreq"):
 			if not currentDevOps:
-				print "Must specify a device (-d) before -F|--getfreq"
-				exit(1)
+				currentDevOps = DevOps(findDevice())
 			currentDevOps.add(OpGetFreq())
 			continue
 		if o in ("-L", "--leds"):
 			if not currentDevOps:
-				print "Must specify a device (-d) before -L|--leds"
-				exit(1)
+				currentDevOps = DevOps(findDevice())
 			currentDevOps.add(OpPrintLeds())
 			continue
 		if o in ("-l", "--setled"):
 			if not currentDevOps:
-				print "Must specify a device (-d) before -l|--setled"
-				exit(1)
+				currentDevOps = DevOps(findDevice())
 			currentDevOps.add(OpSetLed(v))
 			continue
 		if o in ("-V", "--fwver"):
 			if not currentDevOps:
-				print "Must specify a device (-d) before -V|--fwver"
-				exit(1)
+				currentDevOps = DevOps(findDevice())
 			currentDevOps.add(OpGetFwVer())
 			continue
 		if o in ("-S", "--sleep"):
@@ -316,16 +307,14 @@ def parse_args():
 			try:
 				v = float(v)
 			except ValueError:
-				print "Value for -S|--sleep must be a floating point value"
-				exit(1)
+				raise RazerEx("Value for -S|--sleep must be a floating point value")
 			ops.add(OpSleep(v))
 			if not currentDevOps:
 				devOpsList.append(ops)
 			continue
 		if o in ("-X", "--flashfw"):
 			if not currentDevOps:
-				print "Must specify a device (-d) before -X|--flashfw"
-				exit(1)
+				raise RazerEx("Must specify a device (-d) before -X|--flashfw")
 			currentDevOps.add(OpFlashFw(v))
 			continue
 	if currentDevOps and currentDevOps.ops:
@@ -338,13 +327,12 @@ def parse_args():
 def main():
 	try:
 		devOpsList = parse_args()
-		if not devOpsList:
-			exit(1)
 		for devOps in devOpsList:
 			devOps.runAll()
-	except RazerEx, e:
+	except (RazerEx), e:
 		print e
-	exit(0)
+		return 1
+	return 0
 
 if __name__ == "__main__":
-	main()
+	exit(main())
