@@ -431,7 +431,7 @@ class MainWindow(QMainWindow):
 		QMessageBox.information(self, self.tr("About"),
 					self.tr("Razer device configuration tool\n"
 						"Version %s\n"
-						"Copyright (c) 2007-2009 Michael Buesch"
+						"Copyright (c) 2007-2010 Michael Buesch"
 						% RAZER_VERSION))
 
 def exit(exitcode):
