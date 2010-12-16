@@ -3,7 +3,10 @@ set -e
 
 project="razercfg"
 
-origin="$PWD/$(dirname $0)"
+basedir="$(dirname "$0")"
+[ "${basedir:0:1}" = "/" ] || basedir="$PWD/$basedir"
+
+origin="$basedir/.."
 
 version="$(cat $origin/ui/pyrazer.py | grep -e RAZER_VERSION | head -n1 | cut -d'"' -f2)"
 if [ -z "$version" ]; then

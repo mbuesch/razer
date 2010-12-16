@@ -1,4 +1,4 @@
-include("${razer_SOURCE_DIR}/cmake.global")
+include("${razer_SOURCE_DIR}/scripts/cmake.global")
 
 add_library(razer SHARED
 	    librazer.c
@@ -21,7 +21,7 @@ install(TARGETS razer DESTINATION lib)
 
 
 add_custom_target(razer_udev_rules
-		   COMMAND ${CMAKE_SOURCE_DIR}/gen_udev_rules.sh
+		   COMMAND ${CMAKE_SOURCE_DIR}/scripts/gen_udev_rules.sh
 		   ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${CMAKE_INSTALL_PREFIX}
 		   DEPENDS ${CMAKE_SOURCE_DIR}/01-razer-udev.rules.template
 		   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
