@@ -8,3 +8,14 @@ else (BIGENDIAN)
 endif (BIGENDIAN)
 
 add_definitions("-D_GNU_SOURCE -D_BSD_SOURCE -DRAZERCFG_BUILD")
+
+macro(INSTALL_EXEC_CMD _COMMAND _FAILMSG)
+	install(CODE "
+		execute_process(COMMAND ${_COMMAND} RESULT_VARIABLE install_exec_res)
+		if (NOT \"\${install_exec_res}\" STREQUAL \"0\")
+			message(WARNING \"WARNING: ${_COMMAND} failed: \${install_exec_res}\n${_FAILMSG}\n\")
+		else (NOT \"\${install_exec_res}\" STREQUAL \"0\")
+			message(STATUS \"${_COMMAND}: \${install_exec_res}\")
+		endif (NOT \"\${install_exec_res}\" STREQUAL \"0\")
+	")
+endmacro(INSTALL_EXEC_CMD)
