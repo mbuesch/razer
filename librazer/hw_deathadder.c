@@ -631,24 +631,31 @@ static int deathadder_set_dpimapping(struct razer_mouse_profile *p,
 	return err;
 }
 
-void razer_deathadder_gen_idstr(struct usb_device *udev, char *buf)
+static void deathadder_do_gen_idstr(struct usb_device *udev, char *buf,
+				    struct usb_dev_handle *h)
 {
 	char devid[64];
 	char serial[64];
 	unsigned int serial_index;
 	int err;
-	struct razer_usb_context usbctx = { .dev = udev, };
+	struct razer_usb_context usbctx = {
+		.dev = udev,
+		.h = h,
+	};
 
 	err = -EINVAL;
 	serial_index = udev->descriptor.iSerialNumber;
 	if (serial_index && !is_cypress_bootloader(udev)) {
-		err = razer_generic_usb_claim(&usbctx);
+		err = 0;
+		if (!h)
+			err = razer_generic_usb_claim(&usbctx);
 		if (err) {
 			fprintf(stderr, "Failed to claim device for serial fetching.\n");
 		} else {
 			err = usb_get_string_simple(usbctx.h, serial_index,
 						    serial, sizeof(serial));
-			razer_generic_usb_release(&usbctx);
+			if (!h)
+				razer_generic_usb_release(&usbctx);
 		}
 	}
 	if (err <= 0)
@@ -665,6 +672,11 @@ void razer_deathadder_gen_idstr(struct usb_device *udev, char *buf)
 		 udev->descriptor.idProduct, serial);
 	razer_create_idstr(buf, BUSTYPESTR_USB, udev->bus->dirname,
 			   DEVTYPESTR_MOUSE, "DeathAdder", devid);
+}
+
+void razer_deathadder_gen_idstr(struct usb_device *udev, char *buf)
+{
+	deathadder_do_gen_idstr(udev, buf, NULL);
 }
 
 void razer_deathadder_assign_usb_device(struct razer_mouse *m,
@@ -700,17 +712,20 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 		usbdev = priv->usb.dev;
 	}
 
+	err = deathadder_claim(m);
+	if (err) {
+		fprintf(stderr, "hw_deathadder: Failed to claim device\n");
+		goto err_free;
+	}
+
 	/* Fetch firmware version */
-	deathadder_claim(m);
 	fwver = deathadder_read_fw_ver(priv);
 	if (fwver < 0) {
 		fprintf(stderr, "hw_deathadder: Failed to get firmware version\n");
-		deathadder_release(m);
-		free(priv);
-		return fwver;
+		err = fwver;
+		goto err_release;
 	}
 	priv->fw_version = fwver;
-	deathadder_release(m);
 
 	priv->frequency = RAZER_MOUSE_FREQ_1000HZ;
 	priv->old_frequency = priv->frequency;
@@ -750,7 +765,7 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 		priv->cur_dpimapping = &priv->dpimapping[2];
 
 	m->type = RAZER_MOUSETYPE_DEATHADDER;
-	razer_deathadder_gen_idstr(usbdev, m->idstr);
+	deathadder_do_gen_idstr(usbdev, m->idstr, priv->usb.h);
 
 	m->claim = deathadder_claim;
 	m->release = deathadder_release;
@@ -764,7 +779,22 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 	m->supported_freqs = deathadder_supported_freqs;
 	m->supported_dpimappings = deathadder_supported_dpimappings;
 
+	err = deathadder_commit(priv);
+	if (err) {
+		fprintf(stderr, "hw_deathadder: Failed to commit initial settings\n");
+		goto err_release;
+	}
+
+	deathadder_release(m);
+
 	return 0;
+
+err_release:
+	deathadder_release(m);
+err_free:
+	free(priv);
+
+	return err;
 }
 
 void razer_deathadder_release(struct razer_mouse *m)
