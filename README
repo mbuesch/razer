@@ -1,6 +1,6 @@
 ******************************************
 *  Razer device configuration tool       *
-* Copyright (c) 2007-2009 Michael Buesch *
+* Copyright (c) 2007-2010 Michael Buesch *
 ******************************************
 
 This is a configuration utility for Razer devices on Linux systems.
@@ -74,10 +74,7 @@ It installed the script to
   /etc/udev/rules.d/01-razer-udev.rules
 This should work on most distributions.
 
-Please reboot the machine or enter the following command to activate the
-udev notification:
-
-  udevadm control --reload-rules
+If udev notification does not work, try to reboot the system.
 
 
 X11-WINDOW (X.ORG) CONFIGURATION

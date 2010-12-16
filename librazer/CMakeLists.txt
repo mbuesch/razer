@@ -32,7 +32,17 @@ install(FILES ${CMAKE_BINARY_DIR}/01-razer-udev.rules
 	DESTINATION /etc/udev/rules.d/)
 
 install(CODE "
-	execute_process(COMMAND \"ldconfig\" RESULT_VARIABLE ldconfig_res)
+	execute_process(COMMAND udevadm control --reload-rules RESULT_VARIABLE udevadm_res)
+	if (NOT \"\${udevadm_res}\" STREQUAL \"0\")
+		message(WARNING \"WARNING: Failed to reload udev rules: \${udevadm_res}\")
+		message(WARNING \"WARNING: Please reload udev manually or reboot the system\")
+	else (NOT \"\${udevadm_res}\" STREQUAL \"0\")
+		message(STATUS \"udevadm control --reload-rules: \${udevadm_res}\")
+	endif (NOT \"\${udevadm_res}\" STREQUAL \"0\")
+")
+
+install(CODE "
+	execute_process(COMMAND ldconfig RESULT_VARIABLE ldconfig_res)
 	if (NOT \"\${ldconfig_res}\" STREQUAL \"0\")
 		message(WARNING \"WARNING: Failed to run ldconfig: \${ldconfig_res}\")
 		message(WARNING \"WARNING: Your system will probably be unable to find librazer.so library!\")
