@@ -30,3 +30,13 @@ add_dependencies(razer razer_udev_rules)
 
 install(FILES ${CMAKE_BINARY_DIR}/01-razer-udev.rules
 	DESTINATION /etc/udev/rules.d/)
+
+install(CODE "
+	execute_process(COMMAND \"ldconfig\" RESULT_VARIABLE ldconfig_res)
+	if (NOT \"\${ldconfig_res}\" STREQUAL \"0\")
+		message(WARNING \"WARNING: Failed to run ldconfig: \${ldconfig_res}\")
+		message(WARNING \"WARNING: Your system will probably be unable to find librazer.so library!\")
+	else (NOT \"\${ldconfig_res}\" STREQUAL \"0\")
+		message(STATUS \"ldconfig result: \${ldconfig_res}\")
+	endif (NOT \"\${ldconfig_res}\" STREQUAL \"0\")
+")
