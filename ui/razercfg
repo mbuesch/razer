@@ -136,7 +136,16 @@ class OpSetRes(Operation):
 			(profile, mapping) = self.parseProfileValuePair(self.param, idstr)
 		except ValueError:
 			raise RazerEx("Invalid parameter to --res option")
-		error = getRazer().setDpiMapping(idstr, profile - 1, mapping - 1)
+		if mapping >= 100:
+			# Mapping is in DPI. Get the mapping ID.
+			mappings = getRazer().getSupportedDpiMappings(idstr)
+			try:
+				(mapping, res, mutable) = filter(lambda x: x[1] == mapping, mappings)[0]
+			except IndexError:
+				raise RazerEx("Invalid resolution %d" % mapping)
+		else:
+			mapping = mapping - 1
+		error = getRazer().setDpiMapping(idstr, profile - 1, mapping)
 		if error:
 			raise RazerEx("Failed to set resolution to %u (error=%d)" %\
 					(mapping, error))
