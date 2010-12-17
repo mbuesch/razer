@@ -432,20 +432,6 @@ class Razer:
 		self.__sendCommand(self.COMMAND_ID_SETBUTFUNC, idstr, payload)
 		return self.__recvU32()
 
-class RazerConfigFile:
-	DEFAULT_PATH = "/etc/razer.conf"
-
-	def __init__(self, path = DEFAULT_PATH):
-		self.path = path
-
-	def save(self, razer):
-		"Save the data of a 'class Razer' instance to the config file."
-		#TODO
-
-	def load(self, razer):
-		"Load the data from the config file to the specified 'class Razer'"
-		#TODO
-
 class IHEXParser:
 	TYPE_DATA = 0
 	TYPE_EOF  = 1
