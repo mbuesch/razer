@@ -57,7 +57,7 @@ class OpSleep(Operation):
 class OpGetFwVer(Operation):
 	def run(self, idstr):
 		verTuple = getRazer().getFwVer(idstr)
-		print "The firmware version for the mouse %s is: %d.%d" %\
+		print "%s: Firmware version %d.%d" %\
 			(idstr, verTuple[0], verTuple[1])
 
 class OpGetFreq(Operation):
@@ -67,12 +67,13 @@ class OpGetFreq(Operation):
 		for profile in profiles:
 			sys.stdout.write("Profile %u:   " % (profile + 1))
 			curFreq = getRazer().getCurrentFreq(idstr, profile)
+			output = []
 			for freq in freqs:
 				if freq == curFreq:
-					sys.stdout.write(">>%u Hz<<,  " % freq)
+					output.append(">>%u Hz<<" % freq)
 				else:
-					sys.stdout.write("%u Hz,  " % freq)
-			print ""
+					output.append("%u Hz" % freq)
+			print ",  ".join(output)
 
 class OpGetRes(Operation):
 	def run(self, idstr):
@@ -81,17 +82,18 @@ class OpGetRes(Operation):
 		for profile in profiles:
 			sys.stdout.write("Profile %u:   " % (profile + 1))
 			curMapping = getRazer().getDpiMapping(idstr, profile)
+			output = []
 			for mapping in mappings:
 				if mapping[0] == curMapping:
-					sys.stdout.write(">>%u (%u DPI)<<,  " % (mapping[0] + 1, mapping[1]))
+					output.append(">>%u (%u DPI)<<" % (mapping[0] + 1, mapping[1]))
 				else:
-					sys.stdout.write("%u (%u DPI),  " % (mapping[0] + 1, mapping[1]))
-			print ""
+					output.append("%u (%u DPI)" % (mapping[0] + 1, mapping[1]))
+			print ",  ".join(output)
 
 class OpPrintLeds(Operation):
 	def run(self, idstr):
 		leds = getRazer().getLeds(idstr)
-		print "LEDs on mouse %s:" % idstr
+		output = []
 		for led in leds:
 			if led[1] == 0:
 				state = "off"
@@ -99,8 +101,8 @@ class OpPrintLeds(Operation):
 				state = "on"
 			else:
 				state = "unknown"
-			sys.stdout.write("%s => %s, " % (led[0], state))
-		print ""
+			output.append("%s => %s" % (led[0], state))
+		print ",  ".join(output)
 
 class OpSetLed(Operation):
 	def __init__(self, cfgStr):
@@ -210,8 +212,7 @@ def usage():
 	print "-d|--device DEV      Selects the device with the bus ID \"DEV\""
 	print "    Use the special value \"mouse\" for DEV to select"
 	print "    the first razer mouse device found in the system."
-	print "-c|--config FILE     Read the config file and apply it."
-	print "    Use the special value \".\" for FILE to select the default file"
+	print "    If this option is omitted, the first Razer device found is selected."
 	print ""
 	print "-S|--sleep SECS      Sleep SECS seconds."
 	print ""
@@ -272,8 +273,6 @@ def parse_args():
 				devOpsList.append(currentDevOps)
 			currentDevOps = DevOps(v)
 			continue
-#		if o in ("-c", "--config"):
-#			pass#TODO
 		if o in ("-r", "--res"):
 			if not currentDevOps:
 				currentDevOps = DevOps(findDevice())
