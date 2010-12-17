@@ -125,7 +125,7 @@ class OpSetLed(Operation):
 			raise RazerEx("Invalid parameter to --setled option")
 		error = getRazer().setLed(idstr, ledName, newState)
 		if error:
-			raise RazerEx("Failed to set LED state. Error code is %d" % error)
+			raise RazerEx("Failed to set LED state (%s)" % Razer.strerror(error))
 
 class OpSetRes(Operation):
 	def __init__(self, param):
@@ -147,8 +147,8 @@ class OpSetRes(Operation):
 			mapping = mapping - 1
 		error = getRazer().setDpiMapping(idstr, profile - 1, mapping)
 		if error:
-			raise RazerEx("Failed to set resolution to %u (error=%d)" %\
-					(mapping, error))
+			raise RazerEx("Failed to set resolution to %u (%s)" %\
+					(mapping, Razer.strerror(error)))
 
 class OpSetFreq(Operation):
 	def __init__(self, param):
@@ -161,8 +161,8 @@ class OpSetFreq(Operation):
 			raise RazerEx("Invalid parameter to --freq option")
 		error = getRazer().setFrequency(idstr, profile - 1, freq)
 		if error:
-			raise RazerEx("Failed to set frequency to %d Hz (error=%d)" %\
-					(freq, error))
+			raise RazerEx("Failed to set frequency to %d Hz (%s)" %\
+					(freq, Razer.strerror(error)))
 
 class OpFlashFw(Operation):
 	def __init__(self, filename):
@@ -176,7 +176,7 @@ class OpFlashFw(Operation):
 		print "Sending %d bytes..." % len(data)
 		error = getRazer().flashFirmware(idstr, data)
 		if error:
-			raise RazerEx("Failed to flash firmware (error=%d)" % error)
+			raise RazerEx("Failed to flash firmware (%s)" % Razer.strerror(error))
 		print "Firmware successfully flashed."
 
 # List of operations

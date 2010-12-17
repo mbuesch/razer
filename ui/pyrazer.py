@@ -140,6 +140,35 @@ class Razer:
 	NOTIFY_ID_NEWMOUSE = 128	# New mouse was connected.
 	NOTIFY_ID_DELMOUSE = 129	# A mouse was removed.
 
+	ERR_NONE = 0
+	ERR_CMDSIZE = 1
+	ERR_NOMEM = 2
+	ERR_NOMOUSE = 3
+	ERR_NOLED = 4
+	ERR_CLAIM = 5
+	ERR_FAIL = 6
+	ERR_PAYLOAD = 7
+	ERR_NOTSUPP = 8
+
+	errorToStringMap = {
+		ERR_NONE	: "Success",
+		ERR_CMDSIZE	: "Invalid command size",
+		ERR_NOMEM	: "Out of memory",
+		ERR_NOMOUSE	: "Could not find mouse",
+		ERR_NOLED	: "Could not find LED",
+		ERR_CLAIM	: "Failed to claim device",
+		ERR_FAIL	: "Failure",
+		ERR_PAYLOAD	: "Payload error",
+		ERR_NOTSUPP	: "Operation not supported",
+	}
+
+	@staticmethod
+	def strerror(errno):
+		try:
+			errstr = Razer.errorToStringMap[errno]
+		except KeyError:
+			errstr = "Unknown error"
+		return "Errorcode %d: %s" % (errno, errstr)
 
 	def __init__(self, enableNotifications=False):
 		"Connect to razerd."
