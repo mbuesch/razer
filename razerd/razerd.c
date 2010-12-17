@@ -2,7 +2,7 @@
  *   Razer daemon
  *   Daemon to keep track of Razer device state.
  *
- *   Copyright (C) 2008-2009 Michael Buesch <mb@bu3sch.de>
+ *   Copyright (C) 2008-2010 Michael Buesch <mb@bu3sch.de>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -265,8 +265,6 @@ struct client {
 /* Control socket FDs. */
 static int ctlsock = -1;
 static int privsock = -1;
-/* FD set we wait on in the main loop. */
-static fd_set wait_fdset;
 /* Linked list of connected clients. */
 static struct client *clients;
 static struct client *privileged_clients;
@@ -1634,6 +1632,7 @@ static int mainloop(void)
 {
 	struct client *client;
 	int err;
+	fd_set wait_fdset;
 
 	loginfo("Razer device service daemon\n");
 
@@ -1670,17 +1669,10 @@ static int mainloop(void)
 	return 1;
 }
 
-static void banner(FILE *fd)
-{
-	fprintf(fd, "Razer device service daemon\n");
-	fprintf(fd, "Copyright 2009 Michael Buesch <mb@bu3sch.de>\n");
-}
-
 static void usage(FILE *fd, int argc, char **argv)
 {
-	banner(fd);
-	fprintf(fd, "\nUsage: %s [OPTIONS]\n", argv[0]);
-	fprintf(fd, "\n");
+	fprintf(fd, "Razer device service daemon\n\n");
+	fprintf(fd, "Usage: %s [OPTIONS]\n", argv[0]);
 	fprintf(fd, "\n");
 	fprintf(fd, "  -B|--background           Fork into the background (daemon mode)\n");
 	fprintf(fd, "  -P|--pidfile PATH         Create a PID-file\n");
@@ -1689,7 +1681,6 @@ static void usage(FILE *fd, int argc, char **argv)
 	fprintf(fd, "  -f|--force                Force remove sockets before starting up\n");
 	fprintf(fd, "\n");
 	fprintf(fd, "  -h|--help                 Print this help text\n");
-	fprintf(fd, "  -v|--version              Print the version number\n");
 }
 
 static int parse_args(int argc, char **argv)
@@ -1713,10 +1704,8 @@ static int parse_args(int argc, char **argv)
 			break;
 		switch (c) {
 		case 'h':
-			usage(stdout, argc, argv);
-			return 1;
 		case 'v':
-			banner(stdout);
+			usage(stdout, argc, argv);
 			return 1;
 		case 'B':
 			cmdargs.background = 1;
