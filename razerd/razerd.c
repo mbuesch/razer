@@ -472,6 +472,8 @@ static int setup_environment(void)
 		return err;
 	}
 	razer_load_config(NULL);
+	razer_set_loglevel(cmdargs.loglevel >= LOGLEVEL_DEBUG ?
+			   RAZER_LOG_DEBUG : RAZER_LOG_ERROR);
 	err = setup_var_run();
 	if (err) {
 		razer_exit();

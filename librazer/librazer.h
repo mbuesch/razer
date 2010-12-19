@@ -273,7 +273,7 @@ enum {
 struct razer_mouse {
 	struct razer_mouse *next;
 
-	char idstr[RAZER_IDSTR_MAX_SIZE];
+	char idstr[RAZER_IDSTR_MAX_SIZE + 1];
 
 	enum razer_mouse_type type;
 	unsigned int flags;
@@ -388,6 +388,15 @@ void razer_unregister_event_handler(razer_event_handler_t handler);
 /** razer_load_config - Load a configuration file.
  */
 int razer_load_config(const char *path);
+
+enum razer_loglevel {
+	RAZER_LOG_ERROR,
+	RAZER_LOG_DEBUG,
+};
+
+/** razer_set_loglevel - Set a logging level.
+ */
+void razer_set_loglevel(enum razer_loglevel loglevel);
 
 /** razer_init - LibRazer initialization
   * Call this before any other library function.

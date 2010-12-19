@@ -34,6 +34,7 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <usb.h>
+#include <ctype.h>
 
 
 enum razer_devtype {
@@ -134,6 +135,7 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 
 
 static bool librazer_initialized;
+enum razer_loglevel razer_loglevel;
 static struct razer_mouse *mice_list = NULL;
 /* We currently only have one handler. */
 static razer_event_handler_t event_handler;
@@ -224,6 +226,247 @@ struct razer_mouse * razer_mouse_list_find(struct razer_mouse *base, const char 
 	return NULL;
 }
 
+static char * strsplit(char *str, char sep)
+{
+	char c;
+
+	if (!str)
+		return NULL;
+	for (c = *str; c != '\0' && c != sep; c = *str)
+		str++;
+	if (c == sep) {
+		*str = '\0';
+		return str + 1;
+	}
+
+	return NULL;
+}
+
+static int split_pair(const char *str, char sep, char *a, char *b, size_t len)
+{
+	char *tmp;
+
+	if (strlen(str) >= len)
+		return -EINVAL;
+	strcpy(a, str);
+	tmp = strsplit(a, sep);
+	if (!tmp)
+		return -EINVAL;
+	strcpy(b, tmp);
+
+	return 0;
+}
+
+static int parse_idstr(char *idstr, char **devtype, char **devname,
+				    char **buspos, char **devid)
+{
+	*devtype = idstr;
+	*devname = strsplit(*devtype, ':');
+	*buspos = strsplit(*devname, ':');
+	*devid = strsplit(*buspos, ':');
+	if (!*devtype || !*devname || !*buspos || !*devid)
+		return -EINVAL;
+	return 0;
+}
+
+static bool mouse_idstr_glob_match(struct config_file *f,
+				   void *context, void *data,
+				   const char *section)
+{
+	struct razer_mouse *m = context;
+	const char **matched_section = data;
+	char idstr[RAZER_IDSTR_MAX_SIZE + 1] = { 0, };
+	char *idstr_devtype, *idstr_devname, *idstr_buspos, *idstr_devid;
+	char globstr[RAZER_IDSTR_MAX_SIZE + 1] = { 0, };
+	char *globstr_devtype, *globstr_devname, *globstr_buspos, *globstr_devid;
+
+	if (strlen(section) > RAZER_IDSTR_MAX_SIZE) {
+		fprintf(stderr, "ERROR: globbed idstr \"%s\" in config too long\n",
+			section);
+		return 1;
+	}
+	strcpy(globstr, section);
+	strcpy(idstr, m->idstr);
+	if (parse_idstr(globstr, &globstr_devtype, &globstr_devname,
+				 &globstr_buspos, &globstr_devid))
+		return 1;
+	if (parse_idstr(idstr, &idstr_devtype, &idstr_devname,
+			       &idstr_buspos, &idstr_devid)) {
+		fprintf(stderr, "INTERNAL-ERROR: Failed to parse idstr \"%s\"\n",
+			idstr);
+		return 1;
+	}
+
+	if (strcmp(globstr_devtype, "*") != 0 &&
+	    strcmp(globstr_devtype, idstr_devtype) != 0)
+		return 1;
+	if (strcmp(globstr_devname, "*") != 0 &&
+	    strcmp(globstr_devname, idstr_devname) != 0)
+		return 1;
+	if (strcmp(globstr_buspos, "*") != 0 &&
+	    strcmp(globstr_buspos, idstr_buspos) != 0)
+		return 1;
+	if (strcmp(globstr_devid, "*") != 0 &&
+	    strcmp(globstr_devid, idstr_devid) != 0)
+		return 1;
+
+	*matched_section = section;
+
+	return 0; /* Match */
+}
+
+static struct razer_mouse_profile * find_prof(struct razer_mouse *m, unsigned int nr)
+{
+	struct razer_mouse_profile *list;
+	unsigned int i;
+
+	if (!m->get_profiles)
+		return NULL;
+	list = m->get_profiles(m);
+	if (!list)
+		return NULL;
+	for (i = 0; i < m->nr_profiles; i++) {
+		if (list[i].nr == nr)
+			return &list[i];
+	}
+	return NULL;
+}
+
+static bool mouse_apply_one_config(struct config_file *f,
+				   void *context, void *data,
+				   const char *section,
+				   const char *item,
+				   const char *value)
+{
+	struct razer_mouse *m = context;
+	struct razer_mouse_profile *prof;
+	bool *error = data;
+	int err, nr;
+	char a[64], b[64];
+
+	if (strcasecmp(item, "profile") == 0) {
+		int profile;
+
+		err = razer_string_to_int(value, &profile);
+		if (err || profile < 1 || profile > m->nr_profiles)
+			goto error;
+		if (m->set_active_profile) {
+			prof = find_prof(m, profile - 1);
+			if (!prof)
+				goto error;
+			err = m->set_active_profile(m, prof);
+			if (err)
+				goto error;
+		}
+	} else if (strcasecmp(item, "res") == 0) {
+		int profile, resolution, i;
+		struct razer_mouse_dpimapping *mappings;
+
+		err = split_pair(value, ':', a, b, min(sizeof(a), sizeof(b)));
+		if (err)
+			goto error;
+		err = razer_string_to_int(razer_string_strip(a), &profile);
+		err |= razer_string_to_int(razer_string_strip(b), &resolution);
+		if (err)
+			goto error;
+		if (profile < 1 || resolution < 1)
+			goto error;
+		prof = find_prof(m, profile - 1);
+		if (!prof)
+			goto error;
+		nr = m->supported_dpimappings(m, &mappings);
+		if (nr <= 0)
+			goto error;
+		for (i = 0; i < nr; i++) {
+			if (resolution >= 100) {
+				if ((int)(mappings[i].res) != resolution)
+					continue;
+			} else {
+				if (mappings[i].nr != resolution)
+					continue;
+			}
+			err = prof->set_dpimapping(prof, &mappings[i]);
+			if (err)
+				goto error;
+			goto ok;
+		}
+		goto error;
+	} else if (strcasecmp(item, "freq") == 0) {
+		//TODO
+	} else if (strcasecmp(item, "led") == 0) {
+		bool on;
+		struct razer_led *leds, *led;
+		const char *ledname;
+
+		err = split_pair(value, ':', a, b, min(sizeof(a), sizeof(b)));
+		if (err)
+			goto error;
+		ledname = razer_string_strip(a);
+		err = razer_string_to_bool(razer_string_strip(b), &on);
+		if (err)
+			goto error;
+		if (!m->get_leds)
+			goto invalid;
+		err = m->get_leds(m, &leds);
+		if (err < 0)
+			goto error;
+		for (led = leds; led; led = led->next) {
+			if (strcasecmp(led->name, ledname) != 0)
+				continue;
+			if (!led->toggle_state) {
+				razer_free_leds(leds);
+				goto invalid;
+			}
+			err = led->toggle_state(led,
+				on ? RAZER_LED_ON : RAZER_LED_OFF);
+			razer_free_leds(leds);
+			if (err)
+				goto error;
+			goto ok;
+		}
+		razer_free_leds(leds);
+		goto error;
+	} else
+		goto invalid;
+ok:
+	return 1;
+error:
+	*error = 1;
+invalid:
+	fprintf(stderr, "ERROR: Config section \"%s\" item \"%s\" "
+		"invalid.\n", section, item);
+	return *error ? 0 : 1;
+}
+
+static void mouse_apply_initial_config(struct razer_mouse *m)
+{
+	const char *section = NULL;
+	int err;
+	bool error = 0;
+
+	config_for_each_section(razer_config_file,
+				m, &section,
+				mouse_idstr_glob_match);
+	if (!section)
+		return;
+	dprintf("Applying config section \"%s\" to \"%s\"\n",
+		section, m->idstr);
+	err = m->claim(m);
+	if (err) {
+		fprintf(stderr, "ERROR: Failed to claim \"%s\"\n", m->idstr);
+		return;
+	}
+	config_for_each_item(razer_config_file,
+			     m, &error,
+			     section,
+			     mouse_apply_one_config);
+	m->release(m);
+	if (error) {
+		fprintf(stderr, "ERROR: Failed to apply initial config "
+			"to \"%s\"\n", m->idstr);
+	}
+}
+
 static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 				      struct usb_device *udev)
 {
@@ -243,8 +486,8 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 		return NULL;
 	}
 
-	dprintf("Allocated and initialized new mouse (type=%d)\n",
-		m->base_ops->type);
+	dprintf("Allocated and initialized new mouse \"%s\"\n",
+		m->idstr);
 
 	ev.u.mouse = m;
 	razer_notify_event(RAZER_EV_MOUSE_ADD, &ev);
@@ -330,8 +573,10 @@ struct razer_mouse * razer_rescan_mice(void)
 	for (i = 0; i < nr_new_usb_devices; i++) {
 		mouse = mouse_new(new_usb_devices[i].id,
 				  new_usb_devices[i].udev);
-		if (mouse)
+		if (mouse) {
+			mouse_apply_initial_config(mouse);
 			mouse_list_add(&new_list, mouse);
+		}
 	}
 	/* Kill the remaining entries in the old list.
 	 * They are not connected to the machine anymore. */
@@ -771,4 +1016,64 @@ int razer_load_config(const char *path)
 	razer_config_file = conf;
 
 	return 0;
+}
+
+void razer_set_loglevel(enum razer_loglevel loglevel)
+{
+	razer_loglevel = loglevel;
+}
+
+int razer_string_to_int(const char *string, int *i)
+{
+	char *tailptr;
+	long retval;
+
+	retval = strtol(string, &tailptr, 0);
+	if (tailptr == string || tailptr[0] != '\0')
+		return -EINVAL;
+	*i = retval;
+
+	return 0;
+}
+
+int razer_string_to_bool(const char *string, bool *b)
+{
+	int i;
+
+	if (strcasecmp(string, "yes") == 0 ||
+	    strcasecmp(string, "true") == 0 ||
+	    strcasecmp(string, "on") == 0) {
+		*b = 1;
+		return 0;
+	}
+	if (strcasecmp(string, "no") == 0 ||
+	    strcasecmp(string, "false") == 0 ||
+	    strcasecmp(string, "off") == 0) {
+		*b = 0;
+		return 0;
+	}
+	if (!razer_string_to_int(string, &i)) {
+		*b = !!i;
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
+char * razer_string_strip(char *str)
+{
+	char *start = str;
+	size_t len;
+
+	if (!str)
+		return NULL;
+	while (*start != '\0' && isspace(*start))
+		start++;
+	len = strlen(start);
+	while (len && isspace(start[len - 1])) {
+		start[len - 1] = '\0';
+		len--;
+	}
+
+	return start;
 }

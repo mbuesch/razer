@@ -1,6 +1,9 @@
 #ifndef CONFIG_FILE_H_
 #define CONFIG_FILE_H_
 
+#include "razer_private.h"
+
+
 struct config_item;
 struct config_section;
 struct config_file;
@@ -33,6 +36,21 @@ enum {
 
 	CONF_NOCASE		= CONF_SECT_NOCASE | CONF_ITEM_NOCASE | CONF_VALUE_NOCASE,
 };
+
+void config_for_each_item(struct config_file *f,
+			  void *context, void *data,
+			  const char *section,
+			  bool (*func)(struct config_file *f,
+			    	       void *context, void *data,
+				       const char *section,
+			     	       const char *item,
+				       const char *value));
+
+void config_for_each_section(struct config_file *f,
+			     void *context, void *data,
+			     bool (*func)(struct config_file *f,
+			     		  void *context, void *data,
+			     		  const char *section));
 
 const char * config_get(struct config_file *f,
 			const char *section,

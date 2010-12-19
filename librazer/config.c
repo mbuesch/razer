@@ -29,24 +29,6 @@ static inline int strcmp_case(const char *a, const char *b, bool ignorecase)
 	return strcmp(a, b);
 }
 
-static char * string_strip(char *str)
-{
-	char *start = str;
-	size_t len;
-
-	if (!str)
-		return NULL;
-	while (*start != '\0' && isspace(*start))
-		start++;
-	len = strlen(start);
-	while (len && isspace(start[len - 1])) {
-		start[len - 1] = '\0';
-		len--;
-	}
-
-	return start;
-}
-
 static void free_item(struct config_item *i)
 {
 	if (i) {
@@ -85,6 +67,42 @@ static void free_sections(struct config_section *s)
 	}
 }
 
+void config_for_each_item(struct config_file *f,
+			  void *context, void *data,
+			  const char *section,
+			  bool (*func)(struct config_file *f,
+			    	       void *context, void *data,
+				       const char *section,
+			     	       const char *item,
+				       const char *value))
+{
+	struct config_section *s;
+	struct config_item *i;
+
+	for (s = f->sections; s; s = s->next) {
+		if (strcmp(s->name, section) == 0) {
+			for (i = s->items; i; i = i->next) {
+				if (!func(f, context, data, s->name, i->name, i->value))
+					return;
+			}
+		}
+	}
+}
+
+void config_for_each_section(struct config_file *f,
+			     void *context, void *data,
+			     bool (*func)(struct config_file *f,
+			     		  void *context, void *data,
+			     		  const char *section))
+{
+	struct config_section *s;
+
+	for (s = f->sections; s; s = s->next) {
+		if (!func(f, context, data, s->name))
+			return;
+	}
+}
+
 const char * config_get(struct config_file *f,
 			const char *section,
 			const char *item,
@@ -112,19 +130,6 @@ const char * config_get(struct config_file *f,
 	return retval;
 }
 
-static int string_to_int(const char *string, int *i)
-{
-	char *tailptr;
-	long retval;
-
-	retval = strtol(string, &tailptr, 0);
-	if (tailptr == string || tailptr[0] != '\0')
-		return -EINVAL;
-	*i = retval;
-
-	return 0;
-}
-
 int config_get_int(struct config_file *f,
 		   const char *section,
 		   const char *item,
@@ -137,7 +142,7 @@ int config_get_int(struct config_file *f,
 	value = config_get(f, section, item, NULL, flags);
 	if (!value)
 		return _default;
-	if (string_to_int(value, &i))
+	if (razer_string_to_int(value, &i))
 		return _default;
 
 	return i;
@@ -150,23 +155,15 @@ int config_get_bool(struct config_file *f,
 		    unsigned int flags)
 {
 	const char *value;
-	int i;
+	bool b;
 
 	value = config_get(f, section, item, NULL, flags);
 	if (!value)
 		return _default;
-	if (strcmp_case(value, "yes", !!(flags & CONF_VALUE_NOCASE)) == 0 ||
-	    strcmp_case(value, "true", !!(flags & CONF_VALUE_NOCASE)) == 0 ||
-	    strcmp_case(value, "on", !!(flags & CONF_VALUE_NOCASE)) == 0)
-		return 1;
-	if (strcmp_case(value, "no", !!(flags & CONF_VALUE_NOCASE)) == 0 ||
-	    strcmp_case(value, "false", !!(flags & CONF_VALUE_NOCASE)) == 0 ||
-	    strcmp_case(value, "off", !!(flags & CONF_VALUE_NOCASE)) == 0)
-		return 0;
-	if (string_to_int(value, &i))
+	if (razer_string_to_bool(value, &b))
 		return _default;
 
-	return !!i;
+	return b;
 }
 
 #define list_append(container, baseptr, item) do {	\
@@ -223,7 +220,7 @@ struct config_file * config_file_parse(const char *path)
 		count = getline(&linebuf, &linebuf_size, fd);
 		if (count <= 0)
 			break;
-		line = string_strip(linebuf);
+		line = razer_string_strip(linebuf);
 
 		lineno++;
 		len = strlen(line);

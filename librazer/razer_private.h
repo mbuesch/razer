@@ -11,13 +11,14 @@
 #include <stdlib.h>
 
 
+typedef _Bool bool;
 
-#ifdef DEBUG
-# define dprintf(...)		printf("[librazer debug]: " __VA_ARGS__)
-#else
-# define dprintf		noprintf
-#endif
-static inline int noprintf(const char *t, ...) { return 0; }
+extern enum razer_loglevel razer_loglevel;
+
+#define dprintf(...)	do { \
+		if (razer_loglevel >= RAZER_LOG_DEBUG)			\
+			printf("[librazer debug]: " __VA_ARGS__);	\
+	} while (0)
 
 #define ARRAY_SIZE(array)	(sizeof(array) / sizeof((array)[0]))
 
@@ -28,7 +29,6 @@ static inline int noprintf(const char *t, ...) { return 0; }
 	for (dev = devlist; dev; dev = dev->next)
 
 
-typedef _Bool bool;
 #undef min
 #undef max
 #undef offsetof
@@ -132,5 +132,9 @@ static inline void * zalloc(size_t size)
 {
 	return calloc(1, size);
 }
+
+int razer_string_to_int(const char *string, int *i);
+int razer_string_to_bool(const char *string, bool *b);
+char * razer_string_strip(char *str);
 
 #endif /* RAZER_PRIVATE_H_ */
