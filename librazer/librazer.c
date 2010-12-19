@@ -16,6 +16,7 @@
 
 #include "librazer.h"
 #include "razer_private.h"
+#include "config.h"
 
 #include "hw_deathadder.h"
 #include "hw_naga.h"
@@ -136,6 +137,7 @@ static bool librazer_initialized;
 static struct razer_mouse *mice_list = NULL;
 /* We currently only have one handler. */
 static razer_event_handler_t event_handler;
+static struct config_file *razer_config_file = NULL;
 
 
 int razer_register_event_handler(razer_event_handler_t handler)
@@ -379,6 +381,8 @@ void razer_exit(void)
 		return;
 	razer_free_mice(mice_list);
 	mice_list = NULL;
+	config_file_free(razer_config_file);
+	razer_config_file = NULL;
 	librazer_initialized = 0;
 }
 
@@ -750,3 +754,21 @@ void razer_dump(const char *prefix, const void *_buf, size_t size)
 	printf("\n\n");
 }
 #endif
+
+int razer_load_config(const char *path)
+{
+	struct config_file *conf;
+
+	if (!path)
+		path = RAZER_DEFAULT_CONFIG;
+	if (!librazer_initialized)
+		return -EINVAL;
+
+	conf = config_file_parse(path);
+	if (!conf)
+		return -ENOENT;
+	config_file_free(razer_config_file);
+	razer_config_file = conf;
+
+	return 0;
+}

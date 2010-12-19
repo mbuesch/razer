@@ -8,6 +8,7 @@
 #include <string.h>
 #include <byteswap.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 
 
@@ -127,5 +128,9 @@ static inline void razer_dump(const char *p, const void *b, size_t s) { }
 
 #define BUILD_BUG_ON(x)		((void)sizeof(char[1 - 2 * !!(x)]))
 
+static inline void * zalloc(size_t size)
+{
+	return calloc(1, size);
+}
 
 #endif /* RAZER_PRIVATE_H_ */

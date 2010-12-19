@@ -471,6 +471,7 @@ static int setup_environment(void)
 		logerr("librazer initialization failed. (%d)\n", err);
 		return err;
 	}
+	razer_load_config(NULL);
 	err = setup_var_run();
 	if (err) {
 		razer_exit();

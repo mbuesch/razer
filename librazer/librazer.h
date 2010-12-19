@@ -29,6 +29,7 @@
 
 #define RAZER_IDSTR_MAX_SIZE	128
 #define RAZER_LEDNAME_MAX_SIZE	64
+#define RAZER_DEFAULT_CONFIG	"/etc/razer.conf"
 
 struct razer_mouse;
 struct razer_mouse_base_ops;
@@ -383,6 +384,10 @@ int razer_register_event_handler(razer_event_handler_t handler);
 /** razer_unregister_event_handler - Unregister an event handler.
  */
 void razer_unregister_event_handler(razer_event_handler_t handler);
+
+/** razer_load_config - Load a configuration file.
+ */
+int razer_load_config(const char *path);
 
 /** razer_init - LibRazer initialization
   * Call this before any other library function.
