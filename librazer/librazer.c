@@ -486,6 +486,8 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 		return NULL;
 	}
 
+	mouse_apply_initial_config(m);
+
 	dprintf("Allocated and initialized new mouse \"%s\"\n",
 		m->idstr);
 
@@ -573,10 +575,8 @@ struct razer_mouse * razer_rescan_mice(void)
 	for (i = 0; i < nr_new_usb_devices; i++) {
 		mouse = mouse_new(new_usb_devices[i].id,
 				  new_usb_devices[i].udev);
-		if (mouse) {
-			mouse_apply_initial_config(mouse);
+		if (mouse)
 			mouse_list_add(&new_list, mouse);
-		}
 	}
 	/* Kill the remaining entries in the old list.
 	 * They are not connected to the machine anymore. */
