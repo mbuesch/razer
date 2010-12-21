@@ -61,6 +61,7 @@ enum {
 
 struct commandline_args {
 	bool background;
+	const char *configfile;
 	const char *pidfile;
 	int loglevel;
 	bool force;
@@ -471,16 +472,23 @@ static int setup_environment(void)
 		logerr("librazer initialization failed. (%d)\n", err);
 		return err;
 	}
-	razer_load_config(NULL);
+	err = razer_load_config(cmdargs.configfile);
+	if (cmdargs.configfile && err) {
+		logerr("Failed to load config file %s\n",
+			cmdargs.configfile);
+		goto err_exit;
+	}
 	razer_set_loglevel(cmdargs.loglevel >= LOGLEVEL_DEBUG ?
 			   RAZER_LOG_DEBUG : RAZER_LOG_ERROR);
 	err = setup_var_run();
-	if (err) {
-		razer_exit();
-		return err;
-	}
+	if (err)
+		goto err_exit;
 
 	return 0;
+
+err_exit:
+	razer_exit();
+	return err;
 }
 
 static void cleanup_environment(void)
@@ -1678,6 +1686,8 @@ static void usage(FILE *fd, int argc, char **argv)
 	fprintf(fd, "Usage: %s [OPTIONS]\n", argv[0]);
 	fprintf(fd, "\n");
 	fprintf(fd, "  -B|--background           Fork into the background (daemon mode)\n");
+	fprintf(fd, "  -c|--config PATH          Use specified config file. Defaults to %s\n",
+		RAZER_DEFAULT_CONFIG);
 	fprintf(fd, "  -P|--pidfile PATH         Create a PID-file\n");
 	fprintf(fd, "  -l|--loglevel LEVEL       Set the loglevel\n");
 	fprintf(fd, "                            0=error, 1=warning, 2=info(default), 3=debug\n");
@@ -1692,6 +1702,7 @@ static int parse_args(int argc, char **argv)
 		{ "help", no_argument, 0, 'h', },
 		{ "version", no_argument, 0, 'v', },
 		{ "background", no_argument, 0, 'B', },
+		{ "config", required_argument, 0, 'c', },
 		{ "pidfile", required_argument, 0, 'P', },
 		{ "loglevel", required_argument, 0, 'l', },
 		{ "force", no_argument, 0, 'f', },
@@ -1701,7 +1712,7 @@ static int parse_args(int argc, char **argv)
 	int c, idx;
 
 	while (1) {
-		c = getopt_long(argc, argv, "hvBP:l:f",
+		c = getopt_long(argc, argv, "hvBc:P:l:f",
 				long_options, &idx);
 		if (c == -1)
 			break;
@@ -1712,6 +1723,9 @@ static int parse_args(int argc, char **argv)
 			return 1;
 		case 'B':
 			cmdargs.background = 1;
+			break;
+		case 'c':
+			cmdargs.configfile = optarg;
 			break;
 		case 'P':
 			cmdargs.pidfile = optarg;
