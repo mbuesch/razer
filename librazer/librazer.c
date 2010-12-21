@@ -842,7 +842,8 @@ int razer_usb_reconnect_guard_init(struct razer_usb_reconnect_guard *guard,
 
 static struct usb_device * guard_find_usb_dev(const struct usb_device_descriptor *desc,
 					      const char *dirname,
-					      unsigned int filename)
+					      unsigned int filename,
+					      bool exact_match)
 {
 	struct usb_bus *bus, *buslist;
 	struct usb_device *dev;
@@ -864,10 +865,17 @@ static struct usb_device * guard_find_usb_dev(const struct usb_device_descriptor
 				fprintf(stderr, "guard_find_usb_dev: Could not parse filename.\n");
 				return NULL;
 			}
-			for (i = 0; i < 64; i++) {
-				if (dev_filename == ((filename + i) & 0x7F)) {
+			if (exact_match) {
+				if (dev_filename == filename) {
 					/* found it! */
 					return dev;
+				}
+			} else {
+				for (i = 0; i < 64; i++) {
+					if (dev_filename == ((filename + i) & 0x7F)) {
+						/* found it! */
+						return dev;
+					}
 				}
 			}
 		}
@@ -913,7 +921,7 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard, bool
 	timeval_add_msec(&timeout, 3000);
 	while (guard_find_usb_dev(&guard->old_desc,
 				  guard->old_dirname,
-				  old_filename_nr)) {
+				  old_filename_nr, 1)) {
 		gettimeofday(&now, NULL);
 		if (timeval_after(&now, &timeout)) {
 			/* Timeout. Hm. It seems the device won't reconnect.
@@ -937,7 +945,7 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard, bool
 	while (1) {
 		dev = guard_find_usb_dev(&guard->old_desc,
 					 guard->old_dirname,
-					 reconn_filename);
+					 reconn_filename, 0);
 		if (dev)
 			break;
 		gettimeofday(&now, NULL);
