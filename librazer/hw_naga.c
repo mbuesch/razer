@@ -55,8 +55,7 @@ struct naga_private {
 	struct razer_mouse_dpimapping dpimapping[56];
 };
 
-#define NAGA_USB_TIMEOUT		3000
-#define NAGA_FW_IMAGE_SIZE	0x4000
+#define NAGA_USB_TIMEOUT	3000
 
 static int naga_usb_write(struct naga_private *priv,
 				int request, int command,
@@ -103,14 +102,11 @@ static int naga_read_fw_ver(struct naga_private *priv)
 	char buf[90];
 	uint16_t ver;
 	int err;
-	
+
 	// something is wrong, this workaround retries until a valid firmware version is returned
 	do
 	{
-		for(int i=0;i<90;i++)
-		{
-			buf[i] = 0;
-		}
+		memset(buf, 0, sizeof(buf));
 		buf[5] = 0x02;
 		buf[7] = 0x81;
 		buf[88] = 0x83;
@@ -131,13 +127,11 @@ static int naga_read_fw_ver(struct naga_private *priv)
 		printf("\n");
 */
 	}while(buf[8] == 0 && 0/*FIXME*/);
-	
+
 	ver = buf[8];
 	ver <<= 8;
 	ver |= buf[9];
-	
-//	printf("Firmware: (%d.%d)\n", buf[8], buf[9]);
-	
+
 	return ver;
 }
 
@@ -149,89 +143,67 @@ static int naga_commit(struct naga_private *priv)
 	/* Translate frequency setting. */
 	switch (priv->frequency) {
 	case RAZER_MOUSE_FREQ_125HZ:
-		
+		//TODO
 		break;
 	case RAZER_MOUSE_FREQ_500HZ:
-		
+		//TODO
 		break;
 	case RAZER_MOUSE_FREQ_1000HZ:
 	case RAZER_MOUSE_FREQ_UNKNOWN:
-		
+		//TODO
 		break;
 	default:
 		return -EINVAL;
 	}
 
 	/* set the scroll wheel and buttons */
-	for(int i=0;i<90;i++)
-	{
-		buf[i] = 0;
-	}
-	
+	memset(buf, 0, sizeof(buf));
 	buf[5] = 0x03;
 	buf[6] = 0x03;
 	buf[8] = 0x01;
 	buf[9] = 0x01;
-	if (priv->led_states[NAGA_LED_SCROLL])
-	{
+	if (priv->led_states[NAGA_LED_SCROLL]) {
 		buf[10] = 0x01;
 		buf[88] = 0x01;
 	}
-	
 	err = naga_usb_write(priv, 0x09, 0x0300, buf, sizeof(buf));
-	err = naga_usb_read(priv, 0x01, 0x0300, buf, sizeof(buf));
-	
+	err |= naga_usb_read(priv, 0x01, 0x0300, buf, sizeof(buf));
+	if (err)
+		return -ENODEV;
+
 	/* now the logo */
-	for(int i=0;i<90;i++)
-		{
-			buf[i] = 0;
-		}
+	memset(buf, 0, sizeof(buf));
 	buf[5] = 0x03;
 	buf[6] = 0x03;
 	buf[8] = 0x01;
 	buf[9] = 0x04;
-	if(priv->led_states[NAGA_LED_LOGO])
-	{
+	if (priv->led_states[NAGA_LED_LOGO]) {
 		buf[10] = 0x01;
 		buf[88] = 0x04;
-	}else
-	{
+	} else {
 		buf[10] = 0x00;
 		buf[88] = 0x05;
 	}
 	err = naga_usb_write(priv, 0x09, 0x0300, buf, sizeof(buf));
-	err = naga_usb_read(priv, 0x01, 0x0300, buf, sizeof(buf));
-	/*printf("logo led:\n");
-	for(int i=0;i<90;i++)
-	{
-		printf("%02X ",buf[i]);
-		if(i%16 == 0 && i != 0)
-			printf("\n");
-	}
-	printf("\n");
-	*/
-	
+	err |= naga_usb_read(priv, 0x01, 0x0300, buf, sizeof(buf));
 	if (err)
-		return err;
-	
-	/* set the resolution */
-	int res = (priv->cur_dpimapping->res/100)-1;
-	res <<=2;
-	
-	//printf("selected res is 0x%02X\n",res);
+		return -ENODEV;
 
-	for(int i=0;i<90;i++)
-	{
-		buf[i] = 0;
-	}
+	/* set the resolution */
+	int res = (priv->cur_dpimapping->res / 100) - 1;
+	res <<= 2;
+
+	memset(buf, 0, sizeof(buf));
 	buf[5] = 0x03;
 	buf[6] = 0x04;
 	buf[7] = 0x01;
 	buf[8] = res;
 	buf[9] = res;
-	buf[88]=0x06;
+	buf[88] = 0x06;
 	err = naga_usb_write(priv, 0x09, 0x0300, buf, sizeof(buf));
-	err = naga_usb_read(priv, 0x01, 0x0300, buf, sizeof(buf));
+	err |= naga_usb_read(priv, 0x01, 0x0300, buf, sizeof(buf));
+	if (err)
+		return -ENODEV;
 
 	return 0;
 }
@@ -391,10 +363,8 @@ static int naga_supported_resolutions(struct razer_mouse *m,
 	if (!list)
 		return -ENOMEM;
 
-	for(int i = 1;i<56;i++)
-	{
-		list[i-1] = i*100;
-	}
+	for (int i = 1; i < 56; i++)
+		list[i - 1] = i * 100;
 	*res_list = list;
 
 	return count;
