@@ -123,7 +123,7 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 	USB_MOUSE(0x1532, 0x0016, &razer_deathadder_base_ops),
 	USB_MOUSE(0x1532, 0x0003, &razer_krait_base_ops),
 	USB_MOUSE(0x1532, 0x000C, &razer_lachesis_base_ops),
-//	USB_MOUSE(0x1532, 0x0015, &razer_naga_base_ops),
+	USB_MOUSE(0x1532, 0x0015, &razer_naga_base_ops),
 //FIXME	USB_MOUSE(0x1532, 0x0101, &razer_copperhead_base_ops),
 	{ 0, }, /* List end */
 };
