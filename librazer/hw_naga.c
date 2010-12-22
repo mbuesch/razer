@@ -46,8 +46,6 @@ struct naga_private {
 	bool led_states[NAGA_NR_LEDS];
 	/* The currently set frequency. */
 	enum razer_mouse_freq frequency;
-	/* Previous freq. For predicting reconnect events only. */
-	enum razer_mouse_freq old_frequency;
 	/* The currently set resolution. */
 	struct razer_mouse_dpimapping *cur_dpimapping;
 
@@ -340,7 +338,6 @@ static int naga_set_freq(struct razer_mouse_profile *p,
 		return -EBUSY;
 
 	old_freq = priv->frequency;
-	priv->old_frequency = old_freq;
 	priv->frequency = freq;
 
 	err = naga_commit(priv);
@@ -348,7 +345,6 @@ static int naga_set_freq(struct razer_mouse_profile *p,
 		priv->frequency = old_freq;
 		return err;
 	}
-	priv->old_frequency = freq;
 
 	return err;
 }
@@ -495,7 +491,6 @@ int razer_naga_init_struct(struct razer_mouse *m,
 	naga_release(m);
 
 	priv->frequency = RAZER_MOUSE_FREQ_1000HZ;
-	priv->old_frequency = priv->frequency;
 	for (i = 0; i < NAGA_NR_LEDS; i++)
 		priv->led_states[i] = RAZER_LED_ON;
 
