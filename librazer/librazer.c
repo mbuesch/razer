@@ -847,9 +847,10 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard, bool
 		gettimeofday(&now, NULL);
 		if (razer_timeval_after(&now, &timeout)) {
 			/* Timeout. Hm. It seems the device won't reconnect.
-			 * That's OK. We can reclaim the device now. */
+			 * That's probably OK. Reclaim it. */
 			razer_error("razer_usb_reconnect_guard: "
-				"Didn't disconnect, huh?\n");
+				"The device did not disconnect! If it "
+				"does not work anymore, try to replug it.\n");
 			goto reclaim;
 		}
 		razer_msleep(50);
