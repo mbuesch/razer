@@ -188,7 +188,7 @@ void razer_krait_gen_idstr(struct usb_device *udev, char *buf)
 	if (serial_index) {
 		err = razer_generic_usb_claim(&usbctx);
 		if (err) {
-			fprintf(stderr, "Failed to claim device for serial fetching.\n");
+			razer_error("Failed to claim device for serial fetching.\n");
 		} else {
 			err = usb_get_string_simple(usbctx.h, serial_index,
 						    serial, sizeof(serial));

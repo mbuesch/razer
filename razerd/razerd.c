@@ -478,8 +478,9 @@ static int setup_environment(void)
 			cmdargs.configfile);
 		goto err_exit;
 	}
-	razer_set_loglevel(cmdargs.loglevel >= LOGLEVEL_DEBUG ?
-			   RAZER_LOG_DEBUG : RAZER_LOG_ERROR);
+	razer_set_logging(cmdargs.loglevel >= LOGLEVEL_INFO ? loginfo : NULL,
+			  cmdargs.loglevel >= LOGLEVEL_ERROR ? logerr : NULL,
+			  cmdargs.loglevel >= LOGLEVEL_DEBUG ? logdebug : NULL);
 	err = setup_var_run();
 	if (err)
 		goto err_exit;

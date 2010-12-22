@@ -211,7 +211,7 @@ struct config_file * config_file_parse(const char *path)
 		goto err_free_f;
 	fd = fopen(path, "rb");
 	if (!fd) {
-		fprintf(stderr, "Failed to open config file %s: %s\n",
+		razer_error("Failed to open config file %s: %s\n",
 			path, strerror(errno));
 		goto err_free_path;
 	}
@@ -244,13 +244,13 @@ struct config_file * config_file_parse(const char *path)
 			continue;
 		}
 		if (!s) {
-			fprintf(stderr, "%s:%u: Stray characters\n", path, lineno);
+			razer_error("%s:%u: Stray characters\n", path, lineno);
 			goto error_unwind;
 		}
 		/* Config item in section */
 		value = strchr(line, '=');
 		if (!value) {
-			fprintf(stderr, "%s:%u: Invalid config item\n", path, lineno);
+			razer_error("%s:%u: Invalid config item\n", path, lineno);
 			goto error_unwind;
 		}
 		value[0] = '\0';

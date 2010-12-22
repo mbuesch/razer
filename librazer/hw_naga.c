@@ -70,7 +70,7 @@ static int naga_usb_write(struct naga_private *priv,
 			      (char *)buf, size,
 			      NAGA_USB_TIMEOUT);
 	if (err != size) {
-		fprintf(stderr, "razer-naga: "
+		razer_error("razer-naga: "
 			"USB write 0x%02X 0x%02X failed: %d\n",
 			request, command, err);
 		return err;
@@ -90,7 +90,7 @@ static int naga_usb_read(struct naga_private *priv,
 			      buf, size,
 			      NAGA_USB_TIMEOUT);
 	if (err != size) {
-		fprintf(stderr, "razer-naga: "
+		razer_error("razer-naga: "
 			"USB read 0x%02X 0x%02X failed: %d\n",
 			request, command, err);
 		return err;
@@ -119,8 +119,8 @@ static int naga_read_fw_ver(struct naga_private *priv)
 		//err = usb_control_msg(priv->usb.h, USB_ENDPOINT_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE, 0x01, 0x0300, 0x0000, buf, sizeof(buf), DEATHADDER_USB_TIMEOUT);
 		err = naga_usb_read(priv, 0x01, 0x0300, buf, sizeof(buf));
 
-		if(err<0) 
-			printf("error %d\n",err);
+//		if(err<0) 
+//			printf("error %d\n",err);
 /*
 		for(int i=0;i<90;i++)
 		{
@@ -466,7 +466,7 @@ void razer_naga_gen_idstr(struct usb_device *udev, char *buf)
 	if (serial_index) {
 		err = razer_generic_usb_claim(&usbctx);
 		if (err) {
-			fprintf(stderr, "Failed to claim device for serial fetching.\n");
+			razer_error("Failed to claim device for serial fetching.\n");
 		} else {
 			err = usb_get_string_simple(usbctx.h, serial_index,
 						    serial, sizeof(serial));
@@ -516,7 +516,7 @@ int razer_naga_init_struct(struct razer_mouse *m,
 	naga_claim(m);
 	fwver = naga_read_fw_ver(priv);
 	if (fwver < 0) {
-		fprintf(stderr, "hw_naga: Failed to get firmware version\n");
+		razer_error("hw_naga: Failed to get firmware version\n");
 		naga_release(m);
 		free(priv);
 		return fwver;

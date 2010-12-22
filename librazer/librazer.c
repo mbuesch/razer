@@ -135,11 +135,14 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 
 
 static bool librazer_initialized;
-enum razer_loglevel razer_loglevel;
 static struct razer_mouse *mice_list = NULL;
 /* We currently only have one handler. */
 static razer_event_handler_t event_handler;
 static struct config_file *razer_config_file = NULL;
+
+razer_logfunc_t razer_logfunc_info;
+razer_logfunc_t razer_logfunc_error;
+razer_logfunc_t razer_logfunc_debug;
 
 
 int razer_register_event_handler(razer_event_handler_t handler)
@@ -281,7 +284,7 @@ static bool mouse_idstr_glob_match(struct config_file *f,
 	char *globstr_devtype, *globstr_devname, *globstr_buspos, *globstr_devid;
 
 	if (strlen(section) > RAZER_IDSTR_MAX_SIZE) {
-		fprintf(stderr, "ERROR: globbed idstr \"%s\" in config too long\n",
+		razer_error("globbed idstr \"%s\" in config too long\n",
 			section);
 		return 1;
 	}
@@ -292,7 +295,7 @@ static bool mouse_idstr_glob_match(struct config_file *f,
 		return 1;
 	if (parse_idstr(idstr, &idstr_devtype, &idstr_devname,
 			       &idstr_buspos, &idstr_devid)) {
-		fprintf(stderr, "INTERNAL-ERROR: Failed to parse idstr \"%s\"\n",
+		razer_error("INTERNAL-ERROR: Failed to parse idstr \"%s\"\n",
 			idstr);
 		return 1;
 	}
@@ -433,7 +436,7 @@ ok:
 error:
 	*error = 1;
 invalid:
-	fprintf(stderr, "ERROR: Config section \"%s\" item \"%s\" "
+	razer_error("Config section \"%s\" item \"%s\" "
 		"invalid.\n", section, item);
 	return *error ? 0 : 1;
 }
@@ -449,11 +452,11 @@ static void mouse_apply_initial_config(struct razer_mouse *m)
 				mouse_idstr_glob_match);
 	if (!section)
 		return;
-	dprintf("Applying config section \"%s\" to \"%s\"\n",
+	razer_debug("Applying config section \"%s\" to \"%s\"\n",
 		section, m->idstr);
 	err = m->claim(m);
 	if (err) {
-		fprintf(stderr, "ERROR: Failed to claim \"%s\"\n", m->idstr);
+		razer_error("Failed to claim \"%s\"\n", m->idstr);
 		return;
 	}
 	config_for_each_item(razer_config_file,
@@ -462,7 +465,7 @@ static void mouse_apply_initial_config(struct razer_mouse *m)
 			     mouse_apply_one_config);
 	m->release(m);
 	if (error) {
-		fprintf(stderr, "ERROR: Failed to apply initial config "
+		razer_error("Failed to apply initial config "
 			"to \"%s\"\n", m->idstr);
 	}
 }
@@ -488,7 +491,7 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 
 	mouse_apply_initial_config(m);
 
-	dprintf("Allocated and initialized new mouse \"%s\"\n",
+	razer_debug("Allocated and initialized new mouse \"%s\"\n",
 		m->idstr);
 
 	ev.u.mouse = m;
@@ -501,7 +504,7 @@ static void razer_free_mouse(struct razer_mouse *m)
 {
 	struct razer_event_data ev;
 
-	dprintf("Freeing mouse (type=%d)\n",
+	razer_debug("Freeing mouse (type=%d)\n",
 		m->base_ops->type);
 
 	ev.u.mouse = m;
@@ -565,7 +568,7 @@ struct razer_mouse * razer_rescan_mice(void)
 					new_usb_devices[nr_new_usb_devices].udev = dev;
 					nr_new_usb_devices++;
 				} else {
-					fprintf(stderr, "librazer: razer_rescan_nice: "
+					razer_error("razer_rescan_nice: "
 						"new device array overflow\n");
 				}
 			}
@@ -680,7 +683,7 @@ static void razer_reattach_usb_kdrv(struct razer_usb_context *ctx)
 		return;
 	}
 
-	fprintf(stderr, "librazer: Failed to reconnect the kernel driver.\n"
+	razer_error("Failed to reconnect the kernel driver.\n"
 		"The device most likely won't work now. Try to replug it.\n");
 }
 
@@ -691,18 +694,18 @@ static int razer_usb_claim(struct razer_usb_context *ctx)
 	ctx->kdrv_detached = 0;
 	err = usb_claim_interface(ctx->h, ctx->interf);
 	if (err && err != -EBUSY)
-		fprintf(stderr, "razer_usb_claim: first claim failed %d\n", err);
+		razer_error("razer_usb_claim: first claim failed %d\n", err);
 	if (err == -EBUSY) {
 #ifdef LIBUSB_HAS_DETACH_KERNEL_DRIVER_NP
 		err = usb_detach_kernel_driver_np(ctx->h, ctx->interf);
 		if (err) {
-			fprintf(stderr, "razer_usb_claim: detach failed %d\n", err);
+			razer_error("razer_usb_claim: detach failed %d\n", err);
 			return err;
 		}
 		ctx->kdrv_detached = 1;
 		err = usb_claim_interface(ctx->h, ctx->interf);
 		if (err) {
-			fprintf(stderr, "razer_usb_claim: claim failed %d\n", err);
+			razer_error("razer_usb_claim: claim failed %d\n", err);
 			razer_reattach_usb_kdrv(ctx);
 			return err;
 		}
@@ -725,7 +728,7 @@ int razer_generic_usb_claim(struct razer_usb_context *ctx)
 	ctx->interf = ctx->dev->config->interface->altsetting[0].bInterfaceNumber;
 	ctx->h = usb_open(ctx->dev);
 	if (!ctx->h) {
-		fprintf(stderr, "razer_generic_usb_claim: usb_open failed\n");
+		razer_error("razer_generic_usb_claim: usb_open failed\n");
 		return -ENODEV;
 	}
 	err = razer_usb_claim(ctx);
@@ -751,17 +754,17 @@ int razer_usb_force_reinit(struct razer_usb_context *device_ctx)
 	struct razer_usb_reconnect_guard rg;
 	int err;
 
-	dprintf("Forcing device reinitialization\n");
+	razer_debug("Forcing device reinitialization\n");
 
 	razer_usb_reconnect_guard_init(&rg, device_ctx);
 
 	hub = device_ctx->dev->bus->root_dev;
-	dprintf("Resetting root hub %s:%s\n",
+	razer_debug("Resetting root hub %s:%s\n",
 		hub->bus->dirname, hub->filename);
 
 	h = usb_open(hub);
 	if (!h) {
-		fprintf(stderr, "razer_usb_force_reinit: usb_open failed\n");
+		razer_error("razer_usb_force_reinit: usb_open failed\n");
 		return -ENODEV;
 	}
 	usb_reset(h);
@@ -769,7 +772,7 @@ int razer_usb_force_reinit(struct razer_usb_context *device_ctx)
 
 	err = razer_usb_reconnect_guard_wait(&rg, 1);
 	if (err) {
-		fprintf(stderr, "razer_usb_force_reinit: "
+		razer_error("razer_usb_force_reinit: "
 			"Failed to discover the reconnected device\n");
 		return err;
 	}
@@ -819,7 +822,7 @@ void razer_msleep(unsigned int msecs)
 		err = nanosleep(&time, &time);
 	} while (err && errno == EINTR);
 	if (err) {
-		fprintf(stderr, "nanosleep() failed with: %s\n",
+		razer_error("nanosleep() failed with: %s\n",
 			strerror(errno));
 	}
 }
@@ -862,7 +865,7 @@ static struct usb_device * guard_find_usb_dev(const struct usb_device_descriptor
 				continue;
 			res = sscanf(dev->filename, "%03u", &dev_filename);
 			if (res != 1) {
-				fprintf(stderr, "guard_find_usb_dev: Could not parse filename.\n");
+				razer_error("guard_find_usb_dev: Could not parse filename.\n");
 				return NULL;
 			}
 			if (exact_match) {
@@ -910,7 +913,7 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard, bool
 
 	res = sscanf(guard->old_filename, "%03u", &old_filename_nr);
 	if (res != 1) {
-		fprintf(stderr, "razer_usb_reconnect_guard: Could not parse filename.\n");
+		razer_error("razer_usb_reconnect_guard: Could not parse filename.\n");
 		errorcode = -EINVAL;
 		goto reclaim;
 	}
@@ -926,7 +929,7 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard, bool
 		if (timeval_after(&now, &timeout)) {
 			/* Timeout. Hm. It seems the device won't reconnect.
 			 * That's OK. We can reclaim the device now. */
-			dprintf("razer_usb_reconnect_guard: "
+			razer_error("razer_usb_reconnect_guard: "
 				"Didn't disconnect, huh?\n");
 			goto reclaim;
 		}
@@ -950,10 +953,10 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard, bool
 			break;
 		gettimeofday(&now, NULL);
 		if (timeval_after(&now, &timeout)) {
-			fprintf(stderr, "razer_usb_reconnect_guard: The device did not "
+			razer_error("razer_usb_reconnect_guard: The device did not "
 				"reconnect! It might not work anymore. Try to replug it.\n");
-			dprintf("Expected reconnect busid was: %s:%s%03u\n",
-				guard->old_dirname, (hub_reset ? ">=" : ""), reconn_filename);
+			razer_debug("Expected reconnect busid was: %s:>=%03u\n",
+				guard->old_dirname, reconn_filename);
 			errorcode = -EBUSY;
 			goto out;
 		}
@@ -967,7 +970,7 @@ reclaim:
 		/* Reclaim the new device. */
 		res = razer_generic_usb_claim(guard->ctx);
 		if (res) {
-			fprintf(stderr, "razer_usb_reconnect_guard: Reclaim failed.\n");
+			razer_error("razer_usb_reconnect_guard: Reclaim failed.\n");
 			return res;
 		}
 	}
@@ -1026,9 +1029,13 @@ int razer_load_config(const char *path)
 	return 0;
 }
 
-void razer_set_loglevel(enum razer_loglevel loglevel)
+void razer_set_logging(razer_logfunc_t info_callback,
+		       razer_logfunc_t error_callback,
+		       razer_logfunc_t debug_callback)
 {
-	razer_loglevel = loglevel;
+	razer_logfunc_info = info_callback;
+	razer_logfunc_error = error_callback;
+	razer_logfunc_debug = debug_callback;
 }
 
 int razer_string_to_int(const char *string, int *i)

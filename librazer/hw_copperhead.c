@@ -194,7 +194,7 @@ static int copperhead_usb_write_withindex(struct copperhead_private *priv,
 			      (char *)buf, size,
 			      COPPERHEAD_USB_TIMEOUT);
 	if (err != size) {
-		fprintf(stderr, "razer-copperhead: "
+		razer_error("razer-copperhead: "
 			"USB write 0x%02X 0x%02X 0x%02X failed: %d\n",
 			request, command, index, err);
 		return err;
@@ -221,7 +221,7 @@ static int copperhead_usb_read_withindex(struct copperhead_private *priv,
 			      buf, size,
 			      COPPERHEAD_USB_TIMEOUT);
 	if (err != size) {
-		fprintf(stderr, "razer-copperhead: "
+		razer_error("razer-copperhead: "
 			"USB read 0x%02X 0x%02X 0x%02X failed: %d\n",
 			request, command, index, err);
 		return err;
@@ -357,14 +357,12 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 	priv->cur_profile = &priv->profiles[0];
 
 	/* Poke the device */
-printf("Poke dev\n");
 	while (1) {//FIXME timeout
 		err = copperhead_usb_write(priv, USB_REQ_GET_INTERFACE,
 					   0x00, NULL, 0);
 		if (!err)
 			break;
 	}
-printf("Dev poked\n");
 
 	/* Read the current profile number. It's currently unused, though. */
 	err = copperhead_usb_read(priv, USB_REQ_CLEAR_FEATURE,
@@ -378,14 +376,14 @@ printf("Dev poked\n");
 		value = 1;
 		err = copperhead_usb_write_withindex(priv, USB_REQ_SET_CONFIGURATION,
 						     0x02, 0x03, &value, sizeof(value));
-		if (!err)
-			printf("OK\n");
+//		if (!err)
+//			printf("OK\n");
 //			return err;
 		razer_msleep(100);
 		err = copperhead_usb_read(priv, USB_REQ_CLEAR_FEATURE,
 					  0x01, buf, sizeof(buf));
-		if (!err)
-			printf("OK2\n");
+//		if (!err)
+//			printf("OK2\n");
 //			return err;
 		razer_msleep(100);
 	}
@@ -653,7 +651,7 @@ void razer_copperhead_gen_idstr(struct usb_device *udev, char *buf)
 	if (serial_index) {
 		err = razer_generic_usb_claim(&usbctx);
 		if (err) {
-			fprintf(stderr, "Failed to claim device for serial fetching.\n");
+			razer_error("Failed to claim device for serial fetching.\n");
 		} else {
 			err = usb_get_string_simple(usbctx.h, serial_index,
 						    serial, sizeof(serial));
@@ -719,7 +717,7 @@ int razer_copperhead_init_struct(struct razer_mouse *m,
 
 	err = copperhead_claim(m);
 	if (err) {
-		fprintf(stderr, "librazer: hw_copperhead: "
+		razer_error("hw_copperhead: "
 			"Failed to initially claim the device\n");
 		free(priv);
 		return err;
@@ -729,7 +727,7 @@ int razer_copperhead_init_struct(struct razer_mouse *m,
 		err = copperhead_commit(priv);
 	copperhead_release(m);
 	if (err) {
-		fprintf(stderr, "librazer: hw_copperhead: "
+		razer_error("hw_copperhead: "
 			"Failed to read the configuration from hardware\n");
 		free(priv);
 		return err;

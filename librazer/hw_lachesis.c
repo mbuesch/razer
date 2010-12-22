@@ -213,7 +213,7 @@ static int lachesis_usb_write(struct lachesis_private *priv,
 			      LACHESIS_USB_TIMEOUT);
 	if (err != size) {
 		if (!silent) {
-			fprintf(stderr, "librazer: hw_lachesis: usb_write failed (%s)\n",
+			razer_error("hw_lachesis: usb_write failed (%s)\n",
 			usb_strerror());
 		}
 		return err;
@@ -235,7 +235,7 @@ static int lachesis_usb_read_withindex(struct lachesis_private *priv,
 			      LACHESIS_USB_TIMEOUT);
 	if (err != size) {
 		if (!silent) {
-			fprintf(stderr, "librazer: hw_lachesis: usb_read failed (%s)\n",
+			razer_error("hw_lachesis: usb_read failed (%s)\n",
 				usb_strerror());
 		}
 		return err;
@@ -381,7 +381,7 @@ static int lachesis_read_config_from_hw(struct lachesis_private *priv)
 		return err;
 razer_msleep(500);
 
-printf("Read prof\n");
+//printf("Read prof\n");
 	/* Get the current profile number */
 	err = lachesis_usb_read(priv, USB_REQ_CLEAR_FEATURE,
 				0x09, &value, sizeof(value), 1);
@@ -390,20 +390,20 @@ printf("Read prof\n");
 	if (value >= 1 && value <= LACHESIS_NR_PROFILES) {
 		/* Got a valid current profile number. */
 		priv->cur_profile = &priv->profiles[value - 1];
-printf("Read prof conf\n");
+//printf("Read prof conf\n");
 		/* Get the profile configuration */
 		for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
 			err = lachesis_usb_read_withindex(priv, USB_REQ_CLEAR_FEATURE,
 							  0x03, i + 1, &profcfg, sizeof(profcfg), 0);
 			if (err) {
-printf("profcfg %u read err\n", i+1);
+//printf("profcfg %u read err\n", i+1);
 				continue;
 			}
-			printf("Got prof config %u\n", i+1);
+//			printf("Got prof config %u\n", i+1);
 			if (profcfg.dpisel < 1 || profcfg.dpisel > LACHESIS_NR_DPIMAPPINGS)
 				continue;
-			printf("profcfg valid\n");
-printf("Got magic = 0x%04X, prof %u, freq %u\n", profcfg.magic, profcfg.profile, profcfg.freq);
+//			printf("profcfg valid\n");
+//printf("Got magic = 0x%04X, prof %u, freq %u\n", profcfg.magic, profcfg.profile, profcfg.freq);
 			priv->cur_dpimapping[i] = &priv->dpimappings[profcfg.dpisel - 1];
 			switch (profcfg.freq) {
 			case 1:
@@ -416,7 +416,7 @@ printf("Got magic = 0x%04X, prof %u, freq %u\n", profcfg.magic, profcfg.profile,
 				priv->cur_freq[i] = RAZER_MOUSE_FREQ_125HZ;
 				break;
 			default:
-				fprintf(stderr, "librazer: hw_lachesis: "
+				razer_error("hw_lachesis: "
 					"Read invalid frequency value from device (%u)\n",
 					profcfg.freq);
 				return -EINVAL;
@@ -807,7 +807,7 @@ void razer_lachesis_gen_idstr(struct usb_device *udev, char *buf)
 	if (serial_index) {
 		err = razer_generic_usb_claim(&usbctx);
 		if (err) {
-			fprintf(stderr, "Failed to claim device for serial fetching.\n");
+			razer_error("Failed to claim device for serial fetching.\n");
 		} else {
 			err = usb_get_string_simple(usbctx.h, serial_index,
 						    serial, sizeof(serial));
@@ -871,7 +871,7 @@ int razer_lachesis_init_struct(struct razer_mouse *m,
 
 	err = lachesis_claim(m);
 	if (err) {
-		fprintf(stderr, "librazer: hw_lachesis: "
+		razer_error("hw_lachesis: "
 			"Failed to initially claim the device\n");
 		free(priv);
 		return err;
@@ -881,7 +881,7 @@ int razer_lachesis_init_struct(struct razer_mouse *m,
 		err = lachesis_commit(priv);
 	lachesis_release(m);
 	if (err) {
-		fprintf(stderr, "librazer: hw_lachesis: "
+		razer_error("hw_lachesis: "
 			"Failed to read the configuration from hardware\n");
 		free(priv);
 		return err;

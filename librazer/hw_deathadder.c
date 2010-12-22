@@ -86,7 +86,7 @@ static int deathadder_usb_write(struct deathadder_private *priv,
 			      (char *)buf, size,
 			      DEATHADDER_USB_TIMEOUT);
 	if (err != size) {
-		fprintf(stderr, "razer-deathadder: "
+		razer_error("razer-deathadder: "
 			"USB write 0x%02X 0x%02X failed: %d\n",
 			request, command, err);
 		return err;
@@ -112,7 +112,7 @@ static int deathadder_usb_read(struct deathadder_private *priv,
 			      buf, size,
 			      DEATHADDER_USB_TIMEOUT);
 	if (err != size) {
-		fprintf(stderr, "razer-deathadder: "
+		razer_error("razer-deathadder: "
 			"USB read 0x%02X 0x%02X failed: %d\n",
 			request, command, err);
 		return err;
@@ -202,7 +202,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 				razer_msleep(100);
 			}
 			if (i >= 5) {
-				fprintf(stderr, "razer-deathadder: The device didn't wake up "
+				razer_error("razer-deathadder: The device didn't wake up "
 					"after a frequency change. Try to replug it.\n");
 			}
 		}
@@ -319,7 +319,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 			razer_msleep(100);
 		}
 		if (i >= 5) {
-			fprintf(stderr, "razer-deathadder: The device didn't wake up "
+			razer_error("razer-deathadder: The device didn't wake up "
 				"after a config change. Try to replug it.\n");
 		}
 	}
@@ -539,7 +539,7 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 		return -EBUSY;
 
 	if (len != DEATHADDER_FW_IMAGE_SIZE) {
-		fprintf(stderr, "razer-deathadder: "
+		razer_error("razer-deathadder: "
 			"Firmware image has wrong size %u (expected %u).\n",
 			(unsigned int)len,
 			(unsigned int)DEATHADDER_FW_IMAGE_SIZE);
@@ -552,13 +552,13 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 	err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
 				   0x08, &value, sizeof(value));
 	if (err) {
-		fprintf(stderr, "razer-deathadder: Failed to enter the bootloader.\n");
+		razer_error("razer-deathadder: Failed to enter the bootloader.\n");
 		return err;
 	}
 	/* Wait for the cypress device to appear. */
 	cydev = wait_for_usbdev(priv->usb.dev, CYPRESS_BOOT_VENDORID, CYPRESS_BOOT_PRODUCTID);
 	if (!cydev) {
-		fprintf(stderr, "razer-deathadder: Cypress device didn't appear.\n");
+		razer_error("razer-deathadder: Cypress device didn't appear.\n");
 		return -1;
 	}
 	razer_msleep(100);
@@ -650,7 +650,7 @@ static void deathadder_do_gen_idstr(struct usb_device *udev, char *buf,
 		if (!h)
 			err = razer_generic_usb_claim(&usbctx);
 		if (err) {
-			fprintf(stderr, "Failed to claim device for serial fetching.\n");
+			razer_error("Failed to claim device for serial fetching.\n");
 		} else {
 			err = usb_get_string_simple(usbctx.h, serial_index,
 						    serial, sizeof(serial));
@@ -705,7 +705,7 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 	if (!is_cypress_bootloader(priv->usb.dev)) {
 		err = razer_usb_force_reinit(&priv->usb);
 		if (err) {
-			fprintf(stderr, "hw_deathadder: Failed to reinit USB device\n");
+			razer_error("hw_deathadder: Failed to reinit USB device\n");
 			free(priv);
 			return err;
 		}
@@ -714,14 +714,14 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 
 	err = deathadder_claim(m);
 	if (err) {
-		fprintf(stderr, "hw_deathadder: Failed to claim device\n");
+		razer_error("hw_deathadder: Failed to claim device\n");
 		goto err_free;
 	}
 
 	/* Fetch firmware version */
 	fwver = deathadder_read_fw_ver(priv);
 	if (fwver < 0) {
-		fprintf(stderr, "hw_deathadder: Failed to get firmware version\n");
+		razer_error("hw_deathadder: Failed to get firmware version\n");
 		err = fwver;
 		goto err_release;
 	}
@@ -781,7 +781,7 @@ int razer_deathadder_init_struct(struct razer_mouse *m,
 
 	err = deathadder_commit(priv);
 	if (err) {
-		fprintf(stderr, "hw_deathadder: Failed to commit initial settings\n");
+		razer_error("hw_deathadder: Failed to commit initial settings\n");
 		goto err_release;
 	}
 

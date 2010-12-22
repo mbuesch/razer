@@ -386,17 +386,18 @@ int razer_register_event_handler(razer_event_handler_t handler);
 void razer_unregister_event_handler(razer_event_handler_t handler);
 
 /** razer_load_config - Load a configuration file.
+ * If path is NULL, the default config is loaded.
  */
 int razer_load_config(const char *path);
 
-enum razer_loglevel {
-	RAZER_LOG_ERROR,
-	RAZER_LOG_DEBUG,
-};
+typedef void (*razer_logfunc_t)(const char *fmt, ...);
 
-/** razer_set_loglevel - Set a logging level.
+/** razer_set_logging - Set log callbacks.
+ * Callbacks may be NULL to suppress messages.
  */
-void razer_set_loglevel(enum razer_loglevel loglevel);
+void razer_set_logging(razer_logfunc_t info_callback,
+		       razer_logfunc_t error_callback,
+		       razer_logfunc_t debug_callback);
 
 /** razer_init - LibRazer initialization
   * Call this before any other library function.

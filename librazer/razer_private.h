@@ -13,12 +13,20 @@
 
 typedef _Bool bool;
 
-extern enum razer_loglevel razer_loglevel;
 
-#define dprintf(...)	do { \
-		if (razer_loglevel >= RAZER_LOG_DEBUG)			\
-			printf("[librazer debug]: " __VA_ARGS__);	\
+extern razer_logfunc_t razer_logfunc_info;
+extern razer_logfunc_t razer_logfunc_error;
+extern razer_logfunc_t razer_logfunc_debug;
+
+#define call_razer_logfunc(func, ...)	do {		\
+		if (func)				\
+			func("librazer: " __VA_ARGS__);	\
 	} while (0)
+
+#define razer_info(...)		call_razer_logfunc(razer_logfunc_info, __VA_ARGS__)
+#define razer_error(...)	call_razer_logfunc(razer_logfunc_error, __VA_ARGS__)
+#define razer_debug(...)	call_razer_logfunc(razer_logfunc_debug, __VA_ARGS__)
+
 
 #define ARRAY_SIZE(array)	(sizeof(array) / sizeof((array)[0]))
 
