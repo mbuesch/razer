@@ -1080,7 +1080,7 @@ static struct razer_led * razer_mouse_find_led(struct razer_led *leds_list,
 static void command_setled(struct client *client, const struct command *cmd, unsigned int len)
 {
 	struct razer_mouse *mouse;
-	struct razer_led *leds_list, *led;
+	struct razer_led *leds_list = NULL, *led;
 	int err, count;
 	uint32_t errorcode = ERR_NONE;
 
@@ -1116,6 +1116,7 @@ static void command_setled(struct client *client, const struct command *cmd, uns
 	}
 
 error:
+	razer_free_leds(leds_list);
 	send_u32(client, errorcode);
 }
 
