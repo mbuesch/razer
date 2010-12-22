@@ -472,15 +472,15 @@ static int setup_environment(void)
 		logerr("librazer initialization failed. (%d)\n", err);
 		return err;
 	}
+	razer_set_logging(cmdargs.loglevel >= LOGLEVEL_INFO ? loginfo : NULL,
+			  cmdargs.loglevel >= LOGLEVEL_ERROR ? logerr : NULL,
+			  cmdargs.loglevel >= LOGLEVEL_DEBUG ? logdebug : NULL);
 	err = razer_load_config(cmdargs.configfile);
 	if (cmdargs.configfile && err) {
 		logerr("Failed to load config file %s\n",
 			cmdargs.configfile);
 		goto err_exit;
 	}
-	razer_set_logging(cmdargs.loglevel >= LOGLEVEL_INFO ? loginfo : NULL,
-			  cmdargs.loglevel >= LOGLEVEL_ERROR ? logerr : NULL,
-			  cmdargs.loglevel >= LOGLEVEL_DEBUG ? logdebug : NULL);
 	err = setup_var_run();
 	if (err)
 		goto err_exit;
