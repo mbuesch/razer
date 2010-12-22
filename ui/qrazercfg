@@ -273,11 +273,14 @@ class MouseDpiMappingsWidget(QGroupBox):
 		for mapping in self.mappings:
 			mapping.deleteLater()
 		self.mappings = []
+		self.hide()
 
 	def add(self, id, resolution, isMutable):
 		mapping = OneDpiMapping(self, id, resolution, isMutable)
 		self.mappings.append(mapping)
 		self.layout().addWidget(mapping)
+		if isMutable:
+			self.show()
 
 class MouseWidget(QWidget):
 	def __init__(self, parent=None):
