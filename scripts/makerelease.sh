@@ -28,7 +28,7 @@ cd "$release_name"
 echo "git checkout"
 git checkout -f
 
-rm makerelease.sh .gitignore hacking.py
+rm scripts/makerelease.sh .gitignore
 rm -R firmware #XXX Remove it for now...
 
 echo "creating tarball"
