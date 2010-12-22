@@ -301,6 +301,29 @@ static struct razer_mouse_profile * find_prof(struct razer_mouse *m, unsigned in
 	return NULL;
 }
 
+static int parse_int_int_pair(const char *str, int *val0, int *val1)
+{
+	char a[64] = { 0, }, b[64] = { 0, };
+	int err;
+
+	*val0 = *val1 = -1;
+	err = razer_split_pair(str, ':', a, b, min(sizeof(a), sizeof(b)));
+	if (err) {
+		/* It's not a pair. Interpret it as one value. */
+		strncpy(a, str, sizeof(a) - 1);
+		err = razer_string_to_int(razer_string_strip(a), val1);
+		if (err)
+			return -EINVAL;
+		return 1;
+	}
+	err = razer_string_to_int(razer_string_strip(a), val0);
+	err |= razer_string_to_int(razer_string_strip(b), val1);
+	if (err)
+		return -EINVAL;
+
+	return 0;
+}
+
 static bool mouse_apply_one_config(struct config_file *f,
 				   void *context, void *data,
 				   const char *section,
@@ -311,7 +334,7 @@ static bool mouse_apply_one_config(struct config_file *f,
 	struct razer_mouse_profile *prof;
 	bool *error = data;
 	int err, nr;
-	char a[64], b[64];
+	char a[64] = { 0, }, b[64] = { 0, };
 
 	if (strcasecmp(item, "profile") == 0) {
 		int profile;
@@ -331,12 +354,11 @@ static bool mouse_apply_one_config(struct config_file *f,
 		int profile, resolution, i;
 		struct razer_mouse_dpimapping *mappings;
 
-		err = razer_split_pair(value, ':', a, b, min(sizeof(a), sizeof(b)));
-		if (err)
-			goto error;
-		err = razer_string_to_int(razer_string_strip(a), &profile);
-		err |= razer_string_to_int(razer_string_strip(b), &resolution);
-		if (err)
+		err = parse_int_int_pair(value, &profile, &resolution);
+		if (err == 1) {
+			prof = m->get_active_profile(m);
+			profile = prof->nr + 1;
+		} else if (err)
 			goto error;
 		if (profile < 1 || resolution < 1)
 			goto error;
