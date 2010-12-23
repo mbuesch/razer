@@ -141,6 +141,27 @@ struct razer_button {
 	const char *name;
 };
 
+/** enum razer_axis_flags - Usage flags for an axis.
+ * @RAZER_AXIS_INDEPENDENT_DPIMAPPING: Supports independent DPI mappings.
+ */
+enum razer_axis_flags {
+	RAZER_AXIS_INDEPENDENT_DPIMAPPING	= (1 << 0),
+};
+
+/** struct razer_axis - A device axis.
+ *
+ * @id: A unique ID number for this axis.
+ *
+ * @name: A unique and human readable name string for this axis.
+ *
+ * @flags: Usage flags.
+ */
+struct razer_axis {
+	unsigned int id;
+	const char *name;
+	unsigned int flags;
+};
+
 /** struct razer_mouse_dpimapping - Mouse scan resolution mapping.
  *
  * @nr: An ID number. Read only!
@@ -166,8 +187,10 @@ struct razer_mouse_dpimapping {
  * @set_freq: Change the mouse scan frequency.
  *
  * @get_dpimapping: Returns the active scan resolution mapping.
+ *	If axis is NULL, returns the mapping of the first axis.
  *
  * @set_dpimapping: Sets the active scan resolution mapping.
+ *	If axis is NULL, sets the mapping of all axes.
  *
  * @get_button_function: Get the currently assigned function for a button.
  *
@@ -179,8 +202,10 @@ struct razer_mouse_profile {
 	enum razer_mouse_freq (*get_freq)(struct razer_mouse_profile *p);
 	int (*set_freq)(struct razer_mouse_profile *p, enum razer_mouse_freq freq);
 
-	struct razer_mouse_dpimapping * (*get_dpimapping)(struct razer_mouse_profile *p);
+	struct razer_mouse_dpimapping * (*get_dpimapping)(struct razer_mouse_profile *p,
+							  struct razer_axis *axis);
 	int (*set_dpimapping)(struct razer_mouse_profile *p,
+			      struct razer_axis *axis,
 			      struct razer_mouse_dpimapping *d);
 
 	struct razer_button_function * (*get_button_function)(struct razer_mouse_profile *p,
@@ -246,6 +271,10 @@ enum {
   * @set_active_profile: Selects the active profile.
   *	May be NULL, if there's only one profile.
   *
+  * @supported_axes: Returns a list of supported device axes
+  *	for this mouse in res_ptr.
+  *	The return value is a positive list length or a negative error code.
+  *
   * @supported_resolutions: Returns a list of supported scan resolutions
   *	for this mouse in res_ptr.
   *	The return value is a positive list length or a negative error code.
@@ -296,6 +325,8 @@ struct razer_mouse {
 	int (*set_active_profile)(struct razer_mouse *m,
 				  struct razer_mouse_profile *p);
 
+	int (*supported_axes)(struct razer_mouse *m,
+			      struct razer_axis **res_ptr);
 	int (*supported_resolutions)(struct razer_mouse *m,
 				     enum razer_mouse_res **res_ptr);
 	int (*supported_freqs)(struct razer_mouse *m,

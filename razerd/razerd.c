@@ -81,7 +81,7 @@ struct commandline_args {
 #define SOCKPATH		VAR_RUN_RAZERD "/socket"
 #define PRIV_SOCKPATH		VAR_RUN_RAZERD "/socket.privileged"
 
-#define INTERFACE_REVISION	1
+#define INTERFACE_REVISION	2
 
 #define COMMAND_MAX_SIZE	512
 #define COMMAND_HDR_SIZE	sizeof(struct command_hdr)
@@ -111,6 +111,7 @@ enum {
 	COMMAND_ID_SUPPBUTFUNCS,	/* Get a list of supported button functions. */
 	COMMAND_ID_GETBUTFUNC,		/* Get the current function of a button. */
 	COMMAND_ID_SETBUTFUNC,		/* Set the current function of a button. */
+	COMMAND_ID_SUPPAXES,		/* Get a list of supported axes. */
 
 	/* Privileged commands */
 	COMMAND_PRIV_FLASHFW = 128,	/* Upload and flash a firmware image */
@@ -142,6 +143,9 @@ struct command {
 		} _packed getfwver;
 
 		struct {
+		} _packed suppaxes;
+
+		struct {
 		} _packed suppfreqs;
 
 		struct {
@@ -157,10 +161,12 @@ struct command {
 
 		struct {
 			uint32_t profile_id;
+			uint32_t axis_id;
 		} _packed getdpimapping;
 
 		struct {
 			uint32_t profile_id;
+			uint32_t axis_id;
 			uint32_t mapping_id;
 		} _packed setdpimapping;
 
@@ -730,6 +736,25 @@ static struct razer_mouse_profile * find_mouse_profile(struct razer_mouse *mouse
 	return NULL;
 }
 
+static struct razer_axis * find_mouse_axis(struct razer_mouse *mouse,
+					   unsigned int axis_id)
+{
+	struct razer_axis *list;
+	int i, count;
+
+	if (!mouse->supported_axes)
+		return NULL;
+	count = mouse->supported_axes(mouse, &list);
+	if (count <= 0)
+		return NULL;
+	for (i = 0; i < count; i++) {
+		if (list[i].id == axis_id)
+			return &list[i];
+	}
+
+	return NULL;
+}
+
 static struct razer_mouse_dpimapping * find_mouse_dpimapping(struct razer_mouse *mouse,
 							     unsigned int mapping_id)
 {
@@ -968,6 +993,7 @@ static void command_getdpimapping(struct client *client, const struct command *c
 {
 	struct razer_mouse *mouse;
 	struct razer_mouse_profile *profile;
+	struct razer_axis *axis;
 	struct razer_mouse_dpimapping *mapping;
 
 	if (len < CMD_SIZE(getdpimapping))
@@ -978,7 +1004,8 @@ static void command_getdpimapping(struct client *client, const struct command *c
 	profile = find_mouse_profile(mouse, be32_to_cpu(cmd->getdpimapping.profile_id));
 	if (!profile)
 		goto error;
-	mapping = profile->get_dpimapping(profile);
+	axis = find_mouse_axis(mouse, be32_to_cpu(cmd->getdpimapping.axis_id));
+	mapping = profile->get_dpimapping(profile, axis);
 	if (!mapping)
 		goto error;
 
@@ -993,6 +1020,7 @@ static void command_setdpimapping(struct client *client, const struct command *c
 {
 	struct razer_mouse *mouse;
 	struct razer_mouse_profile *profile;
+	struct razer_axis *axis;
 	struct razer_mouse_dpimapping *mapping;
 	uint32_t errorcode = ERR_NONE;
 	int err;
@@ -1011,6 +1039,7 @@ static void command_setdpimapping(struct client *client, const struct command *c
 		errorcode = ERR_FAIL;
 		goto error;
 	}
+	axis = find_mouse_axis(mouse, be32_to_cpu(cmd->setdpimapping.axis_id));
 	mapping = find_mouse_dpimapping(mouse, be32_to_cpu(cmd->setdpimapping.mapping_id));
 	if (!mapping) {
 		errorcode = ERR_FAIL;
@@ -1022,7 +1051,7 @@ static void command_setdpimapping(struct client *client, const struct command *c
 		errorcode = ERR_CLAIM;
 		goto error;
 	}
-	err = profile->set_dpimapping(profile, mapping);
+	err = profile->set_dpimapping(profile, axis, mapping);
 	mouse->release(mouse);
 	if (err) {
 		errorcode = ERR_FAIL;
@@ -1291,7 +1320,6 @@ static void command_suppbutfuncs(struct client *client, const struct command *cm
 	return;
 error:
 	send_u32(client, 0);
-
 }
 
 static void command_getbutfunc(struct client *client, const struct command *cmd, unsigned int len)
@@ -1372,6 +1400,33 @@ static void command_setbutfunc(struct client *client, const struct command *cmd,
 	}
 error:
 	send_u32(client, errorcode);
+}
+
+static void command_suppaxes(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	struct razer_axis *list;
+	int count, i;
+
+	if (len < CMD_SIZE(suppaxes))
+		goto error;
+	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	if (!mouse || !mouse->supported_axes)
+		goto error;
+	count = mouse->supported_axes(mouse, &list);
+	if (count <= 0)
+		goto error;
+
+	send_u32(client, count);
+	for (i = 0; i < count; i++) {
+		send_u32(client, list[i].id);
+		send_string(client, list[i].name);
+		send_u32(client, list[i].flags);
+	}
+
+	return;
+error:
+	send_u32(client, 0);
 }
 
 static void command_flashfw(struct client *client, const struct command *cmd, unsigned int len)
@@ -1545,6 +1600,9 @@ static void handle_received_command(struct client *client, const char *_cmd, uns
 		break;
 	case COMMAND_ID_SETBUTFUNC:
 		command_setbutfunc(client, cmd, len);
+		break;
+	case COMMAND_ID_SUPPAXES:
+		command_suppaxes(client, cmd, len);
 		break;
 	default:
 		/* Unknown command. */

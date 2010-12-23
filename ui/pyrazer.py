@@ -98,7 +98,7 @@ class Razer:
 	SOCKET_PATH	= "/var/run/razerd/socket"
 	PRIVSOCKET_PATH	= "/var/run/razerd/socket.privileged"
 
-	INTERFACE_REVISION = 1
+	INTERFACE_REVISION = 2
 
 	COMMAND_MAX_SIZE = 512
 	COMMAND_HDR_SIZE = 1
@@ -127,6 +127,7 @@ class Razer:
 	COMMAND_ID_SUPPBUTFUNCS = 18	# Get a list of supported button functions.
 	COMMAND_ID_GETBUTFUNC = 19	# Get the current function of a button.
 	COMMAND_ID_SETBUTFUNC = 20	# Set the current function of a button.
+	COMMAND_ID_SUPPAXES = 21	# Get a list of supported axes.
 
 	COMMAND_PRIV_FLASHFW = 128	# Upload and flash a firmware image
 	COMMAND_PRIV_CLAIM = 129	# Claim the device.
@@ -161,6 +162,10 @@ class Razer:
 		ERR_PAYLOAD	: "Payload error",
 		ERR_NOTSUPP	: "Operation not supported",
 	}
+
+	# Axis flags
+	RAZER_AXIS_INDEPENDENT_DPIMAPPING	= (1 << 0)
+
 
 	@staticmethod
 	def strerror(errno):
@@ -384,15 +389,22 @@ class Razer:
 		self.__sendCommand(self.COMMAND_ID_CHANGEDPIMAPPING, idstr, payload)
 		return self.__recvU32()
 
-	def getDpiMapping(self, idstr, profileId):
+	def getDpiMapping(self, idstr, profileId, axisId=None):
 		"Gets the resolution mapping of a profile."
-		payload = razer_int_to_be32(profileId)
+		if axisId is None:
+			axisId = 0xFFFFFFFF
+		payload = razer_int_to_be32(profileId) +\
+			  razer_int_to_be32(axisId)
 		self.__sendCommand(self.COMMAND_ID_GETDPIMAPPING, idstr, payload)
 		return self.__recvU32()
 
-	def setDpiMapping(self, idstr, profileId, mappingId):
+	def setDpiMapping(self, idstr, profileId, mappingId, axisId=None):
 		"Sets the resolution mapping of a profile."
-		payload = razer_int_to_be32(profileId) + razer_int_to_be32(mappingId)
+		if axisId is None:
+			axisId = 0xFFFFFFFF
+		payload = razer_int_to_be32(profileId) +\
+			  razer_int_to_be32(axisId) +\
+			  razer_int_to_be32(mappingId)
 		self.__sendCommand(self.COMMAND_ID_SETDPIMAPPING, idstr, payload)
 		return self.__recvU32()
 
@@ -460,6 +472,18 @@ class Razer:
 			  razer_int_to_be32(functionId)
 		self.__sendCommand(self.COMMAND_ID_SETBUTFUNC, idstr, payload)
 		return self.__recvU32()
+
+	def getSupportedAxes(self, idstr):
+		"Get a list of axes on the device. Each entry is a tuple (id, name, flags)."
+		self.__sendCommand(self.COMMAND_ID_SUPPAXES, idstr)
+		axes = []
+		count = self.__recvU32()
+		for i in range(0, count):
+			id = self.__recvU32()
+			name = self.__recvString()
+			flags = self.__recvU32()
+			axes.append( (id, name, flags) )
+		return axes
 
 class IHEXParser:
 	TYPE_DATA = 0

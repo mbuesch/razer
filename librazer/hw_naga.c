@@ -401,7 +401,7 @@ static struct razer_mouse_profile * naga_get_active_profile(struct razer_mouse *
 }
 
 static int naga_supported_dpimappings(struct razer_mouse *m,
-					    struct razer_mouse_dpimapping **res_ptr)
+				      struct razer_mouse_dpimapping **res_ptr)
 {
 	struct naga_private *priv = m->internal;
 
@@ -410,7 +410,8 @@ static int naga_supported_dpimappings(struct razer_mouse *m,
 	return ARRAY_SIZE(priv->dpimapping);
 }
 
-static struct razer_mouse_dpimapping * naga_get_dpimapping(struct razer_mouse_profile *p)
+static struct razer_mouse_dpimapping * naga_get_dpimapping(struct razer_mouse_profile *p,
+							   struct razer_axis *axis)
 {
 	struct naga_private *priv = p->mouse->internal;
 
@@ -418,7 +419,8 @@ static struct razer_mouse_dpimapping * naga_get_dpimapping(struct razer_mouse_pr
 }
 
 static int naga_set_dpimapping(struct razer_mouse_profile *p,
-				     struct razer_mouse_dpimapping *d)
+			       struct razer_axis *axis,
+			       struct razer_mouse_dpimapping *d)
 {
 	struct naga_private *priv = p->mouse->internal;
 	struct razer_mouse_dpimapping *oldmapping;

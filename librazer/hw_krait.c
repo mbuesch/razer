@@ -139,7 +139,8 @@ static int krait_supported_dpimappings(struct razer_mouse *m,
 	return ARRAY_SIZE(priv->dpimapping);
 }
 
-static struct razer_mouse_dpimapping * krait_get_dpimapping(struct razer_mouse_profile *p)
+static struct razer_mouse_dpimapping * krait_get_dpimapping(struct razer_mouse_profile *p,
+							    struct razer_axis *axis)
 {
 	struct krait_private *priv = p->mouse->internal;
 
@@ -147,6 +148,7 @@ static struct razer_mouse_dpimapping * krait_get_dpimapping(struct razer_mouse_p
 }
 
 static int krait_set_dpimapping(struct razer_mouse_profile *p,
+				struct razer_axis *axis,
 				struct razer_mouse_dpimapping *d)
 {
 	struct krait_private *priv = p->mouse->internal;

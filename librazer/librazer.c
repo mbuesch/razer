@@ -376,7 +376,7 @@ static bool mouse_apply_one_config(struct config_file *f,
 				if (mappings[i].nr != resolution)
 					continue;
 			}
-			err = prof->set_dpimapping(prof, &mappings[i]);
+			err = prof->set_dpimapping(prof, NULL, &mappings[i]);
 			if (err)
 				goto error;
 			goto ok;

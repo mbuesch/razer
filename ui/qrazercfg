@@ -147,26 +147,34 @@ class MouseProfileWidget(QWidget):
 		self.recurseProtect = False
 
 		self.setLayout(QGridLayout(self))
+		yoff = 0
 
 		self.profileActive = QRadioButton(self.tr("Profile active"), self)
 		self.connect(self.profileActive, SIGNAL("toggled(bool)"), self.activeChanged)
-		self.layout().addWidget(self.profileActive, 0, 0)
+		self.layout().addWidget(self.profileActive, 0 + yoff, 0)
 
-		self.layout().addWidget(QLabel(self.tr("Mouse scan frequency:"), self), 1, 0)
+		self.layout().addWidget(QLabel(self.tr("Mouse scan frequency:"), self), 1 + yoff, 0)
 		self.freqSel = QComboBox(self)
 		self.connect(self.freqSel, SIGNAL("currentIndexChanged(int)"), self.freqChanged)
-		self.layout().addWidget(self.freqSel, 1, 1)
+		self.layout().addWidget(self.freqSel, 1 + yoff, 1)
 
-		self.layout().addWidget(QLabel(self.tr("Mouse scan resolution:"), self), 2, 0)
-		self.resSel = QComboBox(self)
-		self.connect(self.resSel, SIGNAL("currentIndexChanged(int)"), self.resChanged)
-		self.layout().addWidget(self.resSel, 2, 1)
+		axes = razer.getSupportedAxes(mouseWidget.mouse)
+		axes = filter(lambda axis: (axis[2] & Razer.RAZER_AXIS_INDEPENDENT_DPIMAPPING),
+			      axes)
+		if not axes:
+			axes = [ (0, self.tr("All axes"), 0) ]
+		for axis in axes:
+			self.layout().addWidget(QLabel(self.tr("%s scan resolution:" % axis[1]), self), 2 + yoff, 0)
+			self.resSel = QComboBox(self)#FIXME
+			self.connect(self.resSel, SIGNAL("currentIndexChanged(int)"), self.resChanged)
+			self.layout().addWidget(self.resSel, 2 + yoff, 1)
+			yoff += 1
 
 		funcs = razer.getSupportedButtonFunctions(self.mouseWidget.mouse)
 		if funcs:
 			self.buttonConf = QPushButton(self.tr("Configure buttons"), self)
 			self.connect(self.buttonConf, SIGNAL("clicked(bool)"), self.showButtonConf)
-			self.layout().addWidget(self.buttonConf, 3, 0, 1, 2)
+			self.layout().addWidget(self.buttonConf, 2 + yoff, 0, 1, 2)
 
 	def reload(self):
 		# Refetch the data from the daemon

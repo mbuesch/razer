@@ -602,7 +602,8 @@ static int deathadder_supported_dpimappings(struct razer_mouse *m,
 	return ARRAY_SIZE(priv->dpimapping) - 1;
 }
 
-static struct razer_mouse_dpimapping * deathadder_get_dpimapping(struct razer_mouse_profile *p)
+static struct razer_mouse_dpimapping * deathadder_get_dpimapping(struct razer_mouse_profile *p,
+								 struct razer_axis *axis)
 {
 	struct deathadder_private *priv = p->mouse->internal;
 
@@ -610,6 +611,7 @@ static struct razer_mouse_dpimapping * deathadder_get_dpimapping(struct razer_mo
 }
 
 static int deathadder_set_dpimapping(struct razer_mouse_profile *p,
+				     struct razer_axis *axis,
 				     struct razer_mouse_dpimapping *d)
 {
 	struct deathadder_private *priv = p->mouse->internal;

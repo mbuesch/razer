@@ -38,6 +38,7 @@ enum { /* LED IDs */
 enum { /* Misc constants */
 	LACHESIS_NR_PROFILES	= 5,
 	LACHESIS_NR_DPIMAPPINGS	= 5,
+	LACHESIS_NR_AXES	= 3,
 };
 
 /* The wire protocol data structures... */
@@ -131,6 +132,9 @@ struct lachesis_private {
 	struct razer_mouse_profile *cur_profile;
 	/* Profile configuration (one per profile). */
 	struct razer_mouse_profile profiles[LACHESIS_NR_PROFILES];
+
+	/* Supported mouse axes */
+	struct razer_axis axes[LACHESIS_NR_AXES];
 
 	/* The active DPI mapping; per profile. */
 	struct razer_mouse_dpimapping *cur_dpimapping[LACHESIS_NR_PROFILES];
@@ -547,6 +551,16 @@ static int lachesis_get_leds(struct razer_mouse *m,
 	return LACHESIS_NR_LEDS;
 }
 
+static int lachesis_supported_axes(struct razer_mouse *m,
+				   struct razer_axis **axes_list)
+{
+	struct lachesis_private *priv = m->internal;
+
+	*axes_list = priv->axes;
+
+	return ARRAY_SIZE(priv->axes);
+}
+
 static int lachesis_supported_freqs(struct razer_mouse *m,
 				    enum razer_mouse_freq **freq_list)
 {
@@ -668,7 +682,8 @@ static int lachesis_supported_dpimappings(struct razer_mouse *m,
 	return ARRAY_SIZE(priv->dpimappings);
 }
 
-static struct razer_mouse_dpimapping * lachesis_get_dpimapping(struct razer_mouse_profile *p)
+static struct razer_mouse_dpimapping * lachesis_get_dpimapping(struct razer_mouse_profile *p,
+							       struct razer_axis *axis)
 {
 	struct lachesis_private *priv = p->mouse->internal;
 
@@ -679,6 +694,7 @@ static struct razer_mouse_dpimapping * lachesis_get_dpimapping(struct razer_mous
 }
 
 static int lachesis_set_dpimapping(struct razer_mouse_profile *p,
+				   struct razer_axis *axis,
 				   struct razer_mouse_dpimapping *d)
 {
 	struct lachesis_private *priv = p->mouse->internal;
@@ -862,6 +878,22 @@ int razer_lachesis_init_struct(struct razer_mouse *m,
 		priv->profiles[i].set_button_function = lachesis_set_button_function;
 		priv->profiles[i].mouse = m;
 	}
+	for (i = 0; i < LACHESIS_NR_AXES; i++) {
+		priv->axes[i].id = i;
+		switch (i) {
+		case 0: /* X */
+			priv->axes[i].flags |= RAZER_AXIS_INDEPENDENT_DPIMAPPING;
+			priv->axes[i].name = "X";
+			break;
+		case 1: /* Y */
+			priv->axes[i].flags |= RAZER_AXIS_INDEPENDENT_DPIMAPPING;
+			priv->axes[i].name = "Y";
+			break;
+		case 2: /* Scrollwheel */
+			priv->axes[i].name = "Scroll";
+			break;
+		}
+	}
 	for (i = 0; i < LACHESIS_NR_DPIMAPPINGS; i++) {
 		priv->dpimappings[i].nr = i;
 		priv->dpimappings[i].res = RAZER_MOUSE_RES_UNKNOWN;
@@ -898,6 +930,7 @@ int razer_lachesis_init_struct(struct razer_mouse *m,
 	m->get_profiles = lachesis_get_profiles;
 	m->get_active_profile = lachesis_get_active_profile;
 	m->set_active_profile = lachesis_set_active_profile;
+	m->supported_axes = lachesis_supported_axes;
 	m->supported_resolutions = lachesis_supported_resolutions;
 	m->supported_freqs = lachesis_supported_freqs;
 	m->supported_dpimappings = lachesis_supported_dpimappings;

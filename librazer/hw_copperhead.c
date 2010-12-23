@@ -536,7 +536,8 @@ static int copperhead_supported_dpimappings(struct razer_mouse *m,
 	return ARRAY_SIZE(priv->dpimappings);
 }
 
-static struct razer_mouse_dpimapping * copperhead_get_dpimapping(struct razer_mouse_profile *p)
+static struct razer_mouse_dpimapping * copperhead_get_dpimapping(struct razer_mouse_profile *p,
+								 struct razer_axis *axis)
 {
 	struct copperhead_private *priv = p->mouse->internal;
 
@@ -547,6 +548,7 @@ static struct razer_mouse_dpimapping * copperhead_get_dpimapping(struct razer_mo
 }
 
 static int copperhead_set_dpimapping(struct razer_mouse_profile *p,
+				     struct razer_axis *axis,
 				     struct razer_mouse_dpimapping *d)
 {
 	struct copperhead_private *priv = p->mouse->internal;
