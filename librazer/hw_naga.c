@@ -141,33 +141,35 @@ static int naga_read_fw_ver(struct naga_private *priv)
 static int naga_commit(struct naga_private *priv)
 {
 	struct naga_command cmd;
-	unsigned int xres, yres;
+	unsigned int xres, yres, freq;
 	int err;
 
-	/* Translate frequency setting. */
+	/* Set scan frequency. */
 	switch (priv->frequency) {
 	case RAZER_MOUSE_FREQ_125HZ:
-		//TODO
+		freq = 8;
 		break;
 	case RAZER_MOUSE_FREQ_500HZ:
-		//TODO
+		freq = 2;
 		break;
 	case RAZER_MOUSE_FREQ_1000HZ:
 	case RAZER_MOUSE_FREQ_UNKNOWN:
-		//TODO
+		freq = 1;
 		break;
 	default:
 		return -EINVAL;
 	}
-
-/*TODO
-[0000]:  2109 0003 0000 5A00 0000 0000 0001 0005  |!.....Z.........|
-[0010]:  0100 0000 0000 0000 0000 0000 0000 0000  |................|
-         ^^
-01 => 1000Hz
-02 => 500Hz
-08 => 125Hz
-*/
+	memset(&cmd, 0, sizeof(cmd));
+	cmd.command = cpu_to_le16(0x0100);
+	cmd.request = cpu_to_le16(0x0500);
+	cmd.value0 = cpu_to_le16(freq);
+	cmd.checksum = razer_xor8_checksum(&cmd, sizeof(cmd) - 2);
+	err = naga_usb_write(priv, USB_REQ_SET_CONFIGURATION, 0x300,
+			     &cmd, sizeof(cmd));
+	err |= naga_usb_read(priv, USB_REQ_CLEAR_FEATURE, 0x300,
+			     &cmd, sizeof(cmd));
+	if (err)
+		return -ENODEV;
 
 	/* Set the scroll wheel and buttons LEDs. */
 	memset(&cmd, 0, sizeof(cmd));
