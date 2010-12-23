@@ -41,7 +41,8 @@ enum { /* Misc constants */
 };
 
 struct naga_command {
-	uint8_t padding0[4];
+	le16_t status;
+	uint8_t padding0[2];
 	le16_t command;
 	le16_t request;
 	le16_t value0;
@@ -124,6 +125,14 @@ static int naga_send_command(struct naga_private *priv,
 			    cmd, sizeof(*cmd));
 	if (err)
 		return err;
+	if (cmd->status != cpu_to_le16(2) &&
+	    cmd->status != cpu_to_le16(1)) {
+		razer_error("razer-naga: Command %04X/%04X failed with %04X\n",
+			    le16_to_cpu(cmd->command),
+			    le16_to_cpu(cmd->request),
+			    le16_to_cpu(cmd->status));
+//		return -EBUSY;
+	}
 
 	return 0;
 }
@@ -158,25 +167,13 @@ static int naga_commit(struct naga_private *priv)
 	unsigned int xres, yres, freq;
 	int err;
 
-	/* Set scan frequency. */
-	switch (priv->frequency) {
-	case RAZER_MOUSE_FREQ_125HZ:
-		freq = 8;
-		break;
-	case RAZER_MOUSE_FREQ_500HZ:
-		freq = 2;
-		break;
-	case RAZER_MOUSE_FREQ_1000HZ:
-	case RAZER_MOUSE_FREQ_UNKNOWN:
-		freq = 1;
-		break;
-	default:
-		return -EINVAL;
-	}
+	/* Set the resolution. */
 	memset(&cmd, 0, sizeof(cmd));
-	cmd.command = cpu_to_le16(0x0100);
-	cmd.request = cpu_to_le16(0x0500);
-	cmd.value0 = cpu_to_le16(freq);
+	cmd.command = cpu_to_le16(0x0300);
+	cmd.request = cpu_to_le16(0x0104);
+	xres = ((priv->cur_dpimapping->res / 100) - 1) * 4;
+	yres = ((priv->cur_dpimapping->res / 100) - 1) * 4;
+	cmd.value0 = cpu_to_le16(xres | (yres << 8));
 	err = naga_send_command(priv, &cmd);
 	if (err)
 		return err;
@@ -203,13 +200,25 @@ static int naga_commit(struct naga_private *priv)
 	if (err)
 		return err;
 
-	/* Set the resolution. */
+	/* Set scan frequency. */
+	switch (priv->frequency) {
+	case RAZER_MOUSE_FREQ_125HZ:
+		freq = 8;
+		break;
+	case RAZER_MOUSE_FREQ_500HZ:
+		freq = 2;
+		break;
+	case RAZER_MOUSE_FREQ_1000HZ:
+	case RAZER_MOUSE_FREQ_UNKNOWN:
+		freq = 1;
+		break;
+	default:
+		return -EINVAL;
+	}
 	memset(&cmd, 0, sizeof(cmd));
-	cmd.command = cpu_to_le16(0x0300);
-	cmd.request = cpu_to_le16(0x0104);
-	xres = ((priv->cur_dpimapping->res / 100) - 1) * 4;
-	yres = ((priv->cur_dpimapping->res / 100) - 1) * 4;
-	cmd.value0 = cpu_to_le16(xres | (yres << 8));
+	cmd.command = cpu_to_le16(0x0100);
+	cmd.request = cpu_to_le16(0x0500);
+	cmd.value0 = cpu_to_le16(freq);
 	err = naga_send_command(priv, &cmd);
 	if (err)
 		return err;
