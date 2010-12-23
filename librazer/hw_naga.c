@@ -110,6 +110,24 @@ static int naga_usb_read(struct naga_private *priv,
 	return 0;
 }
 
+static int naga_send_command(struct naga_private *priv,
+			     struct naga_command *cmd)
+{
+	int err;
+
+	cmd->checksum = razer_xor8_checksum(cmd, sizeof(*cmd) - 2);
+	err = naga_usb_write(priv, USB_REQ_SET_CONFIGURATION, 0x300,
+			     cmd, sizeof(*cmd));
+	if (err)
+		return err;
+	err = naga_usb_read(priv, USB_REQ_CLEAR_FEATURE, 0x300,
+			    cmd, sizeof(*cmd));
+	if (err)
+		return err;
+
+	return 0;
+}
+
 static int naga_read_fw_ver(struct naga_private *priv)
 {
 	struct naga_command cmd;
@@ -123,11 +141,7 @@ static int naga_read_fw_ver(struct naga_private *priv)
 		memset(&cmd, 0, sizeof(cmd));
 		cmd.command = cpu_to_le16(0x0200);
 		cmd.request = cpu_to_le16(0x8100);
-		cmd.checksum = razer_xor8_checksum(&cmd, sizeof(cmd) - 2);
-		err = naga_usb_write(priv, USB_REQ_SET_CONFIGURATION, 0x300,
-				     &cmd, sizeof(cmd));
-		err |= naga_usb_read(priv, USB_REQ_CLEAR_FEATURE, 0x300,
-				     &cmd, sizeof(cmd));
+		err = naga_send_command(priv, &cmd);
 		ver = be16_to_cpu((be16_t)cmd.value0);
 		if (!err && (ver & 0xFF00) != 0)
 			return ver;
@@ -163,13 +177,9 @@ static int naga_commit(struct naga_private *priv)
 	cmd.command = cpu_to_le16(0x0100);
 	cmd.request = cpu_to_le16(0x0500);
 	cmd.value0 = cpu_to_le16(freq);
-	cmd.checksum = razer_xor8_checksum(&cmd, sizeof(cmd) - 2);
-	err = naga_usb_write(priv, USB_REQ_SET_CONFIGURATION, 0x300,
-			     &cmd, sizeof(cmd));
-	err |= naga_usb_read(priv, USB_REQ_CLEAR_FEATURE, 0x300,
-			     &cmd, sizeof(cmd));
+	err = naga_send_command(priv, &cmd);
 	if (err)
-		return -ENODEV;
+		return err;
 
 	/* Set the scroll wheel and buttons LEDs. */
 	memset(&cmd, 0, sizeof(cmd));
@@ -178,13 +188,9 @@ static int naga_commit(struct naga_private *priv)
 	cmd.value0 = cpu_to_le16(0x0101);
 	if (priv->led_states[NAGA_LED_SCROLL])
 		cmd.value1 = cpu_to_le16(1);
-	cmd.checksum = razer_xor8_checksum(&cmd, sizeof(cmd) - 2);
-	err = naga_usb_write(priv, USB_REQ_SET_CONFIGURATION, 0x300,
-			     &cmd, sizeof(cmd));
-	err |= naga_usb_read(priv, USB_REQ_CLEAR_FEATURE, 0x300,
-			     &cmd, sizeof(cmd));
+	err = naga_send_command(priv, &cmd);
 	if (err)
-		return -ENODEV;
+		return err;
 
 	/* Set the logo LED. */
 	memset(&cmd, 0, sizeof(cmd));
@@ -193,28 +199,20 @@ static int naga_commit(struct naga_private *priv)
 	cmd.value0 = cpu_to_le16(0x0401);
 	if (priv->led_states[NAGA_LED_LOGO])
 		cmd.value1 = cpu_to_le16(1);
-	cmd.checksum = razer_xor8_checksum(&cmd, sizeof(cmd) - 2);
-	err = naga_usb_write(priv, USB_REQ_SET_CONFIGURATION, 0x300,
-			     &cmd, sizeof(cmd));
-	err |= naga_usb_read(priv, USB_REQ_CLEAR_FEATURE, 0x300,
-			     &cmd, sizeof(cmd));
+	err = naga_send_command(priv, &cmd);
 	if (err)
-		return -ENODEV;
+		return err;
 
-	/* set the resolution */
+	/* Set the resolution. */
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.command = cpu_to_le16(0x0300);
 	cmd.request = cpu_to_le16(0x0104);
 	xres = ((priv->cur_dpimapping->res / 100) - 1) * 4;
 	yres = ((priv->cur_dpimapping->res / 100) - 1) * 4;
 	cmd.value0 = cpu_to_le16(xres | (yres << 8));
-	cmd.checksum = razer_xor8_checksum(&cmd, sizeof(cmd) - 2);
-	err = naga_usb_write(priv, USB_REQ_SET_CONFIGURATION, 0x300,
-			     &cmd, sizeof(cmd));
-	err |= naga_usb_read(priv, USB_REQ_CLEAR_FEATURE, 0x300,
-			     &cmd, sizeof(cmd));
+	err = naga_send_command(priv, &cmd);
 	if (err)
-		return -ENODEV;
+		return err;
 
 	return 0;
 }
