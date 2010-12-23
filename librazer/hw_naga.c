@@ -40,6 +40,17 @@ enum { /* Misc constants */
 	NAGA_NR_DPIMAPPINGS	= 56,
 };
 
+struct naga_command {
+	uint8_t padding0[4];
+	le16_t command;
+	le16_t request;
+	le16_t value0;
+	le16_t value1;
+	uint8_t padding1[76];
+	uint8_t checksum;
+	uint8_t padding2;
+} __attribute__((__packed__));
+
 struct naga_private {
 	unsigned int claimed;
 	/* Firmware version number. */
@@ -101,7 +112,7 @@ static int naga_usb_read(struct naga_private *priv,
 
 static int naga_read_fw_ver(struct naga_private *priv)
 {
-	char buf[90];
+	struct naga_command cmd;
 	uint16_t ver;
 	int err;
 	unsigned int i;
@@ -109,20 +120,17 @@ static int naga_read_fw_ver(struct naga_private *priv)
 	/* Poke the device several times until it responds with a
 	 * valid version number */
 	for (i = 0; i < 5; i++) {
-		memset(buf, 0, sizeof(buf));
-		buf[5] = 0x02;
-		buf[7] = 0x81;
-		buf[88] = razer_xor8_checksum(buf, 88);
+		memset(&cmd, 0, sizeof(cmd));
+		cmd.command = cpu_to_le16(0x0200);
+		cmd.request = cpu_to_le16(0x8100);
+		cmd.checksum = razer_xor8_checksum(&cmd, sizeof(cmd) - 2);
 		err = naga_usb_write(priv, USB_REQ_SET_CONFIGURATION, 0x300,
-				     buf, sizeof(buf));
+				     &cmd, sizeof(cmd));
 		err |= naga_usb_read(priv, USB_REQ_CLEAR_FEATURE, 0x300,
-				     buf, sizeof(buf));
-		if (!err && buf[8] != 0) {
-			ver = buf[8];
-			ver <<= 8;
-			ver |= buf[9];
+				     &cmd, sizeof(cmd));
+		ver = be16_to_cpu((be16_t)cmd.value0);
+		if (!err && (ver & 0xFF00) != 0)
 			return ver;
-		}
 		razer_msleep(100);
 	}
 	razer_error("razer-naga: Failed to read firmware version\n");
@@ -132,8 +140,9 @@ static int naga_read_fw_ver(struct naga_private *priv)
 
 static int naga_commit(struct naga_private *priv)
 {
+	struct naga_command cmd;
+	unsigned int xres, yres;
 	int err;
-	char buf[90];
 
 	/* Translate frequency setting. */
 	switch (priv->frequency) {
@@ -160,53 +169,48 @@ static int naga_commit(struct naga_private *priv)
 08 => 125Hz
 */
 
-	/* set the scroll wheel and buttons */
-	memset(buf, 0, sizeof(buf));
-	buf[5] = 0x03;
-	buf[6] = 0x03;
-	buf[8] = 0x01;
-	buf[9] = 0x01;
+	/* Set the scroll wheel and buttons LEDs. */
+	memset(&cmd, 0, sizeof(cmd));
+	cmd.command = cpu_to_le16(0x0300);
+	cmd.request = cpu_to_le16(0x0003);
+	cmd.value0 = cpu_to_le16(0x0101);
 	if (priv->led_states[NAGA_LED_SCROLL])
-		buf[10] = 0x01;
-	buf[88] = razer_xor8_checksum(buf, 88);
+		cmd.value1 = cpu_to_le16(1);
+	cmd.checksum = razer_xor8_checksum(&cmd, sizeof(cmd) - 2);
 	err = naga_usb_write(priv, USB_REQ_SET_CONFIGURATION, 0x300,
-			     buf, sizeof(buf));
+			     &cmd, sizeof(cmd));
 	err |= naga_usb_read(priv, USB_REQ_CLEAR_FEATURE, 0x300,
-			     buf, sizeof(buf));
+			     &cmd, sizeof(cmd));
 	if (err)
 		return -ENODEV;
 
-	/* now the logo */
-	memset(buf, 0, sizeof(buf));
-	buf[5] = 0x03;
-	buf[6] = 0x03;
-	buf[8] = 0x01;
-	buf[9] = 0x04;
+	/* Set the logo LED. */
+	memset(&cmd, 0, sizeof(cmd));
+	cmd.command = cpu_to_le16(0x0300);
+	cmd.request = cpu_to_le16(0x0003);
+	cmd.value0 = cpu_to_le16(0x0401);
 	if (priv->led_states[NAGA_LED_LOGO])
-		buf[10] = 0x01;
-	buf[88] = razer_xor8_checksum(buf, 88);
+		cmd.value1 = cpu_to_le16(1);
+	cmd.checksum = razer_xor8_checksum(&cmd, sizeof(cmd) - 2);
 	err = naga_usb_write(priv, USB_REQ_SET_CONFIGURATION, 0x300,
-			     buf, sizeof(buf));
+			     &cmd, sizeof(cmd));
 	err |= naga_usb_read(priv, USB_REQ_CLEAR_FEATURE, 0x300,
-			     buf, sizeof(buf));
+			     &cmd, sizeof(cmd));
 	if (err)
 		return -ENODEV;
 
 	/* set the resolution */
-	int res = (priv->cur_dpimapping->res / 100) - 1;
-	res <<= 2;
-
-	memset(buf, 0, sizeof(buf));
-	buf[5] = 0x03;
-	buf[6] = 0x04;
-	buf[7] = 0x01;
-	buf[8] = res; /* X */
-	buf[9] = res; /* Y */
-	buf[88] = razer_xor8_checksum(buf, 88);
+	memset(&cmd, 0, sizeof(cmd));
+	cmd.command = cpu_to_le16(0x0300);
+	cmd.request = cpu_to_le16(0x0104);
+	xres = ((priv->cur_dpimapping->res / 100) - 1) * 4;
+	yres = ((priv->cur_dpimapping->res / 100) - 1) * 4;
+	cmd.value0 = cpu_to_le16(xres | (yres << 8));
+	cmd.checksum = razer_xor8_checksum(&cmd, sizeof(cmd) - 2);
 	err = naga_usb_write(priv, USB_REQ_SET_CONFIGURATION, 0x300,
-			     buf, sizeof(buf));
+			     &cmd, sizeof(cmd));
 	err |= naga_usb_read(priv, USB_REQ_CLEAR_FEATURE, 0x300,
-			     buf, sizeof(buf));
+			     &cmd, sizeof(cmd));
 	if (err)
 		return -ENODEV;
 
@@ -486,6 +490,8 @@ int razer_naga_init_struct(struct razer_mouse *m,
 	struct naga_private *priv;
 	unsigned int i;
 	int fwver, err;
+
+	BUILD_BUG_ON(sizeof(struct naga_command) != 90);
 
 	priv = zalloc(sizeof(struct naga_private));
 	if (!priv)
