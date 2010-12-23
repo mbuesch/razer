@@ -387,6 +387,8 @@ void razer_unregister_event_handler(razer_event_handler_t handler);
 
 /** razer_load_config - Load a configuration file.
  * If path is NULL, the default config is loaded.
+ * If path is an empty string, the current config (if any) will be
+ * discarded and no config will be loaded.
  */
 int razer_load_config(const char *path);
 

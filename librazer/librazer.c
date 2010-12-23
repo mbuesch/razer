@@ -922,16 +922,18 @@ out:
 
 int razer_load_config(const char *path)
 {
-	struct config_file *conf;
+	struct config_file *conf = NULL;
 
-	if (!path)
-		path = RAZER_DEFAULT_CONFIG;
 	if (!librazer_initialized)
 		return -EINVAL;
 
-	conf = config_file_parse(path);
-	if (!conf)
-		return -ENOENT;
+	if (!path)
+		path = RAZER_DEFAULT_CONFIG;
+	if (strlen(path)) {
+		conf = config_file_parse(path);
+		if (!conf)
+			return -ENOENT;
+	}
 	config_file_free(razer_config_file);
 	razer_config_file = conf;
 
