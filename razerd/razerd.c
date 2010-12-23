@@ -52,6 +52,8 @@ typedef _Bool bool;
 				   __typeof__(y) __y = (y); \
 				   __x > __y ? __x : __y; })
 
+#define _packed			__attribute__((__packed__))
+
 enum {
 	LOGLEVEL_ERROR = 0,
 	LOGLEVEL_WARNING,
@@ -130,94 +132,94 @@ enum {
 
 struct command_hdr {
 	uint8_t id;
-} __attribute__((packed));
+} _packed;
 
 struct command {
 	struct command_hdr hdr;
 	char idstr[RAZER_IDSTR_MAX_SIZE];
 	union {
 		struct {
-		} __attribute__((packed)) getfwver;
+		} _packed getfwver;
 
 		struct {
-		} __attribute__((packed)) suppfreqs;
+		} _packed suppfreqs;
 
 		struct {
-		} __attribute__((packed)) suppresol;
+		} _packed suppresol;
 
 		struct {
-		} __attribute__((packed)) suppdpimappings;
+		} _packed suppdpimappings;
 
 		struct {
 			uint32_t id;
 			uint32_t new_resolution;
-		} __attribute__((packed)) changedpimapping;
+		} _packed changedpimapping;
 
 		struct {
 			uint32_t profile_id;
-		} __attribute__((packed)) getdpimapping;
+		} _packed getdpimapping;
 
 		struct {
 			uint32_t profile_id;
 			uint32_t mapping_id;
-		} __attribute__((packed)) setdpimapping;
+		} _packed setdpimapping;
 
 		struct {
-		} __attribute__((packed)) getleds;
+		} _packed getleds;
 
 		struct {
 			char led_name[RAZER_LEDNAME_MAX_SIZE];
 			uint8_t new_state;
-		} __attribute__((packed)) setled;
+		} _packed setled;
 
 		struct {
 			uint32_t profile_id;
 			uint32_t new_frequency;
-		} __attribute__((packed)) setfreq;
+		} _packed setfreq;
 
 		struct {
-		} __attribute__((packed)) getprofiles;
+		} _packed getprofiles;
 
 		struct {
-		} __attribute__((packed)) getactiveprof;
+		} _packed getactiveprof;
 
 		struct {
 			uint32_t id;
-		} __attribute__((packed)) setactiveprof;
+		} _packed setactiveprof;
 
 		struct {
 			uint32_t profile_id;
-		} __attribute__((packed)) getfreq;
+		} _packed getfreq;
 
 		struct {
-		} __attribute__((packed)) suppbuttons;
+		} _packed suppbuttons;
 
 		struct {
-		} __attribute__((packed)) suppbutfuncs;
+		} _packed suppbutfuncs;
 
 		struct {
 			uint32_t profile_id;
 			uint32_t button_id;
-		} __attribute__((packed)) getbutfunc;
+		} _packed getbutfunc;
 
 		struct {
 			uint32_t profile_id;
 			uint32_t button_id;
 			uint32_t function_id;
-		} __attribute__((packed)) setbutfunc;
+		} _packed setbutfunc;
 
 		struct {
 			uint32_t imagesize;
-		} __attribute__((packed)) flashfw;
+		} _packed flashfw;
 
 		struct {
-		} __attribute__((packed)) claim;
+		} _packed claim;
 
 		struct {
-		} __attribute__((packed)) release;
+		} _packed release;
 
-	} __attribute__((packed));
-} __attribute__((packed));
+	} _packed;
+} _packed;
 
 #define CMD_SIZE(name)	(offsetof(struct command, name) + \
 			 sizeof(((struct command *)0)->name))
@@ -233,25 +235,25 @@ enum {
 
 struct reply_hdr {
 	uint8_t id;
-} __attribute__((packed));
+} _packed;
 
 struct reply {
 	struct reply_hdr hdr;
 	union {
 		struct {
 			uint32_t val;
-		} __attribute__((packed)) u32;
+		} _packed u32;
 		struct {
 			uint16_t len;
 			char str[0];
-		} __attribute__((packed)) string;
+		} _packed string;
 
 		struct {
-		} __attribute__((packed)) notify_newmouse;
+		} _packed notify_newmouse;
 		struct {
-		} __attribute__((packed)) notify_delmouse;
-	} __attribute__((packed));
-} __attribute__((packed));
+		} _packed notify_delmouse;
+	} _packed;
+} _packed;
 
 #define REPLY_SIZE(name)	(offsetof(struct reply, name) + \
 				 sizeof(((struct reply *)0)->name))

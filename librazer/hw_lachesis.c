@@ -86,11 +86,11 @@ struct lachesis_one_buttonmapping {
 	uint8_t physical;
 	uint8_t logical;
 	uint8_t _padding[33];
-} __attribute__((packed));
+} _packed;
 
 struct lachesis_buttonmappings {
 	struct lachesis_one_buttonmapping mappings[NR_LACHESIS_PHYSBUT];
-} __attribute__((packed));
+} _packed;
 
 struct lachesis_profcfg_cmd {
 	le16_t packetlength;
@@ -102,20 +102,20 @@ struct lachesis_profcfg_cmd {
 	uint8_t _padding1;
 	struct lachesis_buttonmappings buttons;
 	le16_t checksum;
-} __attribute__((packed));
+} _packed;
 #define LACHESIS_PROFCFG_MAGIC		cpu_to_le16(0x0002)
 
 struct lachesis_one_dpimapping {
 	uint8_t magic;
 	uint8_t dpival0; /* TODO X */
 	uint8_t dpival1; /* TODO Y */
-} __attribute__((packed));
+} _packed;
 #define LACHESIS_DPIMAPPING_MAGIC	0x01
 
 struct lachesis_dpimap_cmd {
 	struct lachesis_one_dpimapping mappings[5];
 	uint8_t _padding[81];
-} __attribute__((packed));
+} _packed;
 
 
 /* Context data structure */

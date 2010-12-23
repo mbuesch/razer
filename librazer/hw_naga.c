@@ -50,7 +50,7 @@ struct naga_command {
 	uint8_t padding1[76];
 	uint8_t checksum;
 	uint8_t padding2;
-} __attribute__((__packed__));
+} _packed;
 
 struct naga_private {
 	unsigned int claimed;

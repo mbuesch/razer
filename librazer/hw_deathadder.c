@@ -44,7 +44,7 @@ struct deathadder_125_cfg {
 	uint8_t res;
 	uint8_t profile;
 	uint8_t leds;
-} __attribute__((packed));
+} _packed;
 
 struct deathadder_private {
 	unsigned int claimed;

@@ -65,7 +65,7 @@ enum copperhead_button_function {
 struct copperhead_one_buttonmapping {
 	uint8_t physical;
 	uint8_t logical;
-} __attribute__((packed));
+} _packed;
 
 struct copperhead_buttonmappings {
 	struct copperhead_one_buttonmapping left;
@@ -82,7 +82,7 @@ struct copperhead_buttonmappings {
 	uint8_t _padding5[46];
 	struct copperhead_one_buttonmapping rrear;
 	uint8_t _padding6[42];
-} __attribute__((packed));
+} _packed;
 
 struct copperhead_profcfg_cmd {
 	le16_t packetlength;
@@ -93,7 +93,7 @@ struct copperhead_profcfg_cmd {
 	uint8_t freq;
 	struct copperhead_buttonmappings buttons;
 	le16_t checksum;
-} __attribute__((packed));
+} _packed;
 #define COPPERHEAD_PROFCFG_MAGIC0	cpu_to_le32(0x00010002)
 #define COPPERHEAD_PROFCFG_MAGIC1	cpu_to_le16(0x0001)
 

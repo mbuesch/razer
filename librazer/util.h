@@ -24,6 +24,8 @@
 #define BUILD_BUG_ON(x)		((void)sizeof(char[1 - 2 * !!(x)]))
 #define ARRAY_SIZE(array)	(sizeof(array) / sizeof((array)[0]))
 
+#define _packed			__attribute__((__packed__))
+
 typedef _Bool bool;
 
 typedef uint16_t	be16_t;

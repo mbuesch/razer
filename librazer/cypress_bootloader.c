@@ -25,7 +25,7 @@ struct cypress_command {
 	be16_t command;
 	uint8_t key[8];
 	uint8_t payload[54];
-} __attribute__((packed));
+} _packed;
 
 #define CYPRESS_CMD_ENTERBL	cpu_to_be16(0xFF38) /* Enter bootloader */
 #define CYPRESS_CMD_WRITEFL	cpu_to_be16(0xFF39) /* Write flash */
@@ -37,7 +37,7 @@ struct cypress_status {
 	uint8_t status0;
 	uint8_t status1;
 	uint8_t _padding[62];
-} __attribute__((packed));
+} _packed;
 
 #define CYPRESS_STAT_BLMODE	0x20 /* Bootload mode (success) */
 #define CYPRESS_STAT_BOOTOK	0x01 /* Boot completed OK */
