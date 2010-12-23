@@ -100,37 +100,30 @@ static int naga_read_fw_ver(struct naga_private *priv)
 	char buf[90];
 	uint16_t ver;
 	int err;
+	unsigned int i;
 
-	// something is wrong, this workaround retries until a valid firmware version is returned
-	do
-	{
+	/* Poke the device several times until it responds with a
+	 * valid version number */
+	for (i = 0; i < 5; i++) {
 		memset(buf, 0, sizeof(buf));
 		buf[5] = 0x02;
 		buf[7] = 0x81;
-		buf[88] = 0x83;
-		err = naga_usb_write(priv, 0x09, 0x0300, buf, sizeof(buf));
-
-		//err = usb_control_msg(priv->usb.h, USB_ENDPOINT_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE, 0x01, 0x0300, 0x0000, buf, sizeof(buf), DEATHADDER_USB_TIMEOUT);
-		err = naga_usb_read(priv, 0x01, 0x0300, buf, sizeof(buf));
-
-//		if(err<0) 
-//			printf("error %d\n",err);
-/*
-		for(int i=0;i<90;i++)
-		{
-			printf("%02X ",buf[i]);
-			if(i%16 == 0 && i != 0)
-				printf("\n");
+		buf[88] = razer_xor8_checksum(buf, 88);
+		err = naga_usb_write(priv, USB_REQ_SET_CONFIGURATION, 0x300,
+				     buf, sizeof(buf));
+		err |= naga_usb_read(priv, USB_REQ_CLEAR_FEATURE, 0x300,
+				     buf, sizeof(buf));
+		if (!err && buf[8] != 0) {
+			ver = buf[8];
+			ver <<= 8;
+			ver |= buf[9];
+			return ver;
 		}
-		printf("\n");
-*/
-	}while(buf[8] == 0 && 0/*FIXME*/);
+		razer_msleep(100);
+	}
+	razer_error("razer-naga: Failed to read firmware version\n");
 
-	ver = buf[8];
-	ver <<= 8;
-	ver |= buf[9];
-
-	return ver;
+	return -ENODEV;
 }
 
 static int naga_commit(struct naga_private *priv)
@@ -154,18 +147,28 @@ static int naga_commit(struct naga_private *priv)
 		return -EINVAL;
 	}
 
+/*TODO
+[0000]:  2109 0003 0000 5A00 0000 0000 0001 0005  |!.....Z.........|
+[0010]:  0100 0000 0000 0000 0000 0000 0000 0000  |................|
+         ^^
+01 => 1000Hz
+02 => 500Hz
+08 => 125Hz
+*/
+
 	/* set the scroll wheel and buttons */
 	memset(buf, 0, sizeof(buf));
 	buf[5] = 0x03;
 	buf[6] = 0x03;
 	buf[8] = 0x01;
 	buf[9] = 0x01;
-	if (priv->led_states[NAGA_LED_SCROLL]) {
+	if (priv->led_states[NAGA_LED_SCROLL])
 		buf[10] = 0x01;
-		buf[88] = 0x01;
-	}
-	err = naga_usb_write(priv, 0x09, 0x0300, buf, sizeof(buf));
-	err |= naga_usb_read(priv, 0x01, 0x0300, buf, sizeof(buf));
+	buf[88] = razer_xor8_checksum(buf, 88);
+	err = naga_usb_write(priv, USB_REQ_SET_CONFIGURATION, 0x300,
+			     buf, sizeof(buf));
+	err |= naga_usb_read(priv, USB_REQ_CLEAR_FEATURE, 0x300,
+			     buf, sizeof(buf));
 	if (err)
 		return -ENODEV;
 
@@ -175,15 +178,13 @@ static int naga_commit(struct naga_private *priv)
 	buf[6] = 0x03;
 	buf[8] = 0x01;
 	buf[9] = 0x04;
-	if (priv->led_states[NAGA_LED_LOGO]) {
+	if (priv->led_states[NAGA_LED_LOGO])
 		buf[10] = 0x01;
-		buf[88] = 0x04;
-	} else {
-		buf[10] = 0x00;
-		buf[88] = 0x05;
-	}
-	err = naga_usb_write(priv, 0x09, 0x0300, buf, sizeof(buf));
-	err |= naga_usb_read(priv, 0x01, 0x0300, buf, sizeof(buf));
+	buf[88] = razer_xor8_checksum(buf, 88);
+	err = naga_usb_write(priv, USB_REQ_SET_CONFIGURATION, 0x300,
+			     buf, sizeof(buf));
+	err |= naga_usb_read(priv, USB_REQ_CLEAR_FEATURE, 0x300,
+			     buf, sizeof(buf));
 	if (err)
 		return -ENODEV;
 
@@ -195,11 +196,13 @@ static int naga_commit(struct naga_private *priv)
 	buf[5] = 0x03;
 	buf[6] = 0x04;
 	buf[7] = 0x01;
-	buf[8] = res;
-	buf[9] = res;
-	buf[88] = 0x06;
-	err = naga_usb_write(priv, 0x09, 0x0300, buf, sizeof(buf));
-	err |= naga_usb_read(priv, 0x01, 0x0300, buf, sizeof(buf));
+	buf[8] = res; /* X */
+	buf[9] = res; /* Y */
+	buf[88] = razer_xor8_checksum(buf, 88);
+	err = naga_usb_write(priv, USB_REQ_SET_CONFIGURATION, 0x300,
+			     buf, sizeof(buf));
+	err |= naga_usb_read(priv, USB_REQ_CLEAR_FEATURE, 0x300,
+			     buf, sizeof(buf));
 	if (err)
 		return -ENODEV;
 

@@ -155,17 +155,29 @@ void razer_msleep(unsigned int msecs)
 
 le16_t razer_xor16_checksum(const void *_buffer, size_t size)
 {
-	const unsigned char *buffer = _buffer;
+	const uint8_t *buffer = _buffer;
 	uint16_t sum = 0;
 	size_t i;
 
 	for (i = 0; i < size; i += 2) {
-		sum ^= buffer[i] & 0xFF;
+		sum ^= buffer[i];
 		if (i < size - 1)
 			sum ^= ((uint16_t)(buffer[i + 1])) << 8;
 	}
 
 	return cpu_to_le16(sum);
+}
+
+uint8_t razer_xor8_checksum(const void *_buffer, size_t size)
+{
+	const uint8_t *buffer = _buffer;
+	uint8_t sum = 0;
+	size_t i;
+
+	for (i = 0; i < size; i++)
+		sum ^= buffer[i];
+
+	return sum;
 }
 
 void razer_dump(const char *prefix, const void *_buf, size_t size)

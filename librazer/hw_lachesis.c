@@ -107,8 +107,8 @@ struct lachesis_profcfg_cmd {
 
 struct lachesis_one_dpimapping {
 	uint8_t magic;
-	uint8_t dpival0;
-	uint8_t dpival1;
+	uint8_t dpival0; /* TODO X */
+	uint8_t dpival1; /* TODO Y */
 } __attribute__((packed));
 #define LACHESIS_DPIMAPPING_MAGIC	0x01
 

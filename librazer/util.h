@@ -76,6 +76,7 @@ bool razer_timeval_after(const struct timeval *a, const struct timeval *b);
 void razer_msleep(unsigned int msecs);
 
 le16_t razer_xor16_checksum(const void *_buffer, size_t size);
+uint8_t razer_xor8_checksum(const void *_buffer, size_t size);
 
 void razer_dump(const char *prefix, const void *_buf, size_t size);
 
