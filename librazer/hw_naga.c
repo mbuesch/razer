@@ -36,6 +36,10 @@ enum {
 	NAGA_NR_LEDS,
 };
 
+enum { /* Misc constants */
+	NAGA_NR_DPIMAPPINGS	= 56,
+};
+
 struct naga_private {
 	unsigned int claimed;
 	/* Firmware version number. */
@@ -50,7 +54,7 @@ struct naga_private {
 	struct razer_mouse_dpimapping *cur_dpimapping;
 
 	struct razer_mouse_profile profile;
-	struct razer_mouse_dpimapping dpimapping[56];
+	struct razer_mouse_dpimapping dpimapping[NAGA_NR_DPIMAPPINGS];
 };
 
 #define NAGA_USB_TIMEOUT	3000
@@ -275,10 +279,10 @@ static int naga_get_leds(struct razer_mouse *m,
 	struct naga_private *priv = m->internal;
 	struct razer_led *scroll, *logo;
 
-	scroll = malloc(sizeof(struct razer_led));
+	scroll = zalloc(sizeof(struct razer_led));
 	if (!scroll)
 		return -ENOMEM;
-	logo = malloc(sizeof(struct razer_led));
+	logo = zalloc(sizeof(struct razer_led));
 	if (!logo) {
 		free(scroll);
 		return -ENOMEM;
@@ -310,7 +314,7 @@ static int naga_supported_freqs(struct razer_mouse *m,
 	enum razer_mouse_freq *list;
 	const int count = 3;
 
-	list = malloc(sizeof(*list) * count);
+	list = zalloc(sizeof(*list) * count);
 	if (!list)
 		return -ENOMEM;
 
@@ -356,14 +360,14 @@ static int naga_supported_resolutions(struct razer_mouse *m,
 					    enum razer_mouse_res **res_list)
 {
 	enum razer_mouse_res *list;
-	const int count = 55;
+	unsigned int i;
+	const unsigned int count = NAGA_NR_DPIMAPPINGS;
 
-	list = malloc(sizeof(*list) * count);
+	list = zalloc(sizeof(*list) * count);
 	if (!list)
 		return -ENOMEM;
-
-	for (int i = 1; i < 56; i++)
-		list[i - 1] = i * 100;
+	for (i = 0; i < count; i++)
+		list[i] = (i + 1) * 100;
 	*res_list = list;
 
 	return count;
@@ -422,40 +426,50 @@ static int naga_set_dpimapping(struct razer_mouse_profile *p,
 	return err;
 }
 
-void razer_naga_gen_idstr(struct usb_device *udev, char *buf)
+static void naga_do_gen_idstr(struct usb_device *udev, char *buf,
+			      struct usb_dev_handle *h)
 {
 	char devid[64];
 	char serial[64];
+	char buspos[512];
 	unsigned int serial_index;
 	int err;
-	struct razer_usb_context usbctx = { .dev = udev, };
+	struct razer_usb_context usbctx = {
+		.dev = udev,
+		.h = h,
+	};
 
 	err = -EINVAL;
 	serial_index = udev->descriptor.iSerialNumber;
 	if (serial_index) {
-		err = razer_generic_usb_claim(&usbctx);
+		err = 0;
+		if (!h)
+			err = razer_generic_usb_claim(&usbctx);
 		if (err) {
 			razer_error("Failed to claim device for serial fetching.\n");
 		} else {
 			err = usb_get_string_simple(usbctx.h, serial_index,
 						    serial, sizeof(serial));
-			razer_generic_usb_release(&usbctx);
+			if (!h)
+				razer_generic_usb_release(&usbctx);
 		}
 	}
 	if (err <= 0)
 		strcpy(serial, "0");
 
-	/* We can't include the USB device number, because that changes on the
-	 * automatic reconnects the device firmware does.
-	 * The serial number is zero, so that's not very useful, too.
-	 * Basically, that means we have a pretty bad ID string due to
-	 * major design faults in the hardware. :(
-	 */
 	snprintf(devid, sizeof(devid), "%04X-%04X-%s",
 		 udev->descriptor.idVendor,
 		 udev->descriptor.idProduct, serial);
-	razer_create_idstr(buf, BUSTYPESTR_USB, udev->bus->dirname,
+	snprintf(buspos, sizeof(buspos), "%s-%s",
+		 udev->bus->dirname, udev->filename);
+
+	razer_create_idstr(buf, BUSTYPESTR_USB, buspos,
 			   DEVTYPESTR_MOUSE, "Naga", devid);
+}
+
+void razer_naga_gen_idstr(struct usb_device *udev, char *buf)
+{
+	naga_do_gen_idstr(udev, buf, NULL);
 }
 
 void razer_naga_assign_usb_device(struct razer_mouse *m,
@@ -471,27 +485,28 @@ int razer_naga_init_struct(struct razer_mouse *m,
 {
 	struct naga_private *priv;
 	unsigned int i;
-	int fwver;
+	int fwver, err;
 
-	priv = malloc(sizeof(struct naga_private));
+	priv = zalloc(sizeof(struct naga_private));
 	if (!priv)
 		return -ENOMEM;
-	memset(priv, 0, sizeof(*priv));
 	m->internal = priv;
 
 	razer_naga_assign_usb_device(m, usbdev);
 
+	err = naga_claim(m);
+	if (err) {
+		razer_error("hw_naga: Failed to claim device\n");
+		goto err_free;
+	}
+
 	/* Fetch firmware version */
-	naga_claim(m);
 	fwver = naga_read_fw_ver(priv);
 	if (fwver < 0) {
-		razer_error("hw_naga: Failed to get firmware version\n");
-		naga_release(m);
-		free(priv);
-		return fwver;
+		err = fwver;
+		goto err_release;
 	}
 	priv->fw_version = fwver;
-	naga_release(m);
 
 	priv->frequency = RAZER_MOUSE_FREQ_1000HZ;
 	for (i = 0; i < NAGA_NR_LEDS; i++)
@@ -504,18 +519,17 @@ int razer_naga_init_struct(struct razer_mouse *m,
 	priv->profile.set_dpimapping = naga_set_dpimapping;
 	priv->profile.mouse = m;
 
-	for(int i = 1;i<57;i++)
-	{
-		priv->dpimapping[i-1].nr = i-1;
-		priv->dpimapping[i-1].res = i*100;
-		priv->dpimapping[i-1].change = NULL;
-		priv->dpimapping[i-1].mouse = m;
+	for (i = 0; i < NAGA_NR_DPIMAPPINGS; i++) {
+		priv->dpimapping[i].nr = i;
+		priv->dpimapping[i].res = (i + 1) * 100;
+		if (priv->dpimapping[i].res == 1000)
+			priv->cur_dpimapping = &priv->dpimapping[i];
+		priv->dpimapping[i].change = NULL;
+		priv->dpimapping[i].mouse = m;
 	}
-	
-	priv->cur_dpimapping = &priv->dpimapping[54];
-	
+
 	m->type = RAZER_MOUSETYPE_NAGA;
-	razer_naga_gen_idstr(usbdev, m->idstr);
+	naga_do_gen_idstr(usbdev, m->idstr, priv->usb.h);
 
 	m->claim = naga_claim;
 	m->release = naga_release;
@@ -528,7 +542,21 @@ int razer_naga_init_struct(struct razer_mouse *m,
 	m->supported_freqs = naga_supported_freqs;
 	m->supported_dpimappings = naga_supported_dpimappings;
 
+	err = naga_commit(priv);
+	if (err) {
+		razer_error("hw_naga: Failed to commit initial settings\n");
+		goto err_release;
+	}
+
+	naga_release(m);
+
 	return 0;
+
+err_release:
+	naga_release(m);
+err_free:
+	free(priv);
+	return err;
 }
 
 void razer_naga_release(struct razer_mouse *m)
