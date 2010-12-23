@@ -79,6 +79,8 @@ void config_for_each_item(struct config_file *f,
 	struct config_section *s;
 	struct config_item *i;
 
+	if (!f || !section)
+		return;
 	for (s = f->sections; s; s = s->next) {
 		if (strcmp(s->name, section) == 0) {
 			for (i = s->items; i; i = i->next) {
@@ -97,6 +99,8 @@ void config_for_each_section(struct config_file *f,
 {
 	struct config_section *s;
 
+	if (!f)
+		return;
 	for (s = f->sections; s; s = s->next) {
 		if (!func(f, context, data, s->name))
 			return;
