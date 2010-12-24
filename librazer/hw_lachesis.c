@@ -108,8 +108,8 @@ struct lachesis_profcfg_cmd {
 
 struct lachesis_one_dpimapping {
 	uint8_t magic;
-	uint8_t dpival0; /* TODO X */
-	uint8_t dpival1; /* TODO Y */
+	uint8_t dpival0;
+	uint8_t dpival1;
 } _packed;
 #define LACHESIS_DPIMAPPING_MAGIC	0x01
 
@@ -192,6 +192,7 @@ static struct razer_button_function lachesis_button_functions[] = {
  *
  *	CLEAR_FEATURE
  *		0x10:	Read DPI map
+ *		0x06:	read fw version
  *		0x05:	LEDs
  *		0x09:	cur profile
  *		0x03:	profile config
@@ -277,6 +278,7 @@ static int lachesis_commit(struct lachesis_private *priv)
 	unsigned int i;
 	int err;
 	char value;
+	char statusbuf[2];
 	struct lachesis_profcfg_cmd profcfg;
 	struct lachesis_dpimap_cmd dpimap;
 
@@ -306,6 +308,12 @@ static int lachesis_commit(struct lachesis_private *priv)
 					 0x01, &profcfg, sizeof(profcfg), 0);
 		if (err)
 			return err;
+razer_msleep(1000);
+		err = lachesis_usb_read(priv, USB_REQ_CLEAR_FEATURE,
+					0x02, statusbuf, sizeof(statusbuf), 0);
+		if (err)
+			printf("STATUS ERROR\n");
+razer_msleep(50);
 	}
 
 	/* Commit LED states. */
@@ -383,7 +391,7 @@ static int lachesis_read_config_from_hw(struct lachesis_private *priv)
 				 0x0F, &value, sizeof(value), 0);
 	if (err)
 		return err;
-razer_msleep(500);
+razer_msleep(100);
 
 //printf("Read prof\n");
 	/* Get the current profile number */
@@ -391,6 +399,7 @@ razer_msleep(500);
 				0x09, &value, sizeof(value), 1);
 	if (err)
 		return err;
+razer_msleep(3000);
 	if (value >= 1 && value <= LACHESIS_NR_PROFILES) {
 		/* Got a valid current profile number. */
 		priv->cur_profile = &priv->profiles[value - 1];
@@ -399,6 +408,7 @@ razer_msleep(500);
 		for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
 			err = lachesis_usb_read_withindex(priv, USB_REQ_CLEAR_FEATURE,
 							  0x03, i + 1, &profcfg, sizeof(profcfg), 0);
+//razer_msleep(5000);
 			if (err) {
 //printf("profcfg %u read err\n", i+1);
 				continue;
@@ -427,6 +437,15 @@ razer_msleep(500);
 			}
 			priv->buttons[i] = profcfg.buttons;
 			//TODO validate buttonmap
+
+//XXX
+#if 0
+		err = lachesis_read_fw_ver(priv);
+		if (err < 0)
+			printf("FW VER READ FAILED\n");
+		priv->fw_version = err;
+#endif
+//XXX
 		}
 	}
 
@@ -438,6 +457,7 @@ razer_msleep(500);
 	priv->led_states[LACHESIS_LED_LOGO] = !!(value & 0x01);
 	priv->led_states[LACHESIS_LED_SCROLL] = !!(value & 0x02);
 
+razer_msleep(300);
 	/* Get the DPI map */
 	err = lachesis_usb_read(priv, USB_REQ_CLEAR_FEATURE,
 				0x10, &dpimap, sizeof(dpimap), 0);
@@ -882,11 +902,9 @@ int razer_lachesis_init_struct(struct razer_mouse *m,
 		priv->axes[i].id = i;
 		switch (i) {
 		case 0: /* X */
-			priv->axes[i].flags |= RAZER_AXIS_INDEPENDENT_DPIMAPPING;
 			priv->axes[i].name = "X";
 			break;
 		case 1: /* Y */
-			priv->axes[i].flags |= RAZER_AXIS_INDEPENDENT_DPIMAPPING;
 			priv->axes[i].name = "Y";
 			break;
 		case 2: /* Scrollwheel */
