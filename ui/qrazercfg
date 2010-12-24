@@ -158,17 +158,21 @@ class MouseProfileWidget(QWidget):
 		self.connect(self.freqSel, SIGNAL("currentIndexChanged(int)"), self.freqChanged)
 		self.layout().addWidget(self.freqSel, 1 + yoff, 1)
 
-		axes = razer.getSupportedAxes(mouseWidget.mouse)
-		axes = filter(lambda axis: (axis[2] & Razer.RAZER_AXIS_INDEPENDENT_DPIMAPPING),
-			      axes)
-		if not axes:
-			axes = [ (0, self.tr("All axes"), 0) ]
+		self.resSel = []
+		axes = self.__getIndependentAxes()
 		for axis in axes:
 			self.layout().addWidget(QLabel(self.tr("%s scan resolution:" % axis[1]), self), 2 + yoff, 0)
-			self.resSel = QComboBox(self)#FIXME
-			self.connect(self.resSel, SIGNAL("currentIndexChanged(int)"), self.resChanged)
-			self.layout().addWidget(self.resSel, 2 + yoff, 1)
+			resSel = QComboBox(self)
+			self.connect(resSel, SIGNAL("currentIndexChanged(int)"), self.resChanged)
+			self.layout().addWidget(resSel, 2 + yoff, 1)
+			self.resSel.append(resSel)
 			yoff += 1
+		self.resIndependent = QCheckBox(self.tr("Independent resolutions"), self)
+		self.connect(self.resIndependent, SIGNAL("stateChanged(int)"), self.resIndependentChanged)
+		self.layout().addWidget(self.resIndependent, 2 + yoff, 1)
+		yoff += 1
+		if len(axes) <= 1:
+			self.resIndependent.hide()
 
 		funcs = razer.getSupportedButtonFunctions(self.mouseWidget.mouse)
 		if funcs:
@@ -176,10 +180,19 @@ class MouseProfileWidget(QWidget):
 			self.connect(self.buttonConf, SIGNAL("clicked(bool)"), self.showButtonConf)
 			self.layout().addWidget(self.buttonConf, 2 + yoff, 0, 1, 2)
 
+	def __getIndependentAxes(self):
+		axes = razer.getSupportedAxes(self.mouseWidget.mouse)
+		axes = filter(lambda axis: (axis[2] & Razer.RAZER_AXIS_INDEPENDENT_DPIMAPPING),
+			      axes)
+		if not axes:
+			axes = [ (0, self.tr("All axes"), 0) ]
+		return axes
+
 	def reload(self):
 		# Refetch the data from the daemon
 		self.recurseProtect = True
 
+		# Frequency selection
 		self.freqSel.clear()
 		supportedFreqs = razer.getSupportedFreqs(self.mouseWidget.mouse)
 		curFreq = razer.getCurrentFreq(self.mouseWidget.mouse, self.profileId)
@@ -190,23 +203,39 @@ class MouseProfileWidget(QWidget):
 		if index >= 0:
 			self.freqSel.setCurrentIndex(index)
 
-		self.resSel.clear()
+		# Resolution selection
+		for resSel in self.resSel:
+			resSel.clear()
 		supportedMappings = razer.getSupportedDpiMappings(self.mouseWidget.mouse)
-		curMapping = razer.getDpiMapping(self.mouseWidget.mouse, self.profileId)
-		self.resSel.addItem(self.tr("Unknown mapping"), QVariant(0xFFFFFFFF))
-		for mapping in supportedMappings:
-			id = mapping[0]
-			res = mapping[1]
-			if res:
-				res = str(res)
-			else:
-				res = self.tr("Unknown")
-			self.resSel.addItem(self.tr("Scan resolution %u   (%s DPI)" % (id+1, res)),
-					    QVariant(id))
-		index = self.resSel.findData(QVariant(curMapping))
-		if index >= 0:
-			self.resSel.setCurrentIndex(index)
+		axisMappings = []
+		for axis in self.__getIndependentAxes():
+			axisMappings.append(razer.getDpiMapping(self.mouseWidget.mouse,
+								self.profileId,
+								axis[0]))
+		i = 0
+		for resSel in self.resSel:
+			resSel.addItem(self.tr("Unknown mapping"), QVariant(0xFFFFFFFF))
+			for mapping in supportedMappings:
+				mid = mapping[0]
+				res = mapping[1]
+				if res:
+					res = str(res)
+				else:
+					res = self.tr("Unknown")
+				resSel.addItem(self.tr("Scan resolution %u   (%s DPI)" % (mid + 1, res)),
+						QVariant(mid))
+			index = resSel.findData(QVariant(axisMappings[i]))
+			if index >= 0:
+				resSel.setCurrentIndex(index)
+			i += 1
+		independent = bool(filter(lambda x: x != axisMappings[0], axisMappings))
+		if independent:
+			self.resIndependent.setCheckState(Qt.Checked)
+		else:
+			self.resIndependent.setCheckState(Qt.Unchecked)
+		self.resIndependentChanged(self.resIndependent.checkState())
 
+		# Profile selection
 		activeProf = razer.getActiveProfile(self.mouseWidget.mouse)
 		self.profileActive.setChecked(activeProf == self.profileId)
 
@@ -230,11 +259,34 @@ class MouseProfileWidget(QWidget):
 		freq = self.freqSel.itemData(index).toUInt()[0]
 		razer.setFrequency(self.mouseWidget.mouse, self.profileId, freq)
 
-	def resChanged(self, index):
-		if self.recurseProtect or index <= 0:
+	def resChanged(self, unused=None):
+		if self.recurseProtect:
 			return
-		res = self.resSel.itemData(index).toUInt()[0]
-		razer.setDpiMapping(self.mouseWidget.mouse, self.profileId, res)
+		if self.resIndependent.checkState() == Qt.Checked:
+			axisId = 0
+			for resSel in self.resSel:
+				index = resSel.currentIndex()
+				res = resSel.itemData(index).toUInt()[0]
+				razer.setDpiMapping(self.mouseWidget.mouse, self.profileId,
+						    res, axisId)
+				axisId += 1
+		else:
+			index = self.resSel[0].currentIndex()
+			res = self.resSel[0].itemData(index).toUInt()[0]
+			razer.setDpiMapping(self.mouseWidget.mouse, self.profileId, res)
+			for resSel in self.resSel[1:]:
+				self.recurseProtect = True
+				resSel.setCurrentIndex(index)
+				self.recurseProtect = False
+
+	def resIndependentChanged(self, newState):
+		if newState == Qt.Checked:
+			for resSel in self.resSel[1:]:
+				resSel.setEnabled(True)
+		else:
+			for resSel in self.resSel[1:]:
+				resSel.setEnabled(False)
+		self.resChanged()
 
 	def showButtonConf(self, checked):
 		bconf = ButtonConfDialog(self)

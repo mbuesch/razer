@@ -38,6 +38,7 @@ enum {
 
 enum { /* Misc constants */
 	NAGA_NR_DPIMAPPINGS	= 56,
+	NAGA_NR_AXES		= 3,
 };
 
 struct naga_command {
@@ -63,10 +64,12 @@ struct naga_private {
 	/* The currently set frequency. */
 	enum razer_mouse_freq frequency;
 	/* The currently set resolution. */
-	struct razer_mouse_dpimapping *cur_dpimapping;
+	struct razer_mouse_dpimapping *cur_dpimapping_X;
+	struct razer_mouse_dpimapping *cur_dpimapping_Y;
 
 	struct razer_mouse_profile profile;
 	struct razer_mouse_dpimapping dpimapping[NAGA_NR_DPIMAPPINGS];
+	struct razer_axis axes[NAGA_NR_AXES];
 };
 
 #define NAGA_USB_TIMEOUT	3000
@@ -171,8 +174,8 @@ static int naga_commit(struct naga_private *priv)
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.command = cpu_to_le16(0x0300);
 	cmd.request = cpu_to_le16(0x0104);
-	xres = ((priv->cur_dpimapping->res / 100) - 1) * 4;
-	yres = ((priv->cur_dpimapping->res / 100) - 1) * 4;
+	xres = (((unsigned int)priv->cur_dpimapping_X->res / 100) - 1) * 4;
+	yres = (((unsigned int)priv->cur_dpimapping_Y->res / 100) - 1) * 4;
 	cmd.value0 = cpu_to_le16(xres | (yres << 8));
 	err = naga_send_command(priv, &cmd);
 	if (err)
@@ -369,6 +372,16 @@ static int naga_set_freq(struct razer_mouse_profile *p,
 	return err;
 }
 
+static int naga_supported_axes(struct razer_mouse *m,
+			       struct razer_axis **axes_list)
+{
+	struct naga_private *priv = m->internal;
+
+	*axes_list = priv->axes;
+
+	return ARRAY_SIZE(priv->axes);
+}
+
 static int naga_supported_resolutions(struct razer_mouse *m,
 					    enum razer_mouse_res **res_list)
 {
@@ -415,7 +428,14 @@ static struct razer_mouse_dpimapping * naga_get_dpimapping(struct razer_mouse_pr
 {
 	struct naga_private *priv = p->mouse->internal;
 
-	return priv->cur_dpimapping;
+	if (!axis)
+		axis = &priv->axes[0];
+	if (axis->id == 0)
+		return priv->cur_dpimapping_X;
+	if (axis->id == 1)
+		return priv->cur_dpimapping_Y;
+
+	return NULL;
 }
 
 static int naga_set_dpimapping(struct razer_mouse_profile *p,
@@ -423,18 +443,33 @@ static int naga_set_dpimapping(struct razer_mouse_profile *p,
 			       struct razer_mouse_dpimapping *d)
 {
 	struct naga_private *priv = p->mouse->internal;
-	struct razer_mouse_dpimapping *oldmapping;
+	struct razer_mouse_dpimapping *oldmapping_X, *oldmapping_Y;
 	int err;
 
 	if (!priv->claimed)
 		return -EBUSY;
+	if (axis && axis->id >= ARRAY_SIZE(priv->axes))
+		return -EINVAL;
 
-	oldmapping = priv->cur_dpimapping;
-	priv->cur_dpimapping = d;
+	oldmapping_X = priv->cur_dpimapping_X;
+	oldmapping_Y = priv->cur_dpimapping_Y;
+
+	if (axis) {
+		if (axis->id == 0)
+			priv->cur_dpimapping_X = d;
+		else if (axis->id == 1)
+			priv->cur_dpimapping_Y = d;
+		else
+			return -EINVAL;
+	} else {
+		priv->cur_dpimapping_X = d;
+		priv->cur_dpimapping_Y = d;
+	}
 
 	err = naga_commit(priv);
 	if (err) {
-		priv->cur_dpimapping = oldmapping;
+		priv->cur_dpimapping_X = oldmapping_X;
+		priv->cur_dpimapping_Y = oldmapping_Y;
 		return err;
 	}
 
@@ -539,10 +574,28 @@ int razer_naga_init_struct(struct razer_mouse *m,
 	for (i = 0; i < NAGA_NR_DPIMAPPINGS; i++) {
 		priv->dpimapping[i].nr = i;
 		priv->dpimapping[i].res = (i + 1) * 100;
-		if (priv->dpimapping[i].res == 1000)
-			priv->cur_dpimapping = &priv->dpimapping[i];
+		if (priv->dpimapping[i].res == 1000) {
+			priv->cur_dpimapping_X = &priv->dpimapping[i];
+			priv->cur_dpimapping_Y = &priv->dpimapping[i];
+		}
 		priv->dpimapping[i].change = NULL;
 		priv->dpimapping[i].mouse = m;
+	}
+	for (i = 0; i < NAGA_NR_AXES; i++) {
+		priv->axes[i].id = i;
+		switch (i) {
+		case 0: /* X */
+			priv->axes[i].flags |= RAZER_AXIS_INDEPENDENT_DPIMAPPING;
+			priv->axes[i].name = "X";
+			break;
+		case 1: /* Y */
+			priv->axes[i].flags |= RAZER_AXIS_INDEPENDENT_DPIMAPPING;
+			priv->axes[i].name = "Y";
+			break;
+		case 2: /* Scrollwheel */
+			priv->axes[i].name = "Scroll";
+			break;
+		}
 	}
 
 	m->type = RAZER_MOUSETYPE_NAGA;
@@ -555,6 +608,7 @@ int razer_naga_init_struct(struct razer_mouse *m,
 	m->nr_profiles = 1;
 	m->get_profiles = naga_get_profiles;
 	m->get_active_profile = naga_get_active_profile;
+	m->supported_axes = naga_supported_axes;
 	m->supported_resolutions = naga_supported_resolutions;
 	m->supported_freqs = naga_supported_freqs;
 	m->supported_dpimappings = naga_supported_dpimappings;
