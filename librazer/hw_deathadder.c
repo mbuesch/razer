@@ -330,25 +330,15 @@ static int deathadder_commit(struct deathadder_private *priv)
 static int deathadder_claim(struct razer_mouse *m)
 {
 	struct deathadder_private *priv = m->internal;
-	int err;
 
-	if (!priv->claimed) {
-		err = razer_generic_usb_claim(&priv->usb);
-		if (err)
-			return err;
-	}
-	priv->claimed++;
-
-	return 0;
+	return razer_generic_usb_claim_refcount(&priv->usb, &priv->claimed);
 }
 
 static void deathadder_release(struct razer_mouse *m)
 {
 	struct deathadder_private *priv = m->internal;
 
-	priv->claimed--;
-	if (!priv->claimed)
-		razer_generic_usb_release(&priv->usb);
+	razer_generic_usb_release_refcount(&priv->usb, &priv->claimed);
 }
 
 static int deathadder_get_fw_version(struct razer_mouse *m)
@@ -689,8 +679,8 @@ void razer_deathadder_assign_usb_device(struct razer_mouse *m,
 	priv->usb.dev = usbdev;
 }
 
-int razer_deathadder_init_struct(struct razer_mouse *m,
-				 struct usb_device *usbdev)
+int razer_deathadder_init(struct razer_mouse *m,
+			  struct usb_device *usbdev)
 {
 	struct deathadder_private *priv;
 	unsigned int i;
@@ -803,6 +793,7 @@ void razer_deathadder_release(struct razer_mouse *m)
 {
 	struct deathadder_private *priv = m->internal;
 
-	deathadder_release(m);
+	while (priv->claimed)
+		deathadder_release(m);
 	free(priv);
 }

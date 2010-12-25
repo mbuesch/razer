@@ -474,18 +474,17 @@ static int lachesis_claim(struct razer_mouse *m)
 	struct lachesis_private *priv = m->internal;
 	int err, fwver;
 
-	if (!priv->claimed) {
-		err = razer_generic_usb_claim(&priv->usb);
-		if (err)
-			return err;
+	err = razer_generic_usb_claim_refcount(&priv->usb, &priv->claimed);
+	if (!err) {
 		fwver = lachesis_read_fw_ver(priv);
-		if (fwver < 0)
+		if (fwver < 0) {
+			razer_generic_usb_release_refcount(&priv->usb, &priv->claimed);
 			return fwver;
+		}
 		priv->fw_version = fwver;
 	}
-	priv->claimed++;
 
-	return 0;
+	return err;
 }
 
 static void lachesis_release(struct razer_mouse *m)
@@ -871,8 +870,8 @@ void razer_lachesis_assign_usb_device(struct razer_mouse *m,
 	priv->usb.dev = usbdev;
 }
 
-int razer_lachesis_init_struct(struct razer_mouse *m,
-			       struct usb_device *usbdev)
+int razer_lachesis_init(struct razer_mouse *m,
+			struct usb_device *usbdev)
 {
 	struct lachesis_private *priv;
 	unsigned int i;
@@ -962,6 +961,7 @@ void razer_lachesis_release(struct razer_mouse *m)
 {
 	struct lachesis_private *priv = m->internal;
 
-	lachesis_release(m);
+	while (priv->claimed)
+		lachesis_release(m);
 	free(priv);
 }

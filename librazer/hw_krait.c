@@ -76,25 +76,15 @@ static int krait_usb_read(struct krait_private *priv,
 static int krait_claim(struct razer_mouse *m)
 {
 	struct krait_private *priv = m->internal;
-	int err;
 
-	if (!priv->claimed) {
-		err = razer_generic_usb_claim(&priv->usb);
-		if (err)
-			return err;
-	}
-	priv->claimed++;
-
-	return 0;
+	return razer_generic_usb_claim_refcount(&priv->usb, &priv->claimed);
 }
 
 static void krait_release(struct razer_mouse *m)
 {
 	struct krait_private *priv = m->internal;
 
-	priv->claimed--;
-	if (!priv->claimed)
-		razer_generic_usb_release(&priv->usb);
+	razer_generic_usb_release_refcount(&priv->usb, &priv->claimed);
 }
 
 static int krait_supported_resolutions(struct razer_mouse *m,
@@ -218,8 +208,8 @@ void razer_krait_assign_usb_device(struct razer_mouse *m,
 	priv->usb.dev = usbdev;
 }
 
-int razer_krait_init_struct(struct razer_mouse *m,
-				 struct usb_device *usbdev)
+int razer_krait_init(struct razer_mouse *m,
+		     struct usb_device *usbdev)
 {
 	struct krait_private *priv;
 
@@ -266,6 +256,7 @@ void razer_krait_release(struct razer_mouse *m)
 {
 	struct krait_private *priv = m->internal;
 
-	krait_release(m);
+	while (priv->claimed)
+		krait_release(m);
 	free(priv);
 }

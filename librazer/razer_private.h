@@ -42,7 +42,11 @@ struct razer_usb_context {
 };
 
 int razer_generic_usb_claim(struct razer_usb_context *ctx);
+int razer_generic_usb_claim_refcount(struct razer_usb_context *ctx,
+				     unsigned int *refcount);
 void razer_generic_usb_release(struct razer_usb_context *ctx);
+void razer_generic_usb_release_refcount(struct razer_usb_context *ctx,
+					unsigned int *refcount);
 
 struct razer_usb_reconnect_guard {
 	struct razer_usb_context *ctx;

@@ -45,9 +45,9 @@ enum razer_devtype {
  * @gen_idstr: Generate an ID string that uniquely identifies the
  *	       device in the machine.
  *
- * @init: Init the private data structures.
+ * @init: Initialize the device and its private data structures.
  *
- * @release: Release the private data structures.
+ * @release: Release device and data structures.
  *
  * @assign_usb_device: (re)assign a USB device to a mouse.
  */
@@ -71,7 +71,7 @@ struct razer_usb_device {
 static const struct razer_mouse_base_ops razer_deathadder_base_ops = {
 	.type			= RAZER_MOUSETYPE_DEATHADDER,
 	.gen_idstr		= razer_deathadder_gen_idstr,
-	.init			= razer_deathadder_init_struct,
+	.init			= razer_deathadder_init,
 	.release		= razer_deathadder_release,
 	.assign_usb_device	= razer_deathadder_assign_usb_device,
 };
@@ -79,7 +79,7 @@ static const struct razer_mouse_base_ops razer_deathadder_base_ops = {
 static const struct razer_mouse_base_ops razer_naga_base_ops = {
 	.type			= RAZER_MOUSETYPE_NAGA,
 	.gen_idstr		= razer_naga_gen_idstr,
-	.init			= razer_naga_init_struct,
+	.init			= razer_naga_init,
 	.release		= razer_naga_release,
 	.assign_usb_device	= razer_naga_assign_usb_device,
 };
@@ -87,7 +87,7 @@ static const struct razer_mouse_base_ops razer_naga_base_ops = {
 static const struct razer_mouse_base_ops razer_krait_base_ops = {
 	.type			= RAZER_MOUSETYPE_KRAIT,
 	.gen_idstr		= razer_krait_gen_idstr,
-	.init			= razer_krait_init_struct,
+	.init			= razer_krait_init,
 	.release		= razer_krait_release,
 	.assign_usb_device	= razer_krait_assign_usb_device,
 };
@@ -95,7 +95,7 @@ static const struct razer_mouse_base_ops razer_krait_base_ops = {
 static const struct razer_mouse_base_ops razer_lachesis_base_ops = {
 	.type			= RAZER_MOUSETYPE_LACHESIS,
 	.gen_idstr		= razer_lachesis_gen_idstr,
-	.init			= razer_lachesis_init_struct,
+	.init			= razer_lachesis_init,
 	.release		= razer_lachesis_release,
 	.assign_usb_device	= razer_lachesis_assign_usb_device,
 };
@@ -103,7 +103,7 @@ static const struct razer_mouse_base_ops razer_lachesis_base_ops = {
 static const struct razer_mouse_base_ops razer_copperhead_base_ops = {
 	.type			= RAZER_MOUSETYPE_COPPERHEAD,
 	.gen_idstr		= razer_copperhead_gen_idstr,
-	.init			= razer_copperhead_init_struct,
+	.init			= razer_copperhead_init,
 	.release		= razer_copperhead_release,
 	.assign_usb_device	= razer_copperhead_assign_usb_device,
 };
@@ -726,10 +726,35 @@ int razer_generic_usb_claim(struct razer_usb_context *ctx)
 	return 0;
 }
 
+int razer_generic_usb_claim_refcount(struct razer_usb_context *ctx,
+				     unsigned int *refcount)
+{
+	int err;
+
+	if (!(*refcount)) {
+		err = razer_generic_usb_claim(ctx);
+		if (err)
+			return err;
+	}
+	(*refcount)++;
+
+	return 0;
+}
+
 void razer_generic_usb_release(struct razer_usb_context *ctx)
 {
 	razer_usb_release(ctx);
 	usb_close(ctx->h);
+}
+
+void razer_generic_usb_release_refcount(struct razer_usb_context *ctx,
+					unsigned int *refcount)
+{
+	if (*refcount) {
+		(*refcount)--;
+		if (!(*refcount))
+			razer_generic_usb_release(ctx);
+	}
 }
 
 /** razer_usb_force_reinit - Force the USB-level reinitialization of a device,

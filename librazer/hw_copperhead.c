@@ -396,29 +396,15 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 static int copperhead_claim(struct razer_mouse *m)
 {
 	struct copperhead_private *priv = m->internal;
-	int err, fwver;
 
-	if (!priv->claimed) {
-		err = razer_generic_usb_claim(&priv->usb);
-		if (err)
-			return err;
-		fwver = copperhead_read_fw_ver(priv);
-		if (fwver < 0)
-			return fwver;
-		priv->fw_version = fwver;
-	}
-	priv->claimed++;
-
-	return 0;
+	return razer_generic_usb_claim_refcount(&priv->usb, &priv->claimed);
 }
 
 static void copperhead_release(struct razer_mouse *m)
 {
 	struct copperhead_private *priv = m->internal;
 
-	priv->claimed--;
-	if (!priv->claimed)
-		razer_generic_usb_release(&priv->usb);
+	razer_generic_usb_release_refcount(&priv->usb, &priv->claimed);
 }
 
 static int copperhead_get_fw_version(struct razer_mouse *m)
@@ -673,8 +659,8 @@ void razer_copperhead_gen_idstr(struct usb_device *udev, char *buf)
 			   DEVTYPESTR_MOUSE, "Copperhead", devid);
 }
 
-int razer_copperhead_init_struct(struct razer_mouse *m,
-				 struct usb_device *usbdev)
+int razer_copperhead_init(struct razer_mouse *m,
+			  struct usb_device *usbdev)
 {
 	struct copperhead_private *priv;
 	unsigned int i;
@@ -757,6 +743,7 @@ void razer_copperhead_release(struct razer_mouse *m)
 {
 	struct copperhead_private *priv = m->internal;
 
-	copperhead_release(m);
+	while (priv->claimed)
+		copperhead_release(m);
 	free(priv);
 }
