@@ -830,36 +830,7 @@ static int lachesis_set_button_function(struct razer_mouse_profile *p,
 
 void razer_lachesis_gen_idstr(struct usb_device *udev, char *buf)
 {
-	char devid[64];
-	char serial[64];
-	char buspos[512];
-	unsigned int serial_index;
-	int err;
-	struct razer_usb_context usbctx = { .dev = udev, };
-
-	err = -EINVAL;
-	serial_index = udev->descriptor.iSerialNumber;
-	if (serial_index) {
-		err = razer_generic_usb_claim(&usbctx);
-		if (err) {
-			razer_error("Failed to claim device for serial fetching.\n");
-		} else {
-			err = usb_get_string_simple(usbctx.h, serial_index,
-						    serial, sizeof(serial));
-			razer_generic_usb_release(&usbctx);
-		}
-	}
-	if (err <= 0)
-		strcpy(serial, "0");
-
-	snprintf(devid, sizeof(devid), "%04X-%04X-%s",
-		 udev->descriptor.idVendor,
-		 udev->descriptor.idProduct, serial);
-	snprintf(buspos, sizeof(buspos), "%s-%s",
-		 udev->bus->dirname, udev->filename);
-
-	razer_create_idstr(buf, BUSTYPESTR_USB, buspos,
-			   DEVTYPESTR_MOUSE, "Lachesis", devid);
+	razer_generic_usb_gen_idstr(udev, NULL, "Lachesis", 1, buf);
 }
 
 void razer_lachesis_assign_usb_device(struct razer_mouse *m,
@@ -880,10 +851,9 @@ int razer_lachesis_init(struct razer_mouse *m,
 	BUILD_BUG_ON(sizeof(struct lachesis_profcfg_cmd) != 0x18C);
 	BUILD_BUG_ON(sizeof(struct lachesis_dpimap_cmd) != 0x60);
 
-	priv = malloc(sizeof(struct lachesis_private));
+	priv = zalloc(sizeof(struct lachesis_private));
 	if (!priv)
 		return -ENOMEM;
-	memset(priv, 0, sizeof(*priv));
 	m->internal = priv;
 	razer_lachesis_assign_usb_device(m, usbdev);
 
@@ -921,23 +891,18 @@ int razer_lachesis_init(struct razer_mouse *m,
 	err = lachesis_claim(m);
 	if (err) {
 		razer_error("hw_lachesis: "
-			"Failed to initially claim the device\n");
-		free(priv);
-		return err;
+			    "Failed to initially claim the device\n");
+		goto err_free;
 	}
 	err = lachesis_read_config_from_hw(priv);
-	if (!err)
-		err = lachesis_commit(priv);
-	lachesis_release(m);
 	if (err) {
 		razer_error("hw_lachesis: "
-			"Failed to read the configuration from hardware\n");
-		free(priv);
-		return err;
+			    "Failed to read the configuration from hardware\n");
+		goto err_release;
 	}
+	razer_generic_usb_gen_idstr(usbdev, priv->usb.h, "Lachesis", 1, m->idstr);
 
 	m->type = RAZER_MOUSETYPE_LACHESIS;
-	razer_lachesis_gen_idstr(usbdev, m->idstr);
 
 	m->claim = lachesis_claim;
 	m->release = lachesis_release;
@@ -954,7 +919,21 @@ int razer_lachesis_init(struct razer_mouse *m,
 	m->supported_buttons = lachesis_supported_buttons;
 	m->supported_button_functions = lachesis_supported_button_functions;
 
+	err = lachesis_commit(priv);
+	if (err) {
+		razer_error("hw_lachesis: Failed to commit initial settings\n");
+		goto err_release;
+	}
+	lachesis_release(m);
+
 	return 0;
+
+err_release:
+	lachesis_release(m);
+err_free:
+	free(priv);
+
+	return err;
 }
 
 void razer_lachesis_release(struct razer_mouse *m)

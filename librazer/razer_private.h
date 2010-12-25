@@ -74,4 +74,10 @@ static inline void razer_create_idstr(char *buf,
 		 devtype, devname, bustype, busposition, devid);
 }
 
+void razer_generic_usb_gen_idstr(struct usb_device *udev,
+				 struct usb_dev_handle *h,
+				 const char *devname,
+				 bool include_devicenr,
+				 char *idstr_buf);
+
 #endif /* RAZER_PRIVATE_H_ */

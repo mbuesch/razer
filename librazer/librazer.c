@@ -757,6 +757,56 @@ void razer_generic_usb_release_refcount(struct razer_usb_context *ctx,
 	}
 }
 
+void razer_generic_usb_gen_idstr(struct usb_device *udev,
+				 struct usb_dev_handle *h,
+				 const char *devname,
+				 bool include_devicenr,
+				 char *idstr_buf)
+{
+	char devid[64];
+	char serial[64];
+	char buspos[512];
+	unsigned int serial_index;
+	int err;
+	struct razer_usb_context usbctx = {
+		.dev = udev,
+		.h = h,
+	};
+
+	err = -EINVAL;
+	serial_index = udev->descriptor.iSerialNumber;
+	if (serial_index) {
+		err = 0;
+		if (!h)
+			err = razer_generic_usb_claim(&usbctx);
+		if (err) {
+			razer_error("Failed to claim device for serial fetching.\n");
+		} else {
+			err = usb_get_string_simple(usbctx.h, serial_index,
+						    serial, sizeof(serial));
+			if (!h)
+				razer_generic_usb_release(&usbctx);
+		}
+	}
+	if (err <= 0)
+		strcpy(serial, "0");
+
+	snprintf(devid, sizeof(devid), "%04X-%04X-%s",
+		 udev->descriptor.idVendor,
+		 udev->descriptor.idProduct, serial);
+	if (include_devicenr) {
+		snprintf(buspos, sizeof(buspos), "%s-%s",
+			 udev->bus->dirname, udev->filename);
+	} else {
+		snprintf(buspos, sizeof(buspos), "%s",
+			 udev->bus->dirname);
+	}
+
+	razer_create_idstr(idstr_buf, BUSTYPESTR_USB, buspos,
+			   DEVTYPESTR_MOUSE, devname, devid);
+}
+
+
 /** razer_usb_force_reinit - Force the USB-level reinitialization of a device,
   * so it enters a known state.
   */

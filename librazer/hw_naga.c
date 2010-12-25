@@ -466,50 +466,9 @@ static int naga_set_dpimapping(struct razer_mouse_profile *p,
 	return err;
 }
 
-static void naga_do_gen_idstr(struct usb_device *udev, char *buf,
-			      struct usb_dev_handle *h)
-{
-	char devid[64];
-	char serial[64];
-	char buspos[512];
-	unsigned int serial_index;
-	int err;
-	struct razer_usb_context usbctx = {
-		.dev = udev,
-		.h = h,
-	};
-
-	err = -EINVAL;
-	serial_index = udev->descriptor.iSerialNumber;
-	if (serial_index) {
-		err = 0;
-		if (!h)
-			err = razer_generic_usb_claim(&usbctx);
-		if (err) {
-			razer_error("Failed to claim device for serial fetching.\n");
-		} else {
-			err = usb_get_string_simple(usbctx.h, serial_index,
-						    serial, sizeof(serial));
-			if (!h)
-				razer_generic_usb_release(&usbctx);
-		}
-	}
-	if (err <= 0)
-		strcpy(serial, "0");
-
-	snprintf(devid, sizeof(devid), "%04X-%04X-%s",
-		 udev->descriptor.idVendor,
-		 udev->descriptor.idProduct, serial);
-	snprintf(buspos, sizeof(buspos), "%s-%s",
-		 udev->bus->dirname, udev->filename);
-
-	razer_create_idstr(buf, BUSTYPESTR_USB, buspos,
-			   DEVTYPESTR_MOUSE, "Naga", devid);
-}
-
 void razer_naga_gen_idstr(struct usb_device *udev, char *buf)
 {
-	naga_do_gen_idstr(udev, buf, NULL);
+	razer_generic_usb_gen_idstr(udev, NULL, "Naga", 1, buf);
 }
 
 void razer_naga_assign_usb_device(struct razer_mouse *m,
@@ -589,7 +548,7 @@ int razer_naga_init(struct razer_mouse *m,
 	}
 
 	m->type = RAZER_MOUSETYPE_NAGA;
-	naga_do_gen_idstr(usbdev, m->idstr, priv->usb.h);
+	razer_generic_usb_gen_idstr(usbdev, priv->usb.h, "Naga", 1, m->idstr);
 
 	m->claim = naga_claim;
 	m->release = naga_release;
