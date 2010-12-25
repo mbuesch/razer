@@ -472,28 +472,15 @@ razer_msleep(300);
 static int lachesis_claim(struct razer_mouse *m)
 {
 	struct lachesis_private *priv = m->internal;
-	int err, fwver;
 
-	err = razer_generic_usb_claim_refcount(&priv->usb, &priv->claimed);
-	if (!err) {
-		fwver = lachesis_read_fw_ver(priv);
-		if (fwver < 0) {
-			razer_generic_usb_release_refcount(&priv->usb, &priv->claimed);
-			return fwver;
-		}
-		priv->fw_version = fwver;
-	}
-
-	return err;
+	return razer_generic_usb_claim_refcount(&priv->usb, &priv->claimed);
 }
 
 static void lachesis_release(struct razer_mouse *m)
 {
 	struct lachesis_private *priv = m->internal;
 
-	priv->claimed--;
-	if (!priv->claimed)
-		razer_generic_usb_release(&priv->usb);
+	return razer_generic_usb_release_refcount(&priv->usb, &priv->claimed);
 }
 
 static int lachesis_get_fw_version(struct razer_mouse *m)
@@ -846,7 +833,7 @@ int razer_lachesis_init(struct razer_mouse *m,
 {
 	struct lachesis_private *priv;
 	unsigned int i;
-	int err;
+	int err, fwver;
 
 	BUILD_BUG_ON(sizeof(struct lachesis_profcfg_cmd) != 0x18C);
 	BUILD_BUG_ON(sizeof(struct lachesis_dpimap_cmd) != 0x60);
@@ -894,6 +881,14 @@ int razer_lachesis_init(struct razer_mouse *m,
 			    "Failed to initially claim the device\n");
 		goto err_free;
 	}
+	fwver = lachesis_read_fw_ver(priv);
+	if (fwver < 0) {
+		razer_error("hw_lachesis: Failed to get firmware version\n");
+		err = fwver;
+		goto err_release;
+	}
+	priv->fw_version = fwver;
+
 	err = lachesis_read_config_from_hw(priv);
 	if (err) {
 		razer_error("hw_lachesis: "
