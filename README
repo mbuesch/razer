@@ -12,22 +12,23 @@ DEPENDENCIES
  * python 2.x
    http://www.python.org/
    Debian Linux:
-	apt-get install python
+	aptitude install python
 
  * libusb
    http://libusb.sourceforge.net/
    Debian Linux:
-	apt-get install libusb-dev
+	aptitude install libusb-dev
 
  * QT4 python bindings (for the graphical qrazercfg tool only)
-   http://www.trollech.com/
+   http://www.riverbankcomputing.co.uk/software/pyqt/intro
+   http://qt.nokia.com/
    Debian Linux:
-	apt-get install python-qt4
+	aptitude install python-qt4
 
  * cmake (for building only)
    http://www.cmake.org/
    Debian Linux:
-	apt-get install cmake
+	aptitude install cmake
 
 Note that almost all distributions ship prebuilt packages of the
 above dependencies.
@@ -75,6 +76,16 @@ It installed the script to
 This should work on most distributions.
 
 If udev notification does not work, try to reboot the system.
+
+
+RAZERD CONFIGURATION
+====================
+
+The user may create a razerd configuration file in /etc/razer.conf which
+can be used to specify various razerd options and initial hardware
+configuration settings.
+And example config file is included as "razer.conf" in this package.
+If no configuration file is available, razerd will work with default settings.
 
 
 X11-WINDOW (X.ORG) CONFIGURATION
