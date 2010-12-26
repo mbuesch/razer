@@ -7,7 +7,11 @@ else (BIGENDIAN)
 	add_definitions(-DLITTLE_ENDIAN_HOST)
 endif (BIGENDIAN)
 
-add_definitions("-D_GNU_SOURCE -D_BSD_SOURCE -DRAZERCFG_BUILD")
+add_definitions("-D_GNU_SOURCE")
+add_definitions("-DRAZERCFG_BUILD")
+add_definitions("-D_FORTIFY_SOURCE=2")
+
+set(GENERIC_COMPILE_FLAGS "-std=gnu99 -Wall -Wformat -Wformat-security -fstack-protector")
 
 macro(INSTALL_EXEC_CMD _COMMAND _FAILMSG)
 	install(CODE "

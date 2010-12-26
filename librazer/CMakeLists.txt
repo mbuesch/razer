@@ -11,11 +11,9 @@ add_library(razer SHARED
 	    hw_lachesis.c
 	    hw_naga.c)
 
-set_target_properties(razer PROPERTIES
-		      COMPILE_FLAGS "-std=c99 -Wall")
+set_target_properties(razer PROPERTIES COMPILE_FLAGS ${GENERIC_COMPILE_FLAGS})
 
 add_definitions("-Du_int8_t=uint8_t -Du_int16_t=uint16_t -Du_int32_t=uint32_t")
-add_definitions("-D_GNU_SOURCE")
 
 target_link_libraries(razer usb)
 
