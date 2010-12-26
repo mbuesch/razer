@@ -54,7 +54,7 @@ static void cypress_print_one_status(int *ctx, FILE *fd, const char *message)
 {
 	if (*ctx)
 		fprintf(fd, ", ");
-	fprintf(fd, message);
+	fprintf(fd, "%s", message);
 	(*ctx)++;
 }
 
