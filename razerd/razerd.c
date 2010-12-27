@@ -517,7 +517,7 @@ static void signal_handler(int signum)
 		exit(0);
 		break;
 	case SIGPIPE:
-		logdebug("Broken pipe.\n");
+		/* Ignore */
 		break;
 	default:
 		logerr("Received unknown signal %d\n", signum);
