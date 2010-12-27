@@ -23,8 +23,8 @@ extern razer_logfunc_t razer_logfunc_debug;
 
 
 struct razer_usb_interface {
-	int bInterfaceNumber;
-	int bAlternateSetting;
+	uint8_t bInterfaceNumber;
+	uint8_t bAlternateSetting;
 };
 
 #define RAZER_MAX_NR_INTERFACES		2
@@ -34,6 +34,8 @@ struct razer_usb_context {
 	struct libusb_device *dev;
 	/* The handle for all operations. */
 	struct libusb_device_handle *h;
+	/* The configuration we want to use. Defaults to 1. */
+	uint8_t bConfigurationValue;
 	/* The interfaces we use. */
 	struct razer_usb_interface interfaces[RAZER_MAX_NR_INTERFACES];
 	unsigned int nr_interfaces;

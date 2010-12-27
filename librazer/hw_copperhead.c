@@ -626,14 +626,15 @@ int razer_copperhead_init(struct razer_mouse *m,
 			"Failed to initially claim the device\n");
 		goto err_free;
 	}
-	err = copperhead_read_config_from_hw(priv);
-	if (!err)
-		err = copperhead_commit(priv);
-	m->release(m);
+	err = copperhead_read_fw_ver(priv);
 	if (err) {
-		razer_error("hw_copperhead: "
-			"Failed to read the configuration from hardware\n");
-		goto err_free;
+		razer_error("hw_copperhead: Failed to fetch firmware version number\n");
+		goto err_release;
+	}
+	err = copperhead_read_config_from_hw(priv);
+	if (err) {
+		razer_error("hw_copperhead: Failed to read config from hardware\n");
+		goto err_release;
 	}
 
 	m->type = RAZER_MOUSETYPE_COPPERHEAD;
@@ -649,8 +650,18 @@ int razer_copperhead_init(struct razer_mouse *m,
 	m->supported_buttons = copperhead_supported_buttons;
 	m->supported_button_functions = copperhead_supported_button_functions;
 
+	err = copperhead_commit(priv);
+	if (err) {
+		razer_error("hw_copperhead: Failed to commit initial config\n");
+		goto err_release;
+	}
+
+	m->release(m);
+
 	return 0;
 
+err_release:
+	m->release(m);
 err_free:
 	free(priv);
 

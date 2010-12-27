@@ -451,6 +451,19 @@ static void mouse_apply_initial_config(struct razer_mouse *m)
 	}
 }
 
+static struct razer_usb_context * razer_create_usb_ctx(struct libusb_device *dev)
+{
+	struct razer_usb_context *ctx;
+
+	ctx = zalloc(sizeof(*ctx));
+	if (!ctx)
+		return NULL;
+	ctx->dev = dev;
+	ctx->bConfigurationValue = 1;
+
+	return ctx;
+}
+
 static int mouse_default_claim(struct razer_mouse *m)
 {
 	return razer_generic_usb_claim_refcount(m->usb_ctx, &m->claim_count);
@@ -471,11 +484,9 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 	m = zalloc(sizeof(*m));
 	if (!m)
 		return NULL;
-	m->usb_ctx = zalloc(sizeof(*(m->usb_ctx)));
+	m->usb_ctx = razer_create_usb_ctx(udev);
 	if (!m->usb_ctx)
 		goto err_free_mouse;
-
-	m->usb_ctx->dev = udev;
 
 	m->claim = mouse_default_claim;
 	m->release = mouse_default_release;
@@ -684,32 +695,6 @@ static void razer_reattach_usb_kdrv(struct razer_usb_context *ctx,
 	}
 }
 
-static int razer_usb_claim(struct razer_usb_context *ctx,
-			   int bInterfaceNumber)
-{
-	int res;
-
-	res = libusb_kernel_driver_active(ctx->h, bInterfaceNumber);
-	if (res == 1) {
-		res = libusb_detach_kernel_driver(ctx->h, bInterfaceNumber);
-		if (res) {
-			razer_error("Failed to detach kernel driver\n");
-			return -EBUSY;
-		}
-	} else if (res) {
-		razer_error("Failed to get kernel driver state\n");
-		return -ENODEV;
-	}
-
-	res = libusb_claim_interface(ctx->h, bInterfaceNumber);
-	if (res) {
-		razer_error("Failed to claim USB interface\n");
-		return -EBUSY;
-	}
-
-	return 0;
-}
-
 static void razer_usb_release(struct razer_usb_context *ctx,
 			      int bInterfaceNumber)
 {
@@ -719,46 +704,91 @@ static void razer_usb_release(struct razer_usb_context *ctx,
 
 int razer_generic_usb_claim(struct razer_usb_context *ctx)
 {
-	struct libusb_config_descriptor *config;
-	int err, i;
+	unsigned int tries;
+	int err, i, config;
 	struct razer_usb_interface *interf;
 
-	err = libusb_get_active_config_descriptor(ctx->dev, &config);
-	if (err) {
-		razer_error("razer_generic_usb_claim: Failed to get active config\n");
-		return -EIO;
-	}
 	err = libusb_open(ctx->dev, &ctx->h);
 	if (err) {
 		razer_error("razer_generic_usb_claim: Failed to open USB device\n");
-		err = -ENODEV;
-		goto err_free_config;
+		return -ENODEV;
 	}
+
+	/* Detach kernel drivers for all interfaces. */
 	for (i = 0; i < ctx->nr_interfaces; i++) {
 		interf = &ctx->interfaces[i];
-		err = razer_usb_claim(ctx, interf->bInterfaceNumber);
-		if (err)
-			goto err_unwind;
-		err = libusb_set_interface_alt_setting(ctx->h, interf->bInterfaceNumber,
-						       interf->bAlternateSetting);
-		if (err) {
-			razer_usb_release(ctx, interf->bInterfaceNumber);
-			goto err_unwind;
+		err = libusb_kernel_driver_active(ctx->h, interf->bInterfaceNumber);
+		if (err == 1) {
+			err = libusb_detach_kernel_driver(ctx->h, interf->bInterfaceNumber);
+			if (err) {
+				err = -EBUSY;
+				razer_error("Failed to detach kernel driver\n");
+				goto err_close;
+			}
+		} else if (err) {
+			err = -ENODEV;
+			razer_error("Failed to get kernel driver state\n");
+			goto err_close;
 		}
 	}
-	libusb_free_config_descriptor(config);
+
+	tries = 0;
+	while (1) {
+		if (tries >= 10) {
+			razer_error("razer_generic_usb_claim: Failed to claim config\n");
+			goto err_close;
+		}
+
+		/* Select the correct configuration */
+		err = libusb_get_configuration(ctx->h, &config);
+		if (err) {
+			err = -EBUSY;
+			razer_error("razer_generic_usb_claim: Failed to get configuration\n");
+			goto err_close;
+		}
+		if (config != ctx->bConfigurationValue) {
+			err = libusb_set_configuration(ctx->h, ctx->bConfigurationValue);
+			if (err) {
+				err = -EBUSY;
+				razer_error("razer_generic_usb_claim: Failed to set configuration\n");
+				goto err_close;
+			}
+		}
+
+		/* And finally claim all interfaces. */
+		for (i = 0; i < ctx->nr_interfaces; i++) {
+			interf = &ctx->interfaces[i];
+			err = libusb_claim_interface(ctx->h, interf->bInterfaceNumber);
+			if (err) {
+				err = -EIO;
+				razer_error("Failed to claim USB interface\n");
+				goto err_close;
+			}
+			err = libusb_set_interface_alt_setting(ctx->h, interf->bInterfaceNumber,
+							       interf->bAlternateSetting);
+			if (err) {
+				err = -EIO;
+				goto err_close;
+			}
+		}
+
+		/* To make sure there was no race, check config value again */
+		err = libusb_get_configuration(ctx->h, &config);
+		if (err) {
+			err = -EBUSY;
+			razer_error("razer_generic_usb_claim: Failed to get configuration\n");
+			goto err_close;
+		}
+		if (config == ctx->bConfigurationValue)
+			break;
+		razer_msleep(100);
+		tries++;
+	}
 
 	return 0;
 
-err_unwind:
-	for (i--; i >= 0; i--) {
-		interf = &ctx->interfaces[i];
-		razer_usb_release(ctx, interf->bInterfaceNumber);
-	}
-/* err_close: */
+err_close:
 	libusb_close(ctx->h);
-err_free_config:
-	libusb_free_config_descriptor(config);
 
 	return err;
 }
