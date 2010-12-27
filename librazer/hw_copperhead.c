@@ -5,7 +5,7 @@
  *   Important notice:
  *   This hardware driver is based on reverse engineering only.
  *
- *   Copyright (C) 2009 Michael Buesch <mb@bu3sch.de>
+ *   Copyright (C) 2009-2010 Michael Buesch <mb@bu3sch.de>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -181,9 +181,9 @@ static struct copperhead_one_buttonmapping *
 	return NULL;
 }
 
-static int copperhead_usb_write_withindex(struct copperhead_private *priv,
-					  int request, int command, int index,
-					  const void *buf, size_t size)
+static int copperhead_usb_write(struct copperhead_private *priv,
+				int request, int command, int index,
+				const void *buf, size_t size)
 {
 	int err;
 
@@ -197,21 +197,15 @@ static int copperhead_usb_write_withindex(struct copperhead_private *priv,
 		razer_error("razer-copperhead: "
 			"USB write 0x%02X 0x%02X 0x%02X failed: %d\n",
 			request, command, index, err);
-		return err;
+		return -EIO;
 	}
+
 	return 0;
 }
 
-static int copperhead_usb_write(struct copperhead_private *priv,
-				int request, int command,
-				const void *buf, size_t size)
-{
-	return copperhead_usb_write_withindex(priv, request, command, 0, buf, size);
-}
-
-static int copperhead_usb_read_withindex(struct copperhead_private *priv,
-					 int request, int command, int index,
-					 void *buf, size_t size)
+static int copperhead_usb_read(struct copperhead_private *priv,
+			       int request, int command, int index,
+			       void *buf, size_t size)
 {
 	int err;
 
@@ -225,16 +219,10 @@ static int copperhead_usb_read_withindex(struct copperhead_private *priv,
 		razer_error("razer-copperhead: "
 			"USB read 0x%02X 0x%02X 0x%02X failed: %d\n",
 			request, command, index, err);
-		return err;
+		return -EIO;
 	}
-	return 0;
-}
 
-static int copperhead_usb_read(struct copperhead_private *priv,
-			       int request, int command,
-			       void *buf, size_t size)
-{
-	return copperhead_usb_read_withindex(priv, request, command, 0, buf, size);
+	return 0;
 }
 
 static int copperhead_read_fw_ver(struct copperhead_private *priv)
@@ -244,8 +232,8 @@ static int copperhead_read_fw_ver(struct copperhead_private *priv)
 //	int err;
 
 //FIXME this is wrong
-//	err = copperhead_usb_read(priv, USB_REQ_CLEAR_FEATURE,
-//				  0x05, buf, sizeof(buf));
+//	err = copperhead_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
+//				  0x05, 0, buf, sizeof(buf));
 buf[0]=0;
 buf[1]=0;
 //	if (err)
@@ -262,18 +250,15 @@ static int copperhead_commit(struct copperhead_private *priv)
 	struct copperhead_profcfg_cmd profcfg;
 	unsigned int i;
 	int err;
-//	unsigned char value;
+	unsigned char value;
 
-#if 0
 	/* Select the profile */
 	value = 1;
-	err = copperhead_usb_write_withindex(priv, USB_REQ_SET_CONFIGURATION,
-					     0x02, 1, &value, sizeof(value));
+	err = copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
+				   0x02, 1, &value, sizeof(value));
 	if (err)
 		return err;
-#endif
 
-for (int x = 0; x < 1; x++) {
 	/* Upload the profile config */
 	memset(&profcfg, 0, sizeof(profcfg));
 	profcfg.packetlength = cpu_to_le16(sizeof(profcfg));
@@ -311,15 +296,14 @@ for (int x = 0; x < 1; x++) {
 		sizeof(profcfg) - sizeof(profcfg.checksum));
 razer_dump("profcfg", &profcfg, sizeof(profcfg));
 	/* The profile config is committed in 64byte chunks */
-	for (i = 1; i <= 6; i++) {
+	for (i = 0; i < 6; i++) {
 		uint8_t chunk[64] = { 0, };
 		const uint8_t *cfg = (uint8_t *)&profcfg;
 
-		memcpy(chunk, cfg + ((i - 1) * 64),
-		       min(64, sizeof(profcfg) - ((i - 1) * 64)));
-razer_dump("chunk", chunk, 64);
+		memcpy(chunk, cfg + (i * 64),
+		       min(64, sizeof(profcfg) - (i * 64)));
 		err = copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
-					   i, chunk, sizeof(chunk));
+					   i + 1, 0, chunk, sizeof(chunk));
 		if (err)
 			return err;
 	}
@@ -327,18 +311,16 @@ razer_dump("chunk", chunk, 64);
 char buf[0x156];
 
 /* 2109 0200 0300 0100 01 */
-//buf[0] = 1;
+buf[0] = 1;
 //razer_msleep(500);
-//copperhead_usb_write_withindex(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
-//			       0x02, 0x03, buf, 1);
+#if 0
+copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
+		     0x02, 3, buf, 1);
+#endif
 copperhead_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
-		    0x01, buf, sizeof(buf));
+		    0x01, 0, buf, sizeof(buf));
 razer_dump("reply", buf, sizeof(buf));
 }
-//razer_msleep(500);
-}
-
-	//TODO
 
 	return 0;
 }
@@ -357,17 +339,9 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 	}
 	priv->cur_profile = &priv->profiles[0];
 
-	/* Poke the device */
-	while (1) {//FIXME timeout
-		err = copperhead_usb_write(priv, LIBUSB_REQUEST_GET_INTERFACE,
-					   0x00, NULL, 0);
-		if (!err)
-			break;
-	}
-
 	/* Read the current profile number. It's currently unused, though. */
 	err = copperhead_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
-				  0x01, &value, sizeof(value));
+				  0x01, 0, &value, sizeof(value));
 	if (err)
 		return err;
 
@@ -375,21 +349,17 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 		char buf[0x156];
 
 		value = 1;
-		err = copperhead_usb_write_withindex(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
-						     0x02, 0x03, &value, sizeof(value));
-//		if (!err)
-//			printf("OK\n");
+#if 0
+		err = copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
+					   0x02, 3, &value, sizeof(value));
+//		if (err)
 //			return err;
-		razer_msleep(100);
+#endif
 		err = copperhead_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
-					  0x01, buf, sizeof(buf));
-//		if (!err)
-//			printf("OK2\n");
-//			return err;
-		razer_msleep(100);
+					  0x01, 0, buf, sizeof(buf));
+		if (err)
+			return err;
 	}
-
-	//TODO
 
 	return 0;
 }
@@ -617,8 +587,11 @@ int razer_copperhead_init(struct razer_mouse *m,
 	m->internal = priv;
 
 	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
-	if (err)
+	err |= razer_usb_add_used_interface(m->usb_ctx, 1, 0);
+	if (err) {
+		err = -EIO;
 		goto err_free;
+	}
 
 	priv->dpimappings[0].nr = 0;
 	priv->dpimappings[0].res = RAZER_MOUSE_RES_400DPI;
