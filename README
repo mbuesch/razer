@@ -14,10 +14,10 @@ DEPENDENCIES
    Debian Linux:
 	aptitude install python
 
- * libusb
-   http://libusb.sourceforge.net/
+ * libusb 1.0
+   http://libusb.org/
    Debian Linux:
-	aptitude install libusb-dev
+	aptitude install libusb-1.0-0-dev
 
  * QT4 python bindings (for the graphical qrazercfg tool only)
    http://www.riverbankcomputing.co.uk/software/pyqt/intro
