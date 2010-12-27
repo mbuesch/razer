@@ -633,7 +633,7 @@ int razer_deathadder_init(struct razer_mouse *m,
 		goto err_free;
 
 	if (!is_cypress_bootloader(m->usb_ctx->dev)) {
-		err = razer_usb_force_reinit(m->usb_ctx);
+		err = razer_usb_force_hub_reset(m->usb_ctx);
 		if (err) {
 			razer_error("hw_deathadder: Failed to reinit USB device\n");
 			goto err_free;

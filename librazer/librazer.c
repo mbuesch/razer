@@ -885,35 +885,51 @@ void razer_generic_usb_gen_idstr(struct libusb_device *udev,
 			   DEVTYPESTR_MOUSE, devname, devid);
 }
 
-
-/** razer_usb_force_reinit - Force the USB-level reinitialization of a device,
-  * so it enters a known state.
-  */
-int razer_usb_force_reinit(struct razer_usb_context *device_ctx)
+/** razer_usb_force_hub_reset
+ * Force reset of the hub the specified device is on
+ */
+int razer_usb_force_hub_reset(struct razer_usb_context *device_ctx)
 {
-//TODO
-return 0;
-#if 0
-	struct usb_dev_handle *h;
-	struct usb_device *hub;
+	struct libusb_device_handle *h;
+	struct libusb_device *hub = NULL, *dev;
+	uint8_t hub_bus_number, hub_device_address;
 	struct razer_usb_reconnect_guard rg;
 	int err;
+	struct libusb_device **devlist;
+	ssize_t devlist_size, i;
 
-	razer_debug("Forcing device reinitialization\n");
+	razer_debug("Forcing hub reset for device %03u:%03u\n",
+		libusb_get_bus_number(device_ctx->dev),
+		libusb_get_device_address(device_ctx->dev));
 
 	razer_usb_reconnect_guard_init(&rg, device_ctx);
 
-	hub = device_ctx->dev->bus->root_dev;
-	razer_debug("Resetting root hub %s:%s\n",
-		hub->bus->dirname, hub->filename);
+	hub_bus_number = libusb_get_bus_number(device_ctx->dev);
+	hub_device_address = 1; /* Constant */
 
-	h = usb_open(hub);
-	if (!h) {
-		razer_error("razer_usb_force_reinit: usb_open failed\n");
+	devlist_size = libusb_get_device_list(libusb_ctx, &devlist);
+	for (i = 0; i < devlist_size; i++) {
+		dev = devlist[i];
+		if (libusb_get_bus_number(dev) == hub_bus_number &&
+		    libusb_get_device_address(dev) == hub_device_address) {
+			hub = dev;
+			break;
+		}
+	}
+	if (!hub) {
+		razer_error("razer_usb_force_reinit: Failed to find hub\n");
 		return -ENODEV;
 	}
-	usb_reset(h);
-	usb_close(h);
+	razer_debug("Resetting root hub %03u:%03u\n",
+		hub_bus_number, hub_device_address);
+
+	err = libusb_open(hub, &h);
+	if (err) {
+		razer_error("razer_usb_force_reinit: Failed to open hub device\n");
+		return -ENODEV;
+	}
+	libusb_reset_device(h);
+	libusb_close(h);
 
 	err = razer_usb_reconnect_guard_wait(&rg, 1);
 	if (err) {
@@ -921,9 +937,11 @@ return 0;
 			"Failed to discover the reconnected device\n");
 		return err;
 	}
+	razer_debug("Hub reset completed. Device rediscovered as %03u:%03u\n",
+		libusb_get_bus_number(device_ctx->dev),
+		libusb_get_device_address(device_ctx->dev));
 
 	return 0;
-#endif
 }
 
 /** razer_usb_reconnect_guard_init - Init the reconnect-guard context

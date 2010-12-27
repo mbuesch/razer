@@ -63,7 +63,7 @@ int razer_usb_reconnect_guard_init(struct razer_usb_reconnect_guard *guard,
 				   struct razer_usb_context *ctx);
 int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard, bool hub_reset);
 
-int razer_usb_force_reinit(struct razer_usb_context *ctx);
+int razer_usb_force_hub_reset(struct razer_usb_context *ctx);
 
 #define BUSTYPESTR_USB		"USB"
 #define DEVTYPESTR_MOUSE	"Mouse"
