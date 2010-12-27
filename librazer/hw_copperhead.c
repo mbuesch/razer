@@ -247,10 +247,16 @@ buf[1]=0;
 
 static int copperhead_commit(struct copperhead_private *priv)
 {
-	struct copperhead_profcfg_cmd profcfg;
+	union {
+		struct copperhead_profcfg_cmd profcfg;
+		uint8_t chunks[64 * 6];
+	} _packed u;
+	uint8_t *chunk;
 	unsigned int i;
 	int err;
 	unsigned char value;
+
+	BUILD_BUG_ON(sizeof(u) != 0x180);
 
 	/* Select the profile */
 	value = 1;
@@ -260,67 +266,61 @@ static int copperhead_commit(struct copperhead_private *priv)
 		return err;
 
 	/* Upload the profile config */
-	memset(&profcfg, 0, sizeof(profcfg));
-	profcfg.packetlength = cpu_to_le16(sizeof(profcfg));
-	profcfg.magic0 = COPPERHEAD_PROFCFG_MAGIC0;
-	profcfg.magic1 = COPPERHEAD_PROFCFG_MAGIC1;
+	memset(&u, 0, sizeof(u));
+	u.profcfg.packetlength = cpu_to_le16(sizeof(u.profcfg));
+	u.profcfg.magic0 = COPPERHEAD_PROFCFG_MAGIC0;
+	u.profcfg.magic1 = COPPERHEAD_PROFCFG_MAGIC1;
 	switch (priv->cur_dpimapping[0]->res) {
 	default:
 	case RAZER_MOUSE_RES_400DPI:
-		profcfg.dpisel = 4;
+		u.profcfg.dpisel = 4;
 		break;
 	case RAZER_MOUSE_RES_800DPI:
-		profcfg.dpisel = 3;
+		u.profcfg.dpisel = 3;
 		break;
 	case RAZER_MOUSE_RES_1600DPI:
-		profcfg.dpisel = 2;
+		u.profcfg.dpisel = 2;
 		break;
 	case RAZER_MOUSE_RES_2000DPI:
-		profcfg.dpisel = 1;
+		u.profcfg.dpisel = 1;
 		break;
 	}
 	switch (priv->cur_freq[0]) {
 	default:
 	case RAZER_MOUSE_FREQ_125HZ:
-		profcfg.freq = 3;
+		u.profcfg.freq = 3;
 		break;
 	case RAZER_MOUSE_FREQ_500HZ:
-		profcfg.freq = 2;
+		u.profcfg.freq = 2;
 		break;
 	case RAZER_MOUSE_FREQ_1000HZ:
-		profcfg.freq = 1;
+		u.profcfg.freq = 1;
 		break;
 	}
-	profcfg.buttons = priv->buttons[0];
-	profcfg.checksum = razer_xor16_checksum(&profcfg,
-		sizeof(profcfg) - sizeof(profcfg.checksum));
-razer_dump("profcfg", &profcfg, sizeof(profcfg));
+	u.profcfg.buttons = priv->buttons[0];
+	u.profcfg.checksum = razer_xor16_checksum(&u.profcfg,
+		sizeof(u.profcfg) - 2);
+razer_dump("profcfg", &u.profcfg, sizeof(u.profcfg));
 	/* The profile config is committed in 64byte chunks */
-	for (i = 0; i < 6; i++) {
-		uint8_t chunk[64] = { 0, };
-		const uint8_t *cfg = (uint8_t *)&profcfg;
-
-		memcpy(chunk, cfg + (i * 64),
-		       min(64, sizeof(profcfg) - (i * 64)));
+	chunk = &u.chunks[0];
+	for (i = 0; i < 6; i++, chunk += 64) {
 		err = copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
-					   i + 1, 0, chunk, sizeof(chunk));
+					   i + 1, 0, chunk, 64);
+//razer_dump("chunk", chunk, 64);
 		if (err)
 			return err;
 	}
-{
-char buf[0x156];
-
-/* 2109 0200 0300 0100 01 */
-buf[0] = 1;
-//razer_msleep(500);
 #if 0
-copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
-		     0x02, 3, buf, 1);
+	/* 2109 0200 0300 0100 01 */
+	copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
+			     0x02, 3, buf, 1);
 #endif
-copperhead_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
-		    0x01, 0, buf, sizeof(buf));
-razer_dump("reply", buf, sizeof(buf));
-}
+	memset(&u, 0, sizeof(u));
+	err = copperhead_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
+				  0x01, 0, &u.chunks[0], 0x156);
+	if (err)
+		return err;
+	razer_dump("reply", &u.chunks[0], 0x156);
 
 	return 0;
 }
