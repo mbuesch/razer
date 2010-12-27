@@ -67,6 +67,8 @@ static inline void * zalloc(size_t size)
 	return calloc(1, size);
 }
 
+void razer_free(void *ptr, size_t size);
+
 char * razer_strsplit(char *str, char sep);
 int razer_split_pair(const char *str, char sep, char *a, char *b, size_t len);
 int razer_string_to_int(const char *string, int *i);

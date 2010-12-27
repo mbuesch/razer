@@ -15,7 +15,7 @@ set_target_properties(razer PROPERTIES COMPILE_FLAGS ${GENERIC_COMPILE_FLAGS})
 
 add_definitions("-Du_int8_t=uint8_t -Du_int16_t=uint16_t -Du_int32_t=uint32_t")
 
-target_link_libraries(razer usb)
+target_link_libraries(razer usb-1.0)
 
 install(TARGETS razer DESTINATION lib)
 

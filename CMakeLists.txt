@@ -9,18 +9,18 @@ if (COMMAND cmake_policy)
 	cmake_policy(SET CMP0005 OLD)
 endif (COMMAND cmake_policy)
 
+include("${razer_SOURCE_DIR}/scripts/cmake.global")
 include(CheckIncludeFile)
 
 macro(CHECK_LIB _LIB _HEADER)
 	check_include_file(${_HEADER} ${_HEADER}_ERR)
 	if (NOT ${_HEADER}_ERR)
-		message(FATAL_ERROR "Could not find library \"lib${_LIB}\". "
-			"On Debian Linux try \"apt-get install lib${_LIB}-dev\" "
-			"to install the library.")
+		message(FATAL_ERROR "Could not find library \"lib${_LIB}\" "
+			"with header ${_HEADER}")
 	endif (NOT ${_HEADER}_ERR)
 endmacro(CHECK_LIB)
 
-check_lib(usb usb.h)
+check_lib(usb-1.0 libusb.h)
 
 set(CMAKE_C_FLAGS_DEBUG "-DDEBUG ${CMAKE_C_FLAGS_DEBUG}")
 

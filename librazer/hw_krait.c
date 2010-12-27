@@ -26,12 +26,12 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include <usb.h>
 
 
 struct krait_private {
+	struct razer_mouse *m;
+
 	unsigned int claimed;
-	struct razer_usb_context usb;
 	struct razer_mouse_dpimapping *cur_dpimapping;
 	struct razer_mouse_profile profile;
 	struct razer_mouse_dpimapping dpimapping[2];
@@ -45,11 +45,13 @@ static int krait_usb_write(struct krait_private *priv,
 {
 	int err;
 
-	err = usb_control_msg(priv->usb.h,
-			      USB_ENDPOINT_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			      request, command, 0,
-			      buf, size,
-			      KRAIT_USB_TIMEOUT);
+	err = libusb_control_transfer(
+		priv->m->usb_ctx->h,
+		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_CLASS |
+		LIBUSB_RECIPIENT_INTERFACE,
+		request, command, 0,
+		buf, size,
+		KRAIT_USB_TIMEOUT);
 	if (err != size)
 		return err;
 	return 0;
@@ -62,11 +64,13 @@ static int krait_usb_read(struct krait_private *priv,
 {
 	int err;
 
-	err = usb_control_msg(priv->usb.h,
-			      USB_ENDPOINT_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			      request, command, 0,
-			      buf, size,
-			      KRAIT_USB_TIMEOUT);
+	err = libusb_control_transfer(
+		priv->m->usb_ctx->h,
+		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_CLASS |
+		LIBUSB_RECIPIENT_INTERFACE,
+		request, command, 0,
+		(unsigned char *)buf, size,
+		KRAIT_USB_TIMEOUT);
 	if (err != size)
 		return err;
 	return 0;
@@ -77,14 +81,14 @@ static int krait_claim(struct razer_mouse *m)
 {
 	struct krait_private *priv = m->internal;
 
-	return razer_generic_usb_claim_refcount(&priv->usb, &priv->claimed);
+	return razer_generic_usb_claim_refcount(m->usb_ctx, &priv->claimed);
 }
 
 static void krait_release(struct razer_mouse *m)
 {
 	struct krait_private *priv = m->internal;
 
-	razer_generic_usb_release_refcount(&priv->usb, &priv->claimed);
+	razer_generic_usb_release_refcount(m->usb_ctx, &priv->claimed);
 }
 
 static int krait_supported_resolutions(struct razer_mouse *m,
@@ -158,7 +162,7 @@ static int krait_set_dpimapping(struct razer_mouse_profile *p,
 	default:
 		return -EINVAL;
 	}
-	err = krait_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+	err = krait_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 			      0x02, &value, sizeof(value));
 	if (!err)
 		priv->cur_dpimapping = d;
@@ -166,31 +170,23 @@ static int krait_set_dpimapping(struct razer_mouse_profile *p,
 	return err;
 }
 
-void razer_krait_gen_idstr(struct usb_device *udev, char *buf)
-{
-	razer_generic_usb_gen_idstr(udev, NULL, "Krait", 1, buf);
-}
-
-void razer_krait_assign_usb_device(struct razer_mouse *m,
-				   struct usb_device *usbdev)
-{
-	struct krait_private *priv = m->internal;
-
-	priv->usb.dev = usbdev;
-}
-
 int razer_krait_init(struct razer_mouse *m,
-		     struct usb_device *usbdev)
+		     struct libusb_device *usbdev)
 {
 	struct krait_private *priv;
+	int err;
 
-	priv = malloc(sizeof(struct krait_private));
+	priv = zalloc(sizeof(struct krait_private));
 	if (!priv)
 		return -ENOMEM;
-	memset(priv, 0, sizeof(*priv));
+	priv->m = m;
 	m->internal = priv;
 
-	razer_krait_assign_usb_device(m, usbdev);
+	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
+	if (err) {
+		free(priv);
+		return err;
+	}
 
 	priv->profile.nr = 0;
 	priv->profile.get_dpimapping = krait_get_dpimapping;
@@ -210,7 +206,7 @@ int razer_krait_init(struct razer_mouse *m,
 	priv->cur_dpimapping = &priv->dpimapping[1];
 
 	m->type = RAZER_MOUSETYPE_KRAIT;
-	razer_krait_gen_idstr(usbdev, m->idstr);
+	razer_generic_usb_gen_idstr(usbdev, NULL, "Krait", 1, m->idstr);
 
 	m->claim = krait_claim;
 	m->release = krait_release;

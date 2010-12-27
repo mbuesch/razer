@@ -26,7 +26,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include <usb.h>
 
 
 enum { /* Misc constants */
@@ -98,9 +97,10 @@ struct copperhead_profcfg_cmd {
 #define COPPERHEAD_PROFCFG_MAGIC1	cpu_to_le16(0x0001)
 
 struct copperhead_private {
+	struct razer_mouse *m;
+
 	unsigned int claimed;
 	uint16_t fw_version;
-	struct razer_usb_context usb;
 
 	/* The active profile. */
 	struct razer_mouse_profile *cur_profile;
@@ -188,11 +188,12 @@ static int copperhead_usb_write_withindex(struct copperhead_private *priv,
 {
 	int err;
 
-	err = usb_control_msg(priv->usb.h,
-			      USB_ENDPOINT_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			      request, command, index,
-			      (char *)buf, size,
-			      COPPERHEAD_USB_TIMEOUT);
+	err = libusb_control_transfer(
+		priv->m->usb_ctx->h,
+		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_CLASS |
+		LIBUSB_RECIPIENT_INTERFACE,
+		request, command, index,
+		(unsigned char *)buf, size, COPPERHEAD_USB_TIMEOUT);
 	if (err != size) {
 		razer_error("razer-copperhead: "
 			"USB write 0x%02X 0x%02X 0x%02X failed: %d\n",
@@ -215,11 +216,12 @@ static int copperhead_usb_read_withindex(struct copperhead_private *priv,
 {
 	int err;
 
-	err = usb_control_msg(priv->usb.h,
-			      USB_ENDPOINT_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			      request, command, index,
-			      buf, size,
-			      COPPERHEAD_USB_TIMEOUT);
+	err = libusb_control_transfer(
+		priv->m->usb_ctx->h,
+		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_CLASS |
+		LIBUSB_RECIPIENT_INTERFACE,
+		request, command, index,
+		(unsigned char *)buf, size, COPPERHEAD_USB_TIMEOUT);
 	if (err != size) {
 		razer_error("razer-copperhead: "
 			"USB read 0x%02X 0x%02X 0x%02X failed: %d\n",
@@ -317,7 +319,7 @@ razer_dump("profcfg", &profcfg, sizeof(profcfg));
 		memcpy(chunk, cfg + ((i - 1) * 64),
 		       min(64, sizeof(profcfg) - ((i - 1) * 64)));
 razer_dump("chunk", chunk, 64);
-		err = copperhead_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+		err = copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 					   i, chunk, sizeof(chunk));
 		if (err)
 			return err;
@@ -328,9 +330,9 @@ char buf[0x156];
 /* 2109 0200 0300 0100 01 */
 //buf[0] = 1;
 //razer_msleep(500);
-//copperhead_usb_write_withindex(priv, USB_REQ_SET_CONFIGURATION,
+//copperhead_usb_write_withindex(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 //			       0x02, 0x03, buf, 1);
-copperhead_usb_read(priv, USB_REQ_CLEAR_FEATURE,
+copperhead_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
 		    0x01, buf, sizeof(buf));
 razer_dump("reply", buf, sizeof(buf));
 }
@@ -358,14 +360,14 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 
 	/* Poke the device */
 	while (1) {//FIXME timeout
-		err = copperhead_usb_write(priv, USB_REQ_GET_INTERFACE,
+		err = copperhead_usb_write(priv, LIBUSB_REQUEST_GET_INTERFACE,
 					   0x00, NULL, 0);
 		if (!err)
 			break;
 	}
 
 	/* Read the current profile number. It's currently unused, though. */
-	err = copperhead_usb_read(priv, USB_REQ_CLEAR_FEATURE,
+	err = copperhead_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
 				  0x01, &value, sizeof(value));
 	if (err)
 		return err;
@@ -374,13 +376,13 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 		char buf[0x156];
 
 		value = 1;
-		err = copperhead_usb_write_withindex(priv, USB_REQ_SET_CONFIGURATION,
+		err = copperhead_usb_write_withindex(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 						     0x02, 0x03, &value, sizeof(value));
 //		if (!err)
 //			printf("OK\n");
 //			return err;
 		razer_msleep(100);
-		err = copperhead_usb_read(priv, USB_REQ_CLEAR_FEATURE,
+		err = copperhead_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
 					  0x01, buf, sizeof(buf));
 //		if (!err)
 //			printf("OK2\n");
@@ -397,14 +399,14 @@ static int copperhead_claim(struct razer_mouse *m)
 {
 	struct copperhead_private *priv = m->internal;
 
-	return razer_generic_usb_claim_refcount(&priv->usb, &priv->claimed);
+	return razer_generic_usb_claim_refcount(m->usb_ctx, &priv->claimed);
 }
 
 static void copperhead_release(struct razer_mouse *m)
 {
 	struct copperhead_private *priv = m->internal;
 
-	razer_generic_usb_release_refcount(&priv->usb, &priv->claimed);
+	razer_generic_usb_release_refcount(m->usb_ctx, &priv->claimed);
 }
 
 static int copperhead_get_fw_version(struct razer_mouse *m)
@@ -415,14 +417,6 @@ static int copperhead_get_fw_version(struct razer_mouse *m)
 	if (!priv->claimed)
 		return -EBUSY;
 	return priv->fw_version;
-}
-
-void razer_copperhead_assign_usb_device(struct razer_mouse *m,
-					struct usb_device *usbdev)
-{
-	struct copperhead_private *priv = m->internal;
-
-	priv->usb.dev = usbdev;
 }
 
 static struct razer_mouse_profile * copperhead_get_profiles(struct razer_mouse *m)
@@ -625,13 +619,8 @@ static int copperhead_set_button_function(struct razer_mouse_profile *p,
 	return 0;
 }
 
-void razer_copperhead_gen_idstr(struct usb_device *udev, char *buf)
-{
-	razer_generic_usb_gen_idstr(udev, NULL, "Copperhead", 1, buf);
-}
-
 int razer_copperhead_init(struct razer_mouse *m,
-			  struct usb_device *usbdev)
+			  struct libusb_device *usbdev)
 {
 	struct copperhead_private *priv;
 	unsigned int i;
@@ -639,13 +628,15 @@ int razer_copperhead_init(struct razer_mouse *m,
 
 	BUILD_BUG_ON(sizeof(struct copperhead_profcfg_cmd) != 0x15C);
 
-	priv = malloc(sizeof(struct copperhead_private));
+	priv = zalloc(sizeof(struct copperhead_private));
 	if (!priv)
 		return -ENOMEM;
-	memset(priv, 0, sizeof(*priv));
+	priv->m = m;
 	m->internal = priv;
 
-	razer_copperhead_assign_usb_device(m, usbdev);
+	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
+	if (err)
+		goto err_free;
 
 	priv->dpimappings[0].nr = 0;
 	priv->dpimappings[0].res = RAZER_MOUSE_RES_400DPI;
@@ -678,8 +669,7 @@ int razer_copperhead_init(struct razer_mouse *m,
 	if (err) {
 		razer_error("hw_copperhead: "
 			"Failed to initially claim the device\n");
-		free(priv);
-		return err;
+		goto err_free;
 	}
 	err = copperhead_read_config_from_hw(priv);
 	if (!err)
@@ -688,12 +678,11 @@ int razer_copperhead_init(struct razer_mouse *m,
 	if (err) {
 		razer_error("hw_copperhead: "
 			"Failed to read the configuration from hardware\n");
-		free(priv);
-		return err;
+		goto err_free;
 	}
 
 	m->type = RAZER_MOUSETYPE_COPPERHEAD;
-	razer_copperhead_gen_idstr(usbdev, m->idstr);
+	razer_generic_usb_gen_idstr(usbdev, NULL, "Copperhead", 1, m->idstr);
 
 	m->claim = copperhead_claim;
 	m->release = copperhead_release;
@@ -708,6 +697,11 @@ int razer_copperhead_init(struct razer_mouse *m,
 	m->supported_button_functions = copperhead_supported_button_functions;
 
 	return 0;
+
+err_free:
+	free(priv);
+
+	return err;
 }
 
 void razer_copperhead_release(struct razer_mouse *m)

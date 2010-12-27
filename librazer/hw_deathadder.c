@@ -28,7 +28,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include <usb.h>
 
 
 enum {
@@ -47,11 +46,11 @@ struct deathadder_125_cfg {
 } _packed;
 
 struct deathadder_private {
+	struct razer_mouse *m;
+
 	unsigned int claimed;
 	/* Firmware version number. */
 	uint16_t fw_version;
-	/* USB context */
-	struct razer_usb_context usb;
 	/* The currently set LED states. */
 	bool led_states[DEATHADDER_NR_LEDS];
 	/* The currently set frequency. */
@@ -75,16 +74,18 @@ static int deathadder_usb_write(struct deathadder_private *priv,
 {
 	int err;
 
-	if (is_cypress_bootloader(priv->usb.dev)) {
+	if (is_cypress_bootloader(priv->m->usb_ctx->dev)) {
 		/* Deathadder firmware is down and we're in the bootloader. */
 		return 0;
 	}
 
-	err = usb_control_msg(priv->usb.h,
-			      USB_ENDPOINT_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			      request, command, 0,
-			      (char *)buf, size,
-			      DEATHADDER_USB_TIMEOUT);
+	err = libusb_control_transfer(
+		priv->m->usb_ctx->h,
+		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_CLASS |
+		LIBUSB_RECIPIENT_INTERFACE,
+		request, command, 0,
+		(unsigned char *)buf, size,
+		DEATHADDER_USB_TIMEOUT);
 	if (err != size) {
 		razer_error("razer-deathadder: "
 			"USB write 0x%02X 0x%02X failed: %d\n",
@@ -100,17 +101,19 @@ static int deathadder_usb_read(struct deathadder_private *priv,
 {
 	int err;
 
-	if (is_cypress_bootloader(priv->usb.dev)) {
+	if (is_cypress_bootloader(priv->m->usb_ctx->dev)) {
 		/* Deathadder firmware is down and we're in the bootloader. */
 		memset(buf, 0, size);
 		return 0;
 	}
 
-	err = usb_control_msg(priv->usb.h,
-			      USB_ENDPOINT_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			      request, command, 0,
-			      buf, size,
-			      DEATHADDER_USB_TIMEOUT);
+	err = libusb_control_transfer(
+		priv->m->usb_ctx->h,
+		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_CLASS |
+		LIBUSB_RECIPIENT_INTERFACE,
+		request, command, 0,
+		buf, size,
+		DEATHADDER_USB_TIMEOUT);
 	if (err != size) {
 		razer_error("razer-deathadder: "
 			"USB read 0x%02X 0x%02X failed: %d\n",
@@ -126,7 +129,7 @@ static int deathadder_read_fw_ver(struct deathadder_private *priv)
 	uint16_t ver;
 	int err;
 
-	err = deathadder_usb_read(priv, USB_REQ_CLEAR_FEATURE,
+	err = deathadder_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
 				  0x05, buf, sizeof(buf));
 	if (err)
 		return err;
@@ -142,7 +145,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 	struct razer_usb_reconnect_guard guard;
 	int i, err;
 
-	err = razer_usb_reconnect_guard_init(&guard, &priv->usb);
+	err = razer_usb_reconnect_guard_init(&guard, priv->m->usb_ctx);
 	if (err)
 		return err;
 
@@ -183,7 +186,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 
 		if (priv->old_frequency != priv->frequency) {
 			/* Commit frequency setting. */
-			err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+			err = deathadder_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 						   0x07, &freq_value, sizeof(freq_value));
 			if (err)
 				return err;
@@ -213,13 +216,13 @@ static int deathadder_commit(struct deathadder_private *priv)
 			value |= 0x01;
 		if (priv->led_states[DEATHADDER_LED_SCROLL])
 			value |= 0x02;
-		err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+		err = deathadder_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 					   0x06, &value, sizeof(value));
 		if (err)
 			return err;
 
 		/* Commit resolution setting. */
-		err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+		err = deathadder_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 					   0x09, &res_value, sizeof(res_value));
 		if (err)
 			return err;
@@ -289,7 +292,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 
 
 		/* Commit the settings. */
-		err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+		err = deathadder_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 					   0x10, &config, sizeof(config));
 		if (err)
 			return err;
@@ -304,7 +307,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 			/* The device has reconnected, so write the config
 			 * another time to ensure all settings are active.
 			 */
-			err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+			err = deathadder_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 						   0x10, &config, sizeof(config));
 			if (err)
 				return err;
@@ -331,14 +334,14 @@ static int deathadder_claim(struct razer_mouse *m)
 {
 	struct deathadder_private *priv = m->internal;
 
-	return razer_generic_usb_claim_refcount(&priv->usb, &priv->claimed);
+	return razer_generic_usb_claim_refcount(m->usb_ctx, &priv->claimed);
 }
 
 static void deathadder_release(struct razer_mouse *m)
 {
 	struct deathadder_private *priv = m->internal;
 
-	razer_generic_usb_release_refcount(&priv->usb, &priv->claimed);
+	razer_generic_usb_release_refcount(m->usb_ctx, &priv->claimed);
 }
 
 static int deathadder_get_fw_version(struct razer_mouse *m)
@@ -484,6 +487,8 @@ static int deathadder_supported_resolutions(struct razer_mouse *m,
 	return count;
 }
 
+//TODO
+#if 0
 static struct usb_device * wait_for_usbdev(struct usb_device *dev,
 					   uint16_t vendor_id,
 					   uint16_t product_id)
@@ -512,6 +517,7 @@ static struct usb_device * wait_for_usbdev(struct usb_device *dev,
 
 	return NULL;
 }
+#endif
 
 static int deathadder_flash_firmware(struct razer_mouse *m,
 				     const char *data, size_t len,
@@ -520,7 +526,7 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 	struct deathadder_private *priv = m->internal;
 	int err;
 	char value;
-	struct usb_device *cydev;
+	struct libusb_device *cydev;
 	struct cypress cy;
 
 	if (magic_number != RAZER_FW_FLASH_MAGIC)
@@ -539,14 +545,15 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 	/* Enter bootloader mode */
 	razer_msleep(50);
 	value = 0;
-	err = deathadder_usb_write(priv, USB_REQ_SET_CONFIGURATION,
+	err = deathadder_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 				   0x08, &value, sizeof(value));
 	if (err) {
 		razer_error("razer-deathadder: Failed to enter the bootloader.\n");
 		return err;
 	}
 	/* Wait for the cypress device to appear. */
-	cydev = wait_for_usbdev(priv->usb.dev, CYPRESS_BOOT_VENDORID, CYPRESS_BOOT_PRODUCTID);
+//TODO	cydev = wait_for_usbdev(priv->usb.dev, CYPRESS_BOOT_VENDORID, CYPRESS_BOOT_PRODUCTID);
+cydev=NULL;
 	if (!cydev) {
 		razer_error("razer-deathadder: Cypress device didn't appear.\n");
 		return -1;
@@ -623,42 +630,30 @@ static int deathadder_set_dpimapping(struct razer_mouse_profile *p,
 	return err;
 }
 
-void razer_deathadder_gen_idstr(struct usb_device *udev, char *buf)
-{
-	razer_generic_usb_gen_idstr(udev, NULL, "DeathAdder", 0, buf);
-}
-
-void razer_deathadder_assign_usb_device(struct razer_mouse *m,
-					struct usb_device *usbdev)
-{
-	struct deathadder_private *priv = m->internal;
-
-	priv->usb.dev = usbdev;
-}
-
 int razer_deathadder_init(struct razer_mouse *m,
-			  struct usb_device *usbdev)
+			  struct libusb_device *usbdev)
 {
 	struct deathadder_private *priv;
 	unsigned int i;
 	int err, fwver;
 
-	priv = malloc(sizeof(struct deathadder_private));
+	priv = zalloc(sizeof(struct deathadder_private));
 	if (!priv)
 		return -ENOMEM;
-	memset(priv, 0, sizeof(*priv));
+	priv->m = m;
 	m->internal = priv;
 
-	razer_deathadder_assign_usb_device(m, usbdev);
+	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
+	if (err)
+		goto err_free;
 
-	if (!is_cypress_bootloader(priv->usb.dev)) {
-		err = razer_usb_force_reinit(&priv->usb);
+	if (!is_cypress_bootloader(m->usb_ctx->dev)) {
+		err = razer_usb_force_reinit(m->usb_ctx);
 		if (err) {
 			razer_error("hw_deathadder: Failed to reinit USB device\n");
-			free(priv);
-			return err;
+			goto err_free;
 		}
-		usbdev = priv->usb.dev;
+		usbdev = m->usb_ctx->dev;
 	}
 
 	err = deathadder_claim(m);
@@ -714,7 +709,7 @@ int razer_deathadder_init(struct razer_mouse *m,
 		priv->cur_dpimapping = &priv->dpimapping[2];
 
 	m->type = RAZER_MOUSETYPE_DEATHADDER;
-	razer_generic_usb_gen_idstr(usbdev, priv->usb.h, "DeathAdder", 0, m->idstr);
+	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, "DeathAdder", 0, m->idstr);
 
 	m->claim = deathadder_claim;
 	m->release = deathadder_release;

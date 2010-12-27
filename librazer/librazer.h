@@ -3,7 +3,7 @@
  *   Applications do NOT want to use this.
  *   Applications should use pyrazer or librazerd instead.
  *
- *   Copyright (C) 2007-2009 Michael Buesch <mb@bu3sch.de>
+ *   Copyright (C) 2007-2010 Michael Buesch <mb@bu3sch.de>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -31,8 +31,11 @@
 #define RAZER_LEDNAME_MAX_SIZE	64
 #define RAZER_DEFAULT_CONFIG	"/etc/razer.conf"
 
-struct razer_mouse;
+/* Opaque internal data structures */
+struct razer_usb_context;
 struct razer_mouse_base_ops;
+
+struct razer_mouse;
 
 
 /** enum razer_led_state - The LED state value
@@ -226,6 +229,9 @@ struct razer_mouse_profile {
  */
 enum razer_mouse_flags {
 	RAZER_MOUSEFLG_NEW		= (1 << 0),
+
+	/* Internal flags */
+	RAZER_MOUSEFLG_PRESENT		= (1 << 15),
 };
 
 enum {
@@ -340,7 +346,8 @@ struct razer_mouse {
 
 	/* Do not touch these pointers. */
 	const struct razer_mouse_base_ops *base_ops;
-	void *internal;
+	struct razer_usb_context *usb_ctx;
+	void *internal; /* For use by the hardware driver */
 };
 
 /** razer_free_freq_list - Free an array of frequencies.
@@ -372,21 +379,15 @@ struct razer_mouse * razer_rescan_mice(void);
 /** razer_for_each_mouse - Convenience helper for traversing a mouse list
  *
  * @mouse: 'struct razer_mouse' pointer used as a list pointer.
+ * @next: 'struct razer_mouse' pointer used as temporary 'next' pointer.
  * @mice_list: Pointer to the base of the linked list.
  *
  * Use razer_for_each_mouse like a normal C 'for' loop.
  */
-#define razer_for_each_mouse(mouse, mice_list) \
-	for (mouse = mice_list; mouse; mouse = mouse->next)
-
-/** razer_mouse_list_find - Find a mouse in a list by the 'idstr' string.
- *
- * @base: The list to search in.
- * @idstr: The ID-string of the mouse to find.
- *
- * Returns a NULL pointer, if not found.
- */
-struct razer_mouse * razer_mouse_list_find(struct razer_mouse *base, const char *idstr);
+#define razer_for_each_mouse(mouse, next, mice_list) \
+	for (mouse = mice_list, next = (mice_list) ? (mice_list)->next : NULL; \
+	     mouse; \
+	     mouse = next, next = (mouse) ? (mouse)->next : NULL)
 
 /** enum razer_event - The type of an event.
  */

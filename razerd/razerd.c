@@ -717,6 +717,18 @@ static int recv_bulk(struct client *client, char *buf, unsigned int len)
 	return 0;
 }
 
+struct razer_mouse * find_mouse(const char *idstr)
+{
+	struct razer_mouse *m, *next;
+
+	razer_for_each_mouse(m, next, mice) {
+		if (strncmp(m->idstr, idstr, RAZER_IDSTR_MAX_SIZE) == 0)
+			return m;
+	}
+
+	return NULL;
+}
+
 static struct razer_mouse_profile * find_mouse_profile(struct razer_mouse *mouse,
 						       unsigned int profile_id)
 {
@@ -816,13 +828,13 @@ static void command_getmice(struct client *client, const struct command *cmd, un
 {
 	unsigned int count;
 	char str[RAZER_IDSTR_MAX_SIZE + 1];
-	struct razer_mouse *mouse;
+	struct razer_mouse *mouse, *next;
 
 	count = 0;
-	razer_for_each_mouse(mouse, mice)
+	razer_for_each_mouse(mouse, next, mice)
 		count++;
 	send_u32(client, count);
-	razer_for_each_mouse(mouse, mice) {
+	razer_for_each_mouse(mouse, next, mice) {
 		snprintf(str, sizeof(str), "%s", mouse->idstr);
 		send_string(client, str);
 	}
@@ -836,7 +848,7 @@ static void command_getfwver(struct client *client, const struct command *cmd, u
 
 	if (len < CMD_SIZE(getfwver))
 		goto out;
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse || !mouse->get_fw_version)
 		goto out;
 	err = mouse->claim(mouse);
@@ -856,7 +868,7 @@ static void command_getfreq(struct client *client, const struct command *cmd, un
 
 	if (len < CMD_SIZE(getfreq))
 		goto error;
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse)
 		goto error;
 	profile = find_mouse_profile(mouse, be32_to_cpu(cmd->getfreq.profile_id));
@@ -879,7 +891,7 @@ static void command_suppfreqs(struct client *client, const struct command *cmd, 
 
 	if (len < CMD_SIZE(suppfreqs))
 		goto error;
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse || !mouse->supported_freqs)
 		goto error;
 	count = mouse->supported_freqs(mouse, &freq_list);
@@ -905,7 +917,7 @@ static void command_suppresol(struct client *client, const struct command *cmd, 
 
 	if (len < CMD_SIZE(suppresol))
 		goto error;
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse || !mouse->supported_resolutions)
 		goto error;
 	count = mouse->supported_resolutions(mouse, &res_list);
@@ -931,7 +943,7 @@ static void command_suppdpimappings(struct client *client, const struct command 
 
 	if (len < CMD_SIZE(suppdpimappings))
 		goto error;
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse || !mouse->supported_dpimappings)
 		goto error;
 	count = mouse->supported_dpimappings(mouse, &list);
@@ -963,7 +975,7 @@ static void command_changedpimapping(struct client *client, const struct command
 		errorcode = ERR_CMDSIZE;
 		goto error;
 	}
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse) {
 		errorcode = ERR_NOMOUSE;
 		goto error;
@@ -998,7 +1010,7 @@ static void command_getdpimapping(struct client *client, const struct command *c
 
 	if (len < CMD_SIZE(getdpimapping))
 		goto error;
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse)
 		goto error;
 	profile = find_mouse_profile(mouse, be32_to_cpu(cmd->getdpimapping.profile_id));
@@ -1029,7 +1041,7 @@ static void command_setdpimapping(struct client *client, const struct command *c
 		errorcode = ERR_CMDSIZE;
 		goto error;
 	}
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse) {
 		errorcode = ERR_NOMOUSE;
 		goto error;
@@ -1075,7 +1087,7 @@ static void command_getleds(struct client *client, const struct command *cmd, un
 
 	if (len < CMD_SIZE(getleds))
 		goto error;
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse || !mouse->get_leds)
 		goto error;
 	count = mouse->get_leds(mouse, &leds_list);
@@ -1119,7 +1131,7 @@ static void command_setled(struct client *client, const struct command *cmd, uns
 		errorcode = ERR_CMDSIZE;
 		goto error;
 	}
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse) {
 		errorcode = ERR_NOMOUSE;
 		goto error;
@@ -1162,7 +1174,7 @@ static void command_setfreq(struct client *client, const struct command *cmd, un
 		errorcode = ERR_CMDSIZE;
 		goto error;
 	}
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse) {
 		errorcode = ERR_NOMOUSE;
 		goto error;
@@ -1197,7 +1209,7 @@ static void command_getprofiles(struct client *client, const struct command *cmd
 
 	if (len < CMD_SIZE(getprofiles))
 		goto error;
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse)
 		goto error;
 	list = mouse->get_profiles(mouse);
@@ -1220,7 +1232,7 @@ static void command_getactiveprof(struct client *client, const struct command *c
 
 	if (len < CMD_SIZE(getactiveprof))
 		goto error;
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse)
 		goto error;
 	activeprof = mouse->get_active_profile(mouse);
@@ -1245,7 +1257,7 @@ static void command_setactiveprof(struct client *client, const struct command *c
 		errorcode = ERR_CMDSIZE;
 		goto error;
 	}
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse) {
 		errorcode = ERR_NOMOUSE;
 		goto error;
@@ -1278,7 +1290,7 @@ static void command_suppbuttons(struct client *client, const struct command *cmd
 
 	if (len < CMD_SIZE(suppbuttons))
 		goto error;
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse || !mouse->supported_buttons)
 		goto error;
 	count = mouse->supported_buttons(mouse, &list);
@@ -1304,7 +1316,7 @@ static void command_suppbutfuncs(struct client *client, const struct command *cm
 
 	if (len < CMD_SIZE(suppbutfuncs))
 		goto error;
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse || !mouse->supported_button_functions)
 		goto error;
 	count = mouse->supported_button_functions(mouse, &list);
@@ -1331,7 +1343,7 @@ static void command_getbutfunc(struct client *client, const struct command *cmd,
 
 	if (len < CMD_SIZE(getbutfunc))
 		goto error;
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse)
 		goto error;
 	button = find_mouse_button(mouse, be32_to_cpu(cmd->getbutfunc.button_id));
@@ -1366,7 +1378,7 @@ static void command_setbutfunc(struct client *client, const struct command *cmd,
 		errorcode = ERR_CMDSIZE;
 		goto error;
 	}
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse) {
 		errorcode = ERR_NOMOUSE;
 		goto error;
@@ -1410,7 +1422,7 @@ static void command_suppaxes(struct client *client, const struct command *cmd, u
 
 	if (len < CMD_SIZE(suppaxes))
 		goto error;
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse || !mouse->supported_axes)
 		goto error;
 	count = mouse->supported_axes(mouse, &list);
@@ -1459,7 +1471,7 @@ static void command_flashfw(struct client *client, const struct command *cmd, un
 		goto error;
 	}
 
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse) {
 		errorcode = ERR_NOMOUSE;
 		goto error;
@@ -1496,7 +1508,7 @@ static void command_claim(struct client *client, const struct command *cmd, unsi
 		errorcode = ERR_CMDSIZE;
 		goto error;
 	}
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse) {
 		errorcode = ERR_NOMOUSE;
 		goto error;
@@ -1520,7 +1532,7 @@ static void command_release(struct client *client, const struct command *cmd, un
 		errorcode = ERR_CMDSIZE;
 		goto error;
 	}
-	mouse = razer_mouse_list_find(mice, cmd->idstr);
+	mouse = find_mouse(cmd->idstr);
 	if (!mouse) {
 		errorcode = ERR_NOMOUSE;
 		goto error;

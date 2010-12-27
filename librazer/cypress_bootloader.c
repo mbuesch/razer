@@ -95,25 +95,26 @@ static int cypress_send_command(struct cypress *c,
 				size_t command_size, uint8_t status_mask)
 {
 	struct cypress_status status;
-	int res;
+	int err, transferred;
 	uint8_t stat;
 
 	cmd_checksum(command);//XXX
 
 //printf("cmd = 0x%02X\n", be16_to_cpu(command->command));
-	res = usb_bulk_write(c->usb.h, c->ep_out, (const char *)command, command_size,
-			     CYPRESS_USB_TIMEOUT);
-	if (res != command_size) {
-		fprintf(stderr, "cypress: Failed to send command 0x%02X: %s\n",
-			be16_to_cpu(command->command), usb_strerror());
+	err = libusb_bulk_transfer(c->usb.h, c->ep_out,
+				   (unsigned char *)command, command_size,
+				   &transferred, CYPRESS_USB_TIMEOUT);
+	if (err || transferred != command_size) {
+		fprintf(stderr, "cypress: Failed to send command 0x%02X\n",
+			be16_to_cpu(command->command));
 		return -1;
 	}
 	razer_msleep(100);
-	res = usb_bulk_read(c->usb.h, c->ep_in, (char *)&status, sizeof(status),
-			    CYPRESS_USB_TIMEOUT);
-	if (res != sizeof(status)) {
-		fprintf(stderr, "cypress: Failed to receive status report: %s\n",
-			usb_strerror());
+	err = libusb_bulk_transfer(c->usb.h, c->ep_in,
+				   (unsigned char *)&status, sizeof(status),
+				   &transferred, CYPRESS_USB_TIMEOUT);
+	if (err || transferred != sizeof(status)) {
+		fprintf(stderr, "cypress: Failed to receive status report\n");
 		return -1;
 	}
 	status_mask |= CYPRESS_STAT_BLMODE; /* Always check the blmode bit */
@@ -232,14 +233,14 @@ fprintf(stderr, ".");
 	return 0;
 }
 
-int cypress_open(struct cypress *c, struct usb_device *dev,
+int cypress_open(struct cypress *c, struct libusb_device *dev,
 		 void (*assign_key)(uint8_t *key))
 {
 	int err;
-	unsigned int i;
+//	unsigned int i;
 	bool have_in = 0, have_out = 0;
-	struct usb_interface_descriptor *alt;
-	struct usb_endpoint_descriptor *ep;
+//	struct usb_interface_descriptor *alt;
+//	struct usb_endpoint_descriptor *ep;
 
 	BUILD_BUG_ON(sizeof(struct cypress_command) != 64);
 	BUILD_BUG_ON(sizeof(struct cypress_status) != 64);
@@ -258,6 +259,8 @@ return -1; //FIXME: Does not work, yet.
 		fprintf(stderr, "cypress: Failed to open and claim device\n");
 		return -1;
 	}
+//FIXME
+#if 0
 	alt = &c->usb.dev->config->interface->altsetting[0];
 	for (i = 0; i < alt->bNumEndpoints; i++) {
 		ep = &alt->endpoint[i];
@@ -273,6 +276,7 @@ return -1; //FIXME: Does not work, yet.
 		if (have_in && have_out)
 			break;
 	}
+#endif
 	if (!have_in || !have_out) {
 		fprintf(stderr, "cypress: Did not find in and out endpoints (%u %u)\n",
 			have_in, have_out);

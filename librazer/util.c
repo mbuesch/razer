@@ -20,6 +20,14 @@
 #include <ctype.h>
 
 
+void razer_free(void *ptr, size_t size)
+{
+	if (ptr) {
+		memset(ptr, 0, size);
+		free(ptr);
+	}
+}
+
 char * razer_strsplit(char *str, char sep)
 {
 	char c;

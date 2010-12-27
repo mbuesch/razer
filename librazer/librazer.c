@@ -31,7 +31,6 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
-#include <usb.h>
 
 
 enum razer_devtype {
@@ -42,21 +41,14 @@ enum razer_devtype {
  *
  * @type: The type ID.
  *
- * @gen_idstr: Generate an ID string that uniquely identifies the
- *	       device in the machine.
- *
  * @init: Initialize the device and its private data structures.
  *
  * @release: Release device and data structures.
- *
- * @assign_usb_device: (re)assign a USB device to a mouse.
  */
 struct razer_mouse_base_ops {
 	enum razer_mouse_type type;
-	void (*gen_idstr)(struct usb_device *udev, char *buf);
-	int (*init)(struct razer_mouse *m, struct usb_device *udev);
+	int (*init)(struct razer_mouse *m, struct libusb_device *udev);
 	void (*release)(struct razer_mouse *m);
-	void (*assign_usb_device)(struct razer_mouse *m, struct usb_device *udev);
 };
 
 struct razer_usb_device {
@@ -70,42 +62,32 @@ struct razer_usb_device {
 
 static const struct razer_mouse_base_ops razer_deathadder_base_ops = {
 	.type			= RAZER_MOUSETYPE_DEATHADDER,
-	.gen_idstr		= razer_deathadder_gen_idstr,
 	.init			= razer_deathadder_init,
 	.release		= razer_deathadder_release,
-	.assign_usb_device	= razer_deathadder_assign_usb_device,
 };
 
 static const struct razer_mouse_base_ops razer_naga_base_ops = {
 	.type			= RAZER_MOUSETYPE_NAGA,
-	.gen_idstr		= razer_naga_gen_idstr,
 	.init			= razer_naga_init,
 	.release		= razer_naga_release,
-	.assign_usb_device	= razer_naga_assign_usb_device,
 };
 
 static const struct razer_mouse_base_ops razer_krait_base_ops = {
 	.type			= RAZER_MOUSETYPE_KRAIT,
-	.gen_idstr		= razer_krait_gen_idstr,
 	.init			= razer_krait_init,
 	.release		= razer_krait_release,
-	.assign_usb_device	= razer_krait_assign_usb_device,
 };
 
 static const struct razer_mouse_base_ops razer_lachesis_base_ops = {
 	.type			= RAZER_MOUSETYPE_LACHESIS,
-	.gen_idstr		= razer_lachesis_gen_idstr,
 	.init			= razer_lachesis_init,
 	.release		= razer_lachesis_release,
-	.assign_usb_device	= razer_lachesis_assign_usb_device,
 };
 
 static const struct razer_mouse_base_ops razer_copperhead_base_ops = {
 	.type			= RAZER_MOUSETYPE_COPPERHEAD,
-	.gen_idstr		= razer_copperhead_gen_idstr,
 	.init			= razer_copperhead_init,
 	.release		= razer_copperhead_release,
-	.assign_usb_device	= razer_copperhead_assign_usb_device,
 };
 
 
@@ -131,7 +113,7 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 
 
 
-static bool librazer_initialized;
+static struct libusb_context *libusb_ctx;
 static struct razer_mouse *mice_list = NULL;
 /* We currently only have one handler. */
 static razer_event_handler_t event_handler;
@@ -141,6 +123,11 @@ razer_logfunc_t razer_logfunc_info;
 razer_logfunc_t razer_logfunc_error;
 razer_logfunc_t razer_logfunc_debug;
 
+
+static inline bool razer_initialized(void)
+{
+	return !!libusb_ctx;
+}
 
 int razer_register_event_handler(razer_event_handler_t handler)
 {
@@ -162,7 +149,7 @@ static void razer_notify_event(enum razer_event type,
 		event_handler(type, data);
 }
 
-static int match_usbdev(const struct usb_device_descriptor *desc,
+static int match_usbdev(const struct libusb_device_descriptor *desc,
 			const struct razer_usb_device *id)
 {
 	if ((desc->idVendor != id->vendor) &&
@@ -174,7 +161,7 @@ static int match_usbdev(const struct usb_device_descriptor *desc,
 	return 1;
 }
 
-static const struct razer_usb_device * usbdev_lookup(const struct usb_device_descriptor *desc)
+static const struct razer_usb_device * usbdev_lookup(const struct libusb_device_descriptor *desc)
 {
 	const struct razer_usb_device *id = &(razer_usbdev_table[0]);
 
@@ -214,13 +201,19 @@ static void mouse_list_del(struct razer_mouse **base, struct razer_mouse *del_en
 		i->next = del_entry->next;
 }
 
-struct razer_mouse * razer_mouse_list_find(struct razer_mouse *base, const char *idstr)
+static struct razer_mouse * mouse_list_find(struct razer_mouse *base,
+					    struct libusb_device *udev)
 {
-	struct razer_mouse *m;
+	struct razer_mouse *m, *next;
+	uint8_t busnr = libusb_get_bus_number(udev);
+	uint8_t devaddr = libusb_get_device_address(udev);
 
-	razer_for_each_mouse(m, base) {
-		if (strncmp(m->idstr, idstr, RAZER_IDSTR_MAX_SIZE) == 0)
-			return m;
+	razer_for_each_mouse(m, next, base) {
+		if (m->usb_ctx) {
+			if (libusb_get_bus_number(m->usb_ctx->dev) == busnr &&
+			    libusb_get_device_address(m->usb_ctx->dev) == devaddr)
+				return m;
+		}
 	}
 
 	return NULL;
@@ -459,23 +452,26 @@ static void mouse_apply_initial_config(struct razer_mouse *m)
 }
 
 static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
-				      struct usb_device *udev)
+				      struct libusb_device *udev)
 {
 	struct razer_event_data ev;
 	struct razer_mouse *m;
 	int err;
 
-	m = malloc(sizeof(*m));
+	m = zalloc(sizeof(*m));
 	if (!m)
 		return NULL;
-	memset(m, 0, sizeof(*m));
+	m->usb_ctx = zalloc(sizeof(*(m->usb_ctx)));
+	if (!m->usb_ctx)
+		goto err_free_mouse;
+
+	m->usb_ctx->dev = udev;
+
 	m->flags |= RAZER_MOUSEFLG_NEW;
 	m->base_ops = id->u.mouse_ops;
 	err = m->base_ops->init(m, udev);
-	if (err) {
-		free(m);
-		return NULL;
-	}
+	if (err)
+		goto err_free_ctx;
 
 	mouse_apply_initial_config(m);
 
@@ -485,7 +481,16 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 	ev.u.mouse = m;
 	razer_notify_event(RAZER_EV_MOUSE_ADD, &ev);
 
+	libusb_ref_device(udev);
+
 	return m;
+
+err_free_ctx:
+	razer_free(m->usb_ctx, sizeof(*(m->usb_ctx)));
+err_free_mouse:
+	razer_free(m, sizeof(*m));
+
+	return NULL;
 }
 
 static void razer_free_mouse(struct razer_mouse *m)
@@ -499,8 +504,11 @@ static void razer_free_mouse(struct razer_mouse *m)
 	razer_notify_event(RAZER_EV_MOUSE_REMOVE, &ev);
 
 	m->base_ops->release(m);
-	memset(m, 0, sizeof(*m));
-	free(m);
+
+	libusb_unref_device(m->usb_ctx->dev);
+
+	razer_free(m->usb_ctx, sizeof(*(m->usb_ctx)));
+	razer_free(m, sizeof(*m));
 }
 
 static void razer_free_mice(struct razer_mouse *mouse_list)
@@ -521,59 +529,54 @@ struct new_razer_usb_device {
 
 struct razer_mouse * razer_rescan_mice(void)
 {
-	struct usb_bus *bus, *buslist;
-	struct usb_device *dev;
-	const struct usb_device_descriptor *desc;
+	struct libusb_device **devlist, *dev;
+	ssize_t nr_devices;
+	unsigned int i;
+	int err;
+	struct libusb_device_descriptor desc;
 	const struct razer_usb_device *id;
-	char idstr[RAZER_IDSTR_MAX_SIZE + 1] = { 0, };
-	struct razer_mouse *mouse, *new_list = NULL;
-	struct new_razer_usb_device new_usb_devices[64];
-	unsigned int i, nr_new_usb_devices = 0;
+	struct razer_mouse *m, *next;
 
-	usb_find_busses();
-	usb_find_devices();
+	nr_devices = libusb_get_device_list(libusb_ctx, &devlist);
+	if (nr_devices < 0) {
+		razer_error("razer_rescan_mice: Failed to get USB device list\n");
+		return NULL;
+	}
 
-	buslist = usb_get_busses();
-	for_each_usbbus(bus, buslist) {
-		for_each_usbdev(dev, bus->devices) {
-			desc = &dev->descriptor;
-			id = usbdev_lookup(desc);
-			if (!id)
-				continue;
-			if (id->type != RAZER_DEVTYPE_MOUSE)
-				continue;
-			id->u.mouse_ops->gen_idstr(dev, idstr);
-			mouse = razer_mouse_list_find(mice_list, idstr);
-			if (mouse) {
-				/* We already have this mouse. */
-				mouse_list_del(&mice_list, mouse);
-				mouse->base_ops->assign_usb_device(mouse, dev);
-				mouse_list_add(&new_list, mouse);
-			} else {
-				/* We don't have this mouse, yet. Create a new one. */
-				if (nr_new_usb_devices < ARRAY_SIZE(new_usb_devices)) {
-					new_usb_devices[nr_new_usb_devices].id = id;
-					new_usb_devices[nr_new_usb_devices].udev = dev;
-					nr_new_usb_devices++;
-				} else {
-					razer_error("razer_rescan_nice: "
-						"new device array overflow\n");
-				}
+	for (i = 0; i < nr_devices; i++) {
+		dev = devlist[i];
+		err = libusb_get_device_descriptor(dev, &desc);
+		if (err) {
+			razer_error("razer_rescan_mice: Failed to get descriptor\n");
+			continue;
+		}
+		id = usbdev_lookup(&desc);
+		if (!id || id->type != RAZER_DEVTYPE_MOUSE)
+			continue;
+		m = mouse_list_find(mice_list, dev);
+		if (m) {
+			/* We already had this mouse */
+			m->flags |= RAZER_MOUSEFLG_PRESENT;
+		} else {
+			/* We don't have this mouse, yet. Create a new one */
+			m = mouse_new(id, dev);
+			if (m) {
+				m->flags |= RAZER_MOUSEFLG_PRESENT;
+				mouse_list_add(&mice_list, m);
 			}
 		}
 	}
-	/* Register all new mice */
-	for (i = 0; i < nr_new_usb_devices; i++) {
-		mouse = mouse_new(new_usb_devices[i].id,
-				  new_usb_devices[i].udev);
-		if (mouse)
-			mouse_list_add(&new_list, mouse);
+	/* Remove mice that are not connected anymore. */
+	razer_for_each_mouse(m, next, mice_list) {
+		if (m->flags & RAZER_MOUSEFLG_PRESENT) {
+			m->flags &= ~RAZER_MOUSEFLG_PRESENT;
+			continue;
+		}
+		mouse_list_del(&mice_list, m);
+		razer_free_mouse(m);
 	}
-	/* Kill the remaining entries in the old list.
-	 * They are not connected to the machine anymore. */
-	razer_free_mice(mice_list);
-	/* And finally set the pointer to the new list. */
-	mice_list = new_list;
+
+	libusb_free_device_list(devlist, 1);
 
 	return mice_list;
 }
@@ -603,127 +606,142 @@ void razer_free_leds(struct razer_led *led_list)
 
 int razer_init(void)
 {
-	if (librazer_initialized)
-		return 0;
-	usb_init();
-	librazer_initialized = 1;
+	int err = 0;
 
-	return 0;
+	if (!razer_initialized())
+		err = libusb_init(&libusb_ctx);
+
+	return err ? -EINVAL : 0;
 }
 
 void razer_exit(void)
 {
-	if (!librazer_initialized)
+	if (!razer_initialized())
 		return;
 	razer_free_mice(mice_list);
 	mice_list = NULL;
 	config_file_free(razer_config_file);
 	razer_config_file = NULL;
-	librazer_initialized = 0;
+
+	libusb_exit(libusb_ctx);
+	libusb_ctx = NULL;
 }
 
-static int reconnect_kdrv_hack(usb_dev_handle *_h, int interf)
+int razer_usb_add_used_interface(struct razer_usb_context *ctx,
+				 int bInterfaceNumber,
+				 int bAlternateSetting)
 {
-#define IOCTL_USB_IOCTL		_IOWR('U', 18, struct usb_ioctl)
-#define IOCTL_USB_CONNECT	_IO('U', 23)
+	struct razer_usb_interface *interf;
 
-	struct fake_usb_dev_handle {
-		int fd;
-		/* ... there's more */
-	} *h = (struct fake_usb_dev_handle *)_h;
-	struct usb_ioctl {
-		int ifno;
-		int ioctl_code;
-		void *data;
-	} cmd;
-	int err;
+	if (ctx->nr_interfaces >= ARRAY_SIZE(ctx->interfaces))
+		return -ENOSPC;
 
-	cmd.ifno = interf;
-	cmd.ioctl_code = IOCTL_USB_CONNECT;
-	cmd.data = NULL;
+	interf = &ctx->interfaces[ctx->nr_interfaces];
+	interf->bInterfaceNumber = bInterfaceNumber;
+	interf->bAlternateSetting = bAlternateSetting;
+	ctx->nr_interfaces++;
 
-	err = ioctl(h->fd, IOCTL_USB_IOCTL, &cmd);
-	if (err > 0)
-		err = 0;
-
-	return err;
+	return 0;
 }
 
-static void razer_reattach_usb_kdrv(struct razer_usb_context *ctx)
+static void razer_reattach_usb_kdrv(struct razer_usb_context *ctx,
+				    int bInterfaceNumber)
 {
-	int err;
+	int res;
 
-	/* Reattach the kernel driver, if needed. */
-	if (!ctx->kdrv_detached)
+	res = libusb_kernel_driver_active(ctx->h, bInterfaceNumber);
+	if (res == 1)
 		return;
-#ifdef LIBUSB_HAS_ATTACH_KERNEL_DRIVER_NP
-	err = usb_attach_kernel_driver_np(ctx->h, ctx->interf);
-	if (!err) {
-		ctx->kdrv_detached = 0;
-		return;
-	}
-#endif
-	/* libUSB version is too old and doesn't have the attach function.
-	 * Try to hack around it by directly calling the kernel IOCTL. */
-	err = reconnect_kdrv_hack(ctx->h, ctx->interf);
-	if (!err) {
-		ctx->kdrv_detached = 0;
+	if (res) {
+		razer_error("Failed to get kernel driver state\n");
 		return;
 	}
 
-	razer_error("Failed to reconnect the kernel driver.\n"
-		"The device most likely won't work now. Try to replug it.\n");
+	res = libusb_attach_kernel_driver(ctx->h, bInterfaceNumber);
+	if (res) {
+		razer_error("Failed to reconnect the kernel driver (%d).\n"
+			"The device most likely won't work now. Try to replug it.\n", res);
+		return;
+	}
 }
 
-static int razer_usb_claim(struct razer_usb_context *ctx)
+static int razer_usb_claim(struct razer_usb_context *ctx,
+			   int bInterfaceNumber)
 {
-	int err;
+	int res;
 
-	ctx->kdrv_detached = 0;
-	err = usb_claim_interface(ctx->h, ctx->interf);
-	if (err && err != -EBUSY)
-		razer_error("razer_usb_claim: first claim failed %d\n", err);
-	if (err == -EBUSY) {
-#ifdef LIBUSB_HAS_DETACH_KERNEL_DRIVER_NP
-		err = usb_detach_kernel_driver_np(ctx->h, ctx->interf);
-		if (err) {
-			razer_error("razer_usb_claim: detach failed %d\n", err);
-			return err;
+	res = libusb_kernel_driver_active(ctx->h, bInterfaceNumber);
+	if (res == 1) {
+		res = libusb_detach_kernel_driver(ctx->h, bInterfaceNumber);
+		if (res) {
+			razer_error("Failed to detach kernel driver\n");
+			return -EBUSY;
 		}
-		ctx->kdrv_detached = 1;
-		err = usb_claim_interface(ctx->h, ctx->interf);
-		if (err) {
-			razer_error("razer_usb_claim: claim failed %d\n", err);
-			razer_reattach_usb_kdrv(ctx);
-			return err;
-		}
-#endif
+	} else if (res) {
+		razer_error("Failed to get kernel driver state\n");
+		return -ENODEV;
 	}
 
-	return err;
+	res = libusb_claim_interface(ctx->h, bInterfaceNumber);
+	if (res) {
+		razer_error("Failed to claim USB interface\n");
+		return -EBUSY;
+	}
+
+	return 0;
 }
 
-static void razer_usb_release(struct razer_usb_context *ctx)
+static void razer_usb_release(struct razer_usb_context *ctx,
+			      int bInterfaceNumber)
 {
-	usb_release_interface(ctx->h, ctx->interf);
-	razer_reattach_usb_kdrv(ctx);
+	libusb_release_interface(ctx->h, bInterfaceNumber);
+	razer_reattach_usb_kdrv(ctx, bInterfaceNumber);
 }
 
 int razer_generic_usb_claim(struct razer_usb_context *ctx)
 {
-	int err;
+	struct libusb_config_descriptor *config;
+	int err, i;
+	struct razer_usb_interface *interf;
 
-	ctx->interf = ctx->dev->config->interface->altsetting[0].bInterfaceNumber;
-	ctx->h = usb_open(ctx->dev);
-	if (!ctx->h) {
-		razer_error("razer_generic_usb_claim: usb_open failed\n");
-		return -ENODEV;
+	err = libusb_get_active_config_descriptor(ctx->dev, &config);
+	if (err) {
+		razer_error("razer_generic_usb_claim: Failed to get active config\n");
+		return -EIO;
 	}
-	err = razer_usb_claim(ctx);
-	if (err)
-		return err;
+	err = libusb_open(ctx->dev, &ctx->h);
+	if (err) {
+		razer_error("razer_generic_usb_claim: Failed to open USB device\n");
+		err = -ENODEV;
+		goto err_free_config;
+	}
+	for (i = 0; i < ctx->nr_interfaces; i++) {
+		interf = &ctx->interfaces[i];
+		err = razer_usb_claim(ctx, interf->bInterfaceNumber);
+		if (err)
+			goto err_unwind;
+		err = libusb_set_interface_alt_setting(ctx->h, interf->bInterfaceNumber,
+						       interf->bAlternateSetting);
+		if (err) {
+			razer_usb_release(ctx, interf->bInterfaceNumber);
+			goto err_unwind;
+		}
+	}
+	libusb_free_config_descriptor(config);
 
 	return 0;
+
+err_unwind:
+	for (i--; i >= 0; i--) {
+		interf = &ctx->interfaces[i];
+		razer_usb_release(ctx, interf->bInterfaceNumber);
+	}
+/* err_close: */
+	libusb_close(ctx->h);
+err_free_config:
+	libusb_free_config_descriptor(config);
+
+	return err;
 }
 
 int razer_generic_usb_claim_refcount(struct razer_usb_context *ctx,
@@ -743,8 +761,11 @@ int razer_generic_usb_claim_refcount(struct razer_usb_context *ctx,
 
 void razer_generic_usb_release(struct razer_usb_context *ctx)
 {
-	razer_usb_release(ctx);
-	usb_close(ctx->h);
+	int i;
+
+	for (i = ctx->nr_interfaces - 1; i >= 0; i--)
+		razer_usb_release(ctx, ctx->interfaces[i].bInterfaceNumber);
+	libusb_close(ctx->h);
 }
 
 void razer_generic_usb_release_refcount(struct razer_usb_context *ctx,
@@ -757,8 +778,8 @@ void razer_generic_usb_release_refcount(struct razer_usb_context *ctx,
 	}
 }
 
-void razer_generic_usb_gen_idstr(struct usb_device *udev,
-				 struct usb_dev_handle *h,
+void razer_generic_usb_gen_idstr(struct libusb_device *udev,
+				 struct libusb_device_handle *h,
 				 const char *devname,
 				 bool include_devicenr,
 				 char *idstr_buf)
@@ -766,15 +787,22 @@ void razer_generic_usb_gen_idstr(struct usb_device *udev,
 	char devid[64];
 	char serial[64];
 	char buspos[512];
-	unsigned int serial_index;
+	unsigned int serial_index = 0;
 	int err;
+	struct libusb_device_descriptor devdesc;
 	struct razer_usb_context usbctx = {
 		.dev = udev,
 		.h = h,
 	};
 
+	err = libusb_get_device_descriptor(udev, &devdesc);
+	if (err) {
+		razer_error("razer_generic_usb_gen_idstr: Failed to get "
+			"device descriptor (%d)\n", err);
+		return;
+	}
+	serial_index = devdesc.iSerialNumber;
 	err = -EINVAL;
-	serial_index = udev->descriptor.iSerialNumber;
 	if (serial_index) {
 		err = 0;
 		if (!h)
@@ -782,8 +810,9 @@ void razer_generic_usb_gen_idstr(struct usb_device *udev,
 		if (err) {
 			razer_error("Failed to claim device for serial fetching.\n");
 		} else {
-			err = usb_get_string_simple(usbctx.h, serial_index,
-						    serial, sizeof(serial));
+			err = libusb_get_string_descriptor_ascii(
+				usbctx.h, serial_index,
+				(unsigned char *)serial, sizeof(serial));
 			if (!h)
 				razer_generic_usb_release(&usbctx);
 		}
@@ -792,14 +821,15 @@ void razer_generic_usb_gen_idstr(struct usb_device *udev,
 		strcpy(serial, "0");
 
 	snprintf(devid, sizeof(devid), "%04X-%04X-%s",
-		 udev->descriptor.idVendor,
-		 udev->descriptor.idProduct, serial);
+		 devdesc.idVendor,
+		 devdesc.idProduct, serial);
 	if (include_devicenr) {
-		snprintf(buspos, sizeof(buspos), "%s-%s",
-			 udev->bus->dirname, udev->filename);
+		snprintf(buspos, sizeof(buspos), "%03d-%03d",
+			 libusb_get_bus_number(udev),
+			 libusb_get_device_address(udev));
 	} else {
-		snprintf(buspos, sizeof(buspos), "%s",
-			 udev->bus->dirname);
+		snprintf(buspos, sizeof(buspos), "%03d",
+			 libusb_get_bus_number(udev));
 	}
 
 	razer_create_idstr(idstr_buf, BUSTYPESTR_USB, buspos,
@@ -812,6 +842,9 @@ void razer_generic_usb_gen_idstr(struct usb_device *udev,
   */
 int razer_usb_force_reinit(struct razer_usb_context *device_ctx)
 {
+//TODO
+return 0;
+#if 0
 	struct usb_dev_handle *h;
 	struct usb_device *hub;
 	struct razer_usb_reconnect_guard rg;
@@ -841,6 +874,7 @@ int razer_usb_force_reinit(struct razer_usb_context *device_ctx)
 	}
 
 	return 0;
+#endif
 }
 
 /** razer_usb_reconnect_guard_init - Init the reconnect-guard context
@@ -851,56 +885,67 @@ int razer_usb_force_reinit(struct razer_usb_context *device_ctx)
 int razer_usb_reconnect_guard_init(struct razer_usb_reconnect_guard *guard,
 				   struct razer_usb_context *ctx)
 {
+	int err;
+
 	guard->ctx = ctx;
-	memcpy(&guard->old_desc, &ctx->dev->descriptor, sizeof(guard->old_desc));
-	memcpy(guard->old_dirname, ctx->dev->bus->dirname, sizeof(guard->old_dirname));
-	memcpy(guard->old_filename, ctx->dev->filename, sizeof(guard->old_filename));
+	err = libusb_get_device_descriptor(ctx->dev, &guard->old_desc);
+	if (err) {
+		razer_error("razer_usb_reconnect_guard_init: Failed to "
+			"get device descriptor\n");
+		return err;
+	}
+	guard->old_busnr = libusb_get_bus_number(ctx->dev);
+	guard->old_devaddr = libusb_get_device_address(ctx->dev);
 
 	return 0;
 }
 
-static struct usb_device * guard_find_usb_dev(const struct usb_device_descriptor *desc,
-					      const char *dirname,
-					      unsigned int filename,
-					      bool exact_match)
+static struct libusb_device * guard_find_usb_dev(const struct libusb_device_descriptor *expected_desc,
+						 uint8_t expected_bus_number,
+						 uint8_t expected_dev_addr,
+						 bool exact_match)
 {
-	struct usb_bus *bus, *buslist;
-	struct usb_device *dev;
-	unsigned int dev_filename, i;
-	int res;
+	struct libusb_device **devlist, *dev;
+	struct libusb_device_descriptor desc;
+	uint8_t dev_addr;
+	ssize_t nr_devices, i, j;
+	int err;
 
-	usb_find_busses();
-	usb_find_devices();
+	nr_devices = libusb_get_device_list(libusb_ctx, &devlist);
+	if (nr_devices < 0) {
+		razer_error("guard_find_usb_dev: Failed to get device list\n");
+		return NULL;
+	}
 
-	buslist = usb_get_busses();
-	for_each_usbbus(bus, buslist) {
-		for_each_usbdev(dev, bus->devices) {
-			if (memcmp(desc, &dev->descriptor, sizeof(*desc)) != 0)
-				continue;
-			if (strncmp(dev->bus->dirname, dirname, PATH_MAX) != 0)
-				continue;
-			res = sscanf(dev->filename, "%03u", &dev_filename);
-			if (res != 1) {
-				razer_error("guard_find_usb_dev: Could not parse filename.\n");
-				return NULL;
-			}
-			if (exact_match) {
-				if (dev_filename == filename) {
-					/* found it! */
-					return dev;
-				}
-			} else {
-				for (i = 0; i < 64; i++) {
-					if (dev_filename == ((filename + i) & 0x7F)) {
-						/* found it! */
-						return dev;
-					}
-				}
+	for (i = 0; i < nr_devices; i++) {
+		dev = devlist[i];
+		if (libusb_get_bus_number(dev) != expected_bus_number)
+			continue;
+		err = libusb_get_device_descriptor(dev, &desc);
+		if (err)
+			continue;
+		if (memcmp(&desc, expected_desc, sizeof(desc)) != 0)
+			continue;
+		dev_addr = libusb_get_device_address(dev);
+		if (exact_match) {
+			if (dev_addr == expected_dev_addr)
+				goto found_dev;
+		} else {
+			for (j = 0; j < 64; j++) {
+				if (dev_addr == ((expected_dev_addr + j) & 0x7F))
+					goto found_dev;
 			}
 		}
 	}
+	libusb_free_device_list(devlist, 1);
 
 	return NULL;
+
+found_dev:
+	libusb_ref_device(dev);
+	libusb_free_device_list(devlist, 1);
+
+	return dev;
 }
 
 /** razer_usb_reconnect_guard_wait - Protect against a firmware reconnect.
@@ -916,10 +961,11 @@ static struct usb_device * guard_find_usb_dev(const struct usb_device_descriptor
  */
 int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard, bool hub_reset)
 {
-	unsigned int reconn_filename;
-	unsigned int old_filename_nr;
+	uint8_t reconn_dev_addr;
+	uint8_t old_dev_addr = guard->old_devaddr;
+	uint8_t old_bus_number = guard->old_busnr;
 	int res, errorcode = 0;
-	struct usb_device *dev;
+	struct libusb_device *dev;
 	struct timeval now, timeout;
 
 	if (!hub_reset) {
@@ -927,20 +973,15 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard, bool
 		razer_generic_usb_release(guard->ctx);
 	}
 
-	res = sscanf(guard->old_filename, "%03u", &old_filename_nr);
-	if (res != 1) {
-		razer_error("razer_usb_reconnect_guard: Could not parse filename.\n");
-		errorcode = -EINVAL;
-		goto reclaim;
-	}
-
 	/* Wait for the device to disconnect. */
-	gettimeofday(&now, NULL);
-	memcpy(&timeout, &now, sizeof(timeout));
+	gettimeofday(&timeout, NULL);
 	razer_timeval_add_msec(&timeout, 3000);
-	while (guard_find_usb_dev(&guard->old_desc,
-				  guard->old_dirname,
-				  old_filename_nr, 1)) {
+	while (1) {
+		dev = guard_find_usb_dev(&guard->old_desc,
+				old_bus_number, old_dev_addr, 1);
+		if (!dev)
+			break;
+		libusb_unref_device(dev);
 		gettimeofday(&now, NULL);
 		if (razer_timeval_after(&now, &timeout)) {
 			/* Timeout. Hm. It seems the device won't reconnect.
@@ -953,33 +994,33 @@ int razer_usb_reconnect_guard_wait(struct razer_usb_reconnect_guard *guard, bool
 		razer_msleep(50);
 	}
 
-	/* Construct the filename the device will reconnect on.
-	 * On a device reset the new filename will be >= reconn_filename.
+	/* Construct the device address it will reconnect on.
+	 * On a device reset the new dev addr will be >= reconn_dev_addr.
 	 */
-	reconn_filename = (old_filename_nr + 1) & 0x7F;
+	reconn_dev_addr = (old_dev_addr + 1) & 0x7F;
 
 	/* Wait for the device to reconnect. */
-	gettimeofday(&now, NULL);
-	memcpy(&timeout, &now, sizeof(timeout));
+	gettimeofday(&timeout, NULL);
 	razer_timeval_add_msec(&timeout, 3000);
 	while (1) {
 		dev = guard_find_usb_dev(&guard->old_desc,
-					 guard->old_dirname,
-					 reconn_filename, 0);
+				old_bus_number, reconn_dev_addr, 0);
 		if (dev)
 			break;
 		gettimeofday(&now, NULL);
 		if (razer_timeval_after(&now, &timeout)) {
 			razer_error("razer_usb_reconnect_guard: The device did not "
 				"reconnect! It might not work anymore. Try to replug it.\n");
-			razer_debug("Expected reconnect busid was: %s:>=%03u\n",
-				guard->old_dirname, reconn_filename);
+			razer_debug("Expected reconnect busid was: %02u:>=%03u\n",
+				old_dev_addr, reconn_dev_addr);
 			errorcode = -EBUSY;
 			goto out;
 		}
 		razer_msleep(50);
 	}
+
 	/* Update the USB context. */
+	libusb_unref_device(guard->ctx->dev);
 	guard->ctx->dev = dev;
 
 reclaim:
@@ -999,7 +1040,7 @@ int razer_load_config(const char *path)
 {
 	struct config_file *conf = NULL;
 
-	if (!librazer_initialized)
+	if (!razer_initialized())
 		return -EINVAL;
 
 	if (!path)

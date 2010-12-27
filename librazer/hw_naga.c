@@ -27,7 +27,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include <usb.h>
 
 
 enum {
@@ -54,11 +53,11 @@ struct naga_command {
 } _packed;
 
 struct naga_private {
+	struct razer_mouse *m;
+
 	unsigned int claimed;
 	/* Firmware version number. */
 	uint16_t fw_version;
-	/* USB context */
-	struct razer_usb_context usb;
 	/* The currently set LED states. */
 	bool led_states[NAGA_NR_LEDS];
 	/* The currently set frequency. */
@@ -75,16 +74,18 @@ struct naga_private {
 #define NAGA_USB_TIMEOUT	3000
 
 static int naga_usb_write(struct naga_private *priv,
-				int request, int command,
-				const void *buf, size_t size)
+			  int request, int command,
+			  const void *buf, size_t size)
 {
 	int err;
 
-	err = usb_control_msg(priv->usb.h,
-			      USB_ENDPOINT_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			      request, command, 0,
-			      (char *)buf, size,
-			      NAGA_USB_TIMEOUT);
+	err = libusb_control_transfer(
+		priv->m->usb_ctx->h,
+		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_CLASS |
+		LIBUSB_RECIPIENT_INTERFACE,
+		request, command, 0,
+		(unsigned char *)buf, size,
+		NAGA_USB_TIMEOUT);
 	if (err != size) {
 		razer_error("razer-naga: "
 			"USB write 0x%02X 0x%02X failed: %d\n",
@@ -95,16 +96,18 @@ static int naga_usb_write(struct naga_private *priv,
 }
 
 static int naga_usb_read(struct naga_private *priv,
-			       int request, int command,
-			       void *buf, size_t size)
+			 int request, int command,
+			 void *buf, size_t size)
 {
 	int err;
 
-	err = usb_control_msg(priv->usb.h,
-			      USB_ENDPOINT_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			      request, command, 0,
-			      buf, size,
-			      NAGA_USB_TIMEOUT);
+	err = libusb_control_transfer(
+		priv->m->usb_ctx->h,
+		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_CLASS |
+		LIBUSB_RECIPIENT_INTERFACE,
+		request, command, 0,
+		buf, size,
+		NAGA_USB_TIMEOUT);
 	if (err != size) {
 		razer_error("razer-naga: "
 			"USB read 0x%02X 0x%02X failed: %d\n",
@@ -120,11 +123,11 @@ static int naga_send_command(struct naga_private *priv,
 	int err;
 
 	cmd->checksum = razer_xor8_checksum(cmd, sizeof(*cmd) - 2);
-	err = naga_usb_write(priv, USB_REQ_SET_CONFIGURATION, 0x300,
+	err = naga_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION, 0x300,
 			     cmd, sizeof(*cmd));
 	if (err)
 		return err;
-	err = naga_usb_read(priv, USB_REQ_CLEAR_FEATURE, 0x300,
+	err = naga_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE, 0x300,
 			    cmd, sizeof(*cmd));
 	if (err)
 		return err;
@@ -233,14 +236,14 @@ static int naga_claim(struct razer_mouse *m)
 {
 	struct naga_private *priv = m->internal;
 
-	return razer_generic_usb_claim_refcount(&priv->usb, &priv->claimed);
+	return razer_generic_usb_claim_refcount(m->usb_ctx, &priv->claimed);
 }
 
 static void naga_release(struct razer_mouse *m)
 {
 	struct naga_private *priv = m->internal;
 
-	razer_generic_usb_release_refcount(&priv->usb, &priv->claimed);
+	razer_generic_usb_release_refcount(m->usb_ctx, &priv->claimed);
 }
 
 static int naga_get_fw_version(struct razer_mouse *m)
@@ -466,21 +469,8 @@ static int naga_set_dpimapping(struct razer_mouse_profile *p,
 	return err;
 }
 
-void razer_naga_gen_idstr(struct usb_device *udev, char *buf)
-{
-	razer_generic_usb_gen_idstr(udev, NULL, "Naga", 1, buf);
-}
-
-void razer_naga_assign_usb_device(struct razer_mouse *m,
-					struct usb_device *usbdev)
-{
-	struct naga_private *priv = m->internal;
-
-	priv->usb.dev = usbdev;
-}
-
 int razer_naga_init(struct razer_mouse *m,
-		    struct usb_device *usbdev)
+		    struct libusb_device *usbdev)
 {
 	struct naga_private *priv;
 	unsigned int i;
@@ -491,9 +481,12 @@ int razer_naga_init(struct razer_mouse *m,
 	priv = zalloc(sizeof(struct naga_private));
 	if (!priv)
 		return -ENOMEM;
+	priv->m = m;
 	m->internal = priv;
 
-	razer_naga_assign_usb_device(m, usbdev);
+	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
+	if (err)
+		goto err_free;
 
 	err = naga_claim(m);
 	if (err) {
@@ -548,7 +541,7 @@ int razer_naga_init(struct razer_mouse *m,
 	}
 
 	m->type = RAZER_MOUSETYPE_NAGA;
-	razer_generic_usb_gen_idstr(usbdev, priv->usb.h, "Naga", 1, m->idstr);
+	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, "Naga", 1, m->idstr);
 
 	m->claim = naga_claim;
 	m->release = naga_release;

@@ -4,7 +4,7 @@
 #include "librazer.h"
 #include "util.h"
 
-#include <usb.h>
+#include <libusb.h>
 #include <stdio.h>
 
 
@@ -22,24 +22,26 @@ extern razer_logfunc_t razer_logfunc_debug;
 #define razer_debug(...)	call_razer_logfunc(razer_logfunc_debug, __VA_ARGS__)
 
 
+struct razer_usb_interface {
+	int bInterfaceNumber;
+	int bAlternateSetting;
+};
 
-
-#define for_each_usbbus(bus, buslist) \
-	for (bus = buslist; bus; bus = bus->next)
-#define for_each_usbdev(dev, devlist) \
-	for (dev = devlist; dev; dev = dev->next)
-
+#define RAZER_MAX_NR_INTERFACES		1
 
 struct razer_usb_context {
 	/* Device pointer. */
-	struct usb_device *dev;
+	struct libusb_device *dev;
 	/* The handle for all operations. */
-	struct usb_dev_handle *h;
-	/* The interface number we use. */
-	int interf;
-	/* Did we detach the kernel driver? */
-	bool kdrv_detached;
+	struct libusb_device_handle *h;
+	/* The interfaces we use. */
+	struct razer_usb_interface interfaces[RAZER_MAX_NR_INTERFACES];
+	unsigned int nr_interfaces;
 };
+
+int razer_usb_add_used_interface(struct razer_usb_context *ctx,
+				 int bInterfaceNumber,
+				 int bAlternateSetting);
 
 int razer_generic_usb_claim(struct razer_usb_context *ctx);
 int razer_generic_usb_claim_refcount(struct razer_usb_context *ctx,
@@ -50,9 +52,9 @@ void razer_generic_usb_release_refcount(struct razer_usb_context *ctx,
 
 struct razer_usb_reconnect_guard {
 	struct razer_usb_context *ctx;
-	struct usb_device_descriptor old_desc;
-	char old_dirname[PATH_MAX + 1];
-	char old_filename[PATH_MAX + 1];
+	struct libusb_device_descriptor old_desc;
+	uint8_t old_busnr;
+	uint8_t old_devaddr;
 };
 
 int razer_usb_reconnect_guard_init(struct razer_usb_reconnect_guard *guard,
@@ -74,8 +76,8 @@ static inline void razer_create_idstr(char *buf,
 		 devtype, devname, bustype, busposition, devid);
 }
 
-void razer_generic_usb_gen_idstr(struct usb_device *udev,
-				 struct usb_dev_handle *h,
+void razer_generic_usb_gen_idstr(struct libusb_device *udev,
+				 struct libusb_device_handle *h,
 				 const char *devname,
 				 bool include_devicenr,
 				 char *idstr_buf);
