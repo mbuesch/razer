@@ -838,20 +838,10 @@ int razer_lachesis_init(struct razer_mouse *m,
 		priv->profiles[i].set_button_function = lachesis_set_button_function;
 		priv->profiles[i].mouse = m;
 	}
-	for (i = 0; i < LACHESIS_NR_AXES; i++) {
-		priv->axes[i].id = i;
-		switch (i) {
-		case 0: /* X */
-			priv->axes[i].name = "X";
-			break;
-		case 1: /* Y */
-			priv->axes[i].name = "Y";
-			break;
-		case 2: /* Scrollwheel */
-			priv->axes[i].name = "Scroll";
-			break;
-		}
-	}
+	razer_init_axes(&priv->axes[0],
+			"X", 0,
+			"Y", 0,
+			"Scroll", 0);
 	for (i = 0; i < LACHESIS_NR_DPIMAPPINGS; i++) {
 		priv->dpimappings[i].nr = i;
 		priv->dpimappings[i].res = RAZER_MOUSE_RES_UNKNOWN;

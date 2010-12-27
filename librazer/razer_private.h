@@ -82,4 +82,9 @@ void razer_generic_usb_gen_idstr(struct libusb_device *udev,
 				 bool include_devicenr,
 				 char *idstr_buf);
 
+void razer_init_axes(struct razer_axis *axes,
+		     const char *name0, unsigned int flags0,
+		     const char *name1, unsigned int flags1,
+		     const char *name2, unsigned int flags2);
+
 #endif /* RAZER_PRIVATE_H_ */

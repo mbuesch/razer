@@ -1066,3 +1066,23 @@ void razer_set_logging(razer_logfunc_t info_callback,
 	razer_logfunc_error = error_callback;
 	razer_logfunc_debug = debug_callback;
 }
+
+static void do_init_axis(struct razer_axis *axis,
+			 unsigned int id, const char *name, unsigned int flags)
+{
+	if (name) {
+		axis->id = id;
+		axis->name = name;
+		axis->flags = flags;
+	}
+}
+
+void razer_init_axes(struct razer_axis *axes,
+		     const char *name0, unsigned int flags0,
+		     const char *name1, unsigned int flags1,
+		     const char *name2, unsigned int flags2)
+{
+	do_init_axis(&axes[0], 0, name0, flags0);
+	do_init_axis(&axes[1], 1, name1, flags1);
+	do_init_axis(&axes[2], 2, name2, flags2);
+}

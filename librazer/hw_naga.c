@@ -523,22 +523,10 @@ int razer_naga_init(struct razer_mouse *m,
 		priv->dpimapping[i].change = NULL;
 		priv->dpimapping[i].mouse = m;
 	}
-	for (i = 0; i < NAGA_NR_AXES; i++) {
-		priv->axes[i].id = i;
-		switch (i) {
-		case 0: /* X */
-			priv->axes[i].flags |= RAZER_AXIS_INDEPENDENT_DPIMAPPING;
-			priv->axes[i].name = "X";
-			break;
-		case 1: /* Y */
-			priv->axes[i].flags |= RAZER_AXIS_INDEPENDENT_DPIMAPPING;
-			priv->axes[i].name = "Y";
-			break;
-		case 2: /* Scrollwheel */
-			priv->axes[i].name = "Scroll";
-			break;
-		}
-	}
+	razer_init_axes(&priv->axes[0],
+			"X", RAZER_AXIS_INDEPENDENT_DPIMAPPING,
+			"Y", RAZER_AXIS_INDEPENDENT_DPIMAPPING,
+			"Scroll", 0);
 
 	m->type = RAZER_MOUSETYPE_NAGA;
 	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, "Naga", 1, m->idstr);
