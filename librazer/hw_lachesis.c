@@ -206,8 +206,8 @@ static struct razer_button_function lachesis_button_functions[] = {
  */
 
 static int lachesis_usb_write(struct lachesis_private *priv,
-			      int request, int command,
-			      void *buf, size_t size, bool silent)
+			      int request, int command, int index,
+			      void *buf, size_t size)
 {
 	int err;
 
@@ -215,21 +215,20 @@ static int lachesis_usb_write(struct lachesis_private *priv,
 		priv->m->usb_ctx->h,
 		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_CLASS |
 		LIBUSB_RECIPIENT_INTERFACE,
-		request, command, 0,
+		request, command, index,
 		buf, size,
 		LACHESIS_USB_TIMEOUT);
 	if (err != size) {
-		if (!silent)
-			razer_error("hw_lachesis: usb_write failed\n");
-		return err;
+		razer_error("hw_lachesis: usb_write failed\n");
+		return -EIO;
 	}
 
 	return 0;
 }
 
-static int lachesis_usb_read_withindex(struct lachesis_private *priv,
-				       int request, int command, int index,
-				       void *buf, size_t size, bool silent)
+static int lachesis_usb_read(struct lachesis_private *priv,
+			     int request, int command, int index,
+			     void *buf, size_t size)
 {
 	int err;
 
@@ -241,19 +240,11 @@ static int lachesis_usb_read_withindex(struct lachesis_private *priv,
 		buf, size,
 		LACHESIS_USB_TIMEOUT);
 	if (err != size) {
-		if (!silent)
-			razer_error("hw_lachesis: usb_read failed\n");
-		return err;
+		razer_error("hw_lachesis: usb_read failed\n");
+		return -EIO;
 	}
 
 	return 0;
-}
-
-static int lachesis_usb_read(struct lachesis_private *priv,
-			     int request, int command,
-			     void *buf, size_t size, bool silent)
-{
-	return lachesis_usb_read_withindex(priv, request, command, 0, buf, size, silent);
 }
 
 static int lachesis_read_fw_ver(struct lachesis_private *priv)
@@ -263,7 +254,7 @@ static int lachesis_read_fw_ver(struct lachesis_private *priv)
 	int err;
 
 	err = lachesis_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
-				0x06, buf, sizeof(buf), 0);
+				0x06, 0, buf, sizeof(buf));
 	if (err)
 		return -EIO;
 	ver = buf[0];
@@ -277,8 +268,7 @@ static int lachesis_commit(struct lachesis_private *priv)
 {
 	unsigned int i;
 	int err;
-	char value;
-	char statusbuf[2];
+	char value, status;
 	struct lachesis_profcfg_cmd profcfg;
 	struct lachesis_dpimap_cmd dpimap;
 
@@ -305,15 +295,15 @@ static int lachesis_commit(struct lachesis_private *priv)
 		profcfg.checksum = razer_xor16_checksum(&profcfg,
 				sizeof(profcfg) - sizeof(profcfg.checksum));
 		err = lachesis_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
-					 0x01, &profcfg, sizeof(profcfg), 0);
+					 0x01, 0, &profcfg, sizeof(profcfg));
 		if (err)
 			return err;
-razer_msleep(1000);
 		err = lachesis_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
-					0x02, statusbuf, sizeof(statusbuf), 0);
-		if (err)
-			printf("STATUS ERROR\n");
-razer_msleep(50);
+					0x02, 0, &status, sizeof(status));
+		if (err || status != 1) {
+			razer_error("hw_lachesis: Failed to commit profile\n");
+			return err;
+		}
 	}
 
 	/* Commit LED states. */
@@ -323,14 +313,14 @@ razer_msleep(50);
 	if (priv->led_states[LACHESIS_LED_SCROLL])
 		value |= 0x02;
 	err = lachesis_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
-				 0x04, &value, sizeof(value), 0);
+				 0x04, 0, &value, sizeof(value));
 	if (err)
 		return err;
 
 	/* Commit the active profile selection. */
 	value = priv->cur_profile->nr + 1;
 	err = lachesis_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
-				 0x08, &value, sizeof(value), 0);
+				 0x08, 0, &value, sizeof(value));
 	if (err)
 		return err;
 
@@ -342,7 +332,7 @@ razer_msleep(50);
 		dpimap.mappings[i].dpival1 = dpimap.mappings[i].dpival0;
 	}
 	err = lachesis_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
-				 0x12, &dpimap, sizeof(dpimap), 0);
+				 0x12, 0, &dpimap, sizeof(dpimap));
 	if (err)
 		return err;
 
@@ -388,79 +378,79 @@ static int lachesis_read_config_from_hw(struct lachesis_private *priv)
 
 	value = 0x01;
 	err = lachesis_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
-				 0x0F, &value, sizeof(value), 0);
+				 0x0F, 0, &value, sizeof(value));
 	if (err)
 		return err;
-razer_msleep(100);
 
-//printf("Read prof\n");
 	/* Get the current profile number */
 	err = lachesis_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
-				0x09, &value, sizeof(value), 1);
+				0x09, 0, &value, sizeof(value));
 	if (err)
 		return err;
-razer_msleep(3000);
-	if (value >= 1 && value <= LACHESIS_NR_PROFILES) {
-		/* Got a valid current profile number. */
-		priv->cur_profile = &priv->profiles[value - 1];
-//printf("Read prof conf\n");
-		/* Get the profile configuration */
-		for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
-			err = lachesis_usb_read_withindex(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
-							  0x03, i + 1, &profcfg, sizeof(profcfg), 0);
-//razer_msleep(5000);
-			if (err) {
-//printf("profcfg %u read err\n", i+1);
-				continue;
-			}
-//			printf("Got prof config %u\n", i+1);
-			if (profcfg.dpisel < 1 || profcfg.dpisel > LACHESIS_NR_DPIMAPPINGS)
-				continue;
-//			printf("profcfg valid\n");
-//printf("Got magic = 0x%04X, prof %u, freq %u\n", profcfg.magic, profcfg.profile, profcfg.freq);
-			priv->cur_dpimapping[i] = &priv->dpimappings[profcfg.dpisel - 1];
-			switch (profcfg.freq) {
-			case 1:
-				priv->cur_freq[i] = RAZER_MOUSE_FREQ_1000HZ;
-				break;
-			case 2:
-				priv->cur_freq[i] = RAZER_MOUSE_FREQ_500HZ;
-				break;
-			case 3:
-				priv->cur_freq[i] = RAZER_MOUSE_FREQ_125HZ;
-				break;
-			default:
-				razer_error("hw_lachesis: "
-					"Read invalid frequency value from device (%u)\n",
-					profcfg.freq);
-				return -EINVAL;
-			}
-			priv->buttons[i] = profcfg.buttons;
-			//TODO validate buttonmap
-
-//XXX
-#if 0
-		err = lachesis_read_fw_ver(priv);
-		if (err < 0)
-			printf("FW VER READ FAILED\n");
-		priv->fw_version = err;
-#endif
-//XXX
-		}
+	if (value < 1 || value > LACHESIS_NR_PROFILES) {
+		razer_error("hw_lachesis: Got invalid profile number\n");
+		return -EIO;
 	}
+	priv->cur_profile = &priv->profiles[value - 1];
+
+	/* Get the profile configuration */
+	for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
+		/* Change to the profile */
+		value = i + 1;
+		err = lachesis_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
+					 0x08, 0, &value, sizeof(value));
+		if (err)
+			return err;
+		/* And read the profile config */
+		err = lachesis_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
+					0x03, 1, &profcfg, sizeof(profcfg));
+		if (err)
+			return err;
+		if (profcfg.dpisel < 1 || profcfg.dpisel > LACHESIS_NR_DPIMAPPINGS) {
+			razer_error("hw_lachesis: Got invalid DPI selection\n");
+			return -EIO;
+		}
+		razer_debug("hw_lachesis: Got profile config %d "
+			"(magic 0x%04X, prof %u, freq %u, dpisel %u)\n",
+			i + 1, profcfg.magic, profcfg.profile, profcfg.freq, profcfg.dpisel);
+		priv->cur_dpimapping[i] = &priv->dpimappings[profcfg.dpisel - 1];
+		switch (profcfg.freq) {
+		case 1:
+			priv->cur_freq[i] = RAZER_MOUSE_FREQ_1000HZ;
+			break;
+		case 2:
+			priv->cur_freq[i] = RAZER_MOUSE_FREQ_500HZ;
+			break;
+		case 3:
+			priv->cur_freq[i] = RAZER_MOUSE_FREQ_125HZ;
+			break;
+		default:
+			razer_error("hw_lachesis: "
+				"Read invalid frequency value from device (%u)\n",
+				profcfg.freq);
+			return -EINVAL;
+		}
+		priv->buttons[i] = profcfg.buttons;
+		//TODO validate buttonmap
+	}
+	/* Select original profile */
+	value = priv->cur_profile->nr + 1;
+	err = lachesis_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
+				 0x08, 0, &value, sizeof(value));
+	if (err)
+		return err;
 
 	/* Get the LED states */
 	err = lachesis_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
-				0x05, &value, sizeof(value), 0);
+				0x05, 0, &value, sizeof(value));
 	if (err)
 		return err;
 	priv->led_states[LACHESIS_LED_LOGO] = !!(value & 0x01);
 	priv->led_states[LACHESIS_LED_SCROLL] = !!(value & 0x02);
 
-razer_msleep(300);
 	/* Get the DPI map */
 	err = lachesis_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
-				0x10, &dpimap, sizeof(dpimap), 0);
+				0x10, 0, &dpimap, sizeof(dpimap));
 	if (err)
 		return err;
 	for (i = 0; i < LACHESIS_NR_DPIMAPPINGS; i++)
@@ -832,8 +822,11 @@ int razer_lachesis_init(struct razer_mouse *m,
 	m->internal = priv;
 
 	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
-	if (err)
+	err |= razer_usb_add_used_interface(m->usb_ctx, 1, 0);
+	if (err) {
+		err = -ENODEV;
 		goto err_free;
+	}
 
 	for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
 		priv->profiles[i].nr = i;

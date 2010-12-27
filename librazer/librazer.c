@@ -633,8 +633,10 @@ int razer_usb_add_used_interface(struct razer_usb_context *ctx,
 {
 	struct razer_usb_interface *interf;
 
-	if (ctx->nr_interfaces >= ARRAY_SIZE(ctx->interfaces))
+	if (ctx->nr_interfaces >= ARRAY_SIZE(ctx->interfaces)) {
+		razer_error("USB context interface array overflow\n");
 		return -ENOSPC;
+	}
 
 	interf = &ctx->interfaces[ctx->nr_interfaces];
 	interf->bInterfaceNumber = bInterfaceNumber;

@@ -27,7 +27,7 @@ struct razer_usb_interface {
 	int bAlternateSetting;
 };
 
-#define RAZER_MAX_NR_INTERFACES		1
+#define RAZER_MAX_NR_INTERFACES		2
 
 struct razer_usb_context {
 	/* Device pointer. */
