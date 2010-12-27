@@ -22,8 +22,6 @@ endmacro(CHECK_LIB)
 
 check_lib(usb-1.0 libusb.h)
 
-set(CMAKE_C_FLAGS_DEBUG "-DDEBUG ${CMAKE_C_FLAGS_DEBUG}")
-
 add_subdirectory(librazer)
 add_subdirectory(razerd)
 add_subdirectory(ui)
