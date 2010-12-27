@@ -451,6 +451,16 @@ static void mouse_apply_initial_config(struct razer_mouse *m)
 	}
 }
 
+static int mouse_default_claim(struct razer_mouse *m)
+{
+	return razer_generic_usb_claim_refcount(m->usb_ctx, &m->claim_count);
+}
+
+static void mouse_default_release(struct razer_mouse *m)
+{
+	razer_generic_usb_release_refcount(m->usb_ctx, &m->claim_count);
+}
+
 static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 				      struct libusb_device *udev)
 {
@@ -466,6 +476,9 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 		goto err_free_mouse;
 
 	m->usb_ctx->dev = udev;
+
+	m->claim = mouse_default_claim;
+	m->release = mouse_default_release;
 
 	m->flags |= RAZER_MOUSEFLG_NEW;
 	m->base_ops = id->u.mouse_ops;
@@ -503,6 +516,10 @@ static void razer_free_mouse(struct razer_mouse *m)
 	ev.u.mouse = m;
 	razer_notify_event(RAZER_EV_MOUSE_REMOVE, &ev);
 
+	if (m->release == mouse_default_release) {
+		while (m->claim_count)
+			m->release(m);
+	}
 	m->base_ops->release(m);
 
 	libusb_unref_device(m->usb_ctx->dev);

@@ -99,7 +99,6 @@ struct copperhead_profcfg_cmd {
 struct copperhead_private {
 	struct razer_mouse *m;
 
-	unsigned int claimed;
 	uint16_t fw_version;
 
 	/* The active profile. */
@@ -395,27 +394,10 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 	return 0;
 }
 
-static int copperhead_claim(struct razer_mouse *m)
-{
-	struct copperhead_private *priv = m->internal;
-
-	return razer_generic_usb_claim_refcount(m->usb_ctx, &priv->claimed);
-}
-
-static void copperhead_release(struct razer_mouse *m)
-{
-	struct copperhead_private *priv = m->internal;
-
-	razer_generic_usb_release_refcount(m->usb_ctx, &priv->claimed);
-}
-
 static int copperhead_get_fw_version(struct razer_mouse *m)
 {
 	struct copperhead_private *priv = m->internal;
 
-	/* Version is read on claim. */
-	if (!priv->claimed)
-		return -EBUSY;
 	return priv->fw_version;
 }
 
@@ -489,7 +471,7 @@ static int copperhead_set_freq(struct razer_mouse_profile *p,
 	enum razer_mouse_freq oldfreq;
 	int err;
 
-	if (!priv->claimed)
+	if (!priv->m->claim_count)
 		return -EBUSY;
 	if (p->nr >= ARRAY_SIZE(priv->cur_freq))
 		return -EINVAL;
@@ -535,7 +517,7 @@ static int copperhead_set_dpimapping(struct razer_mouse_profile *p,
 	struct razer_mouse_dpimapping *oldmapping;
 	int err;
 
-	if (!priv->claimed)
+	if (!priv->m->claim_count)
 		return -EBUSY;
 	if (p->nr >= ARRAY_SIZE(priv->cur_dpimapping))
 		return -EINVAL;
@@ -599,7 +581,7 @@ static int copperhead_set_button_function(struct razer_mouse_profile *p,
 	uint8_t oldlogical;
 	int err;
 
-	if (!priv->claimed)
+	if (!priv->m->claim_count)
 		return -EBUSY;
 	if (p->nr > ARRAY_SIZE(priv->buttons))
 		return -EINVAL;
@@ -665,7 +647,7 @@ int razer_copperhead_init(struct razer_mouse *m,
 		priv->profiles[i].mouse = m;
 	}
 
-	err = copperhead_claim(m);
+	err = m->claim(m);
 	if (err) {
 		razer_error("hw_copperhead: "
 			"Failed to initially claim the device\n");
@@ -674,7 +656,7 @@ int razer_copperhead_init(struct razer_mouse *m,
 	err = copperhead_read_config_from_hw(priv);
 	if (!err)
 		err = copperhead_commit(priv);
-	copperhead_release(m);
+	m->release(m);
 	if (err) {
 		razer_error("hw_copperhead: "
 			"Failed to read the configuration from hardware\n");
@@ -684,8 +666,6 @@ int razer_copperhead_init(struct razer_mouse *m,
 	m->type = RAZER_MOUSETYPE_COPPERHEAD;
 	razer_generic_usb_gen_idstr(usbdev, NULL, "Copperhead", 1, m->idstr);
 
-	m->claim = copperhead_claim;
-	m->release = copperhead_release;
 	m->get_fw_version = copperhead_get_fw_version;
 	m->nr_profiles = COPPERHEAD_NR_PROFILES;
 	m->get_profiles = copperhead_get_profiles;
@@ -708,7 +688,5 @@ void razer_copperhead_release(struct razer_mouse *m)
 {
 	struct copperhead_private *priv = m->internal;
 
-	while (priv->claimed)
-		copperhead_release(m);
 	free(priv);
 }

@@ -122,7 +122,6 @@ struct lachesis_dpimap_cmd {
 struct lachesis_private {
 	struct razer_mouse *m;
 
-	unsigned int claimed;
 	uint16_t fw_version;
 
 	/* The currently set LED states. */
@@ -459,27 +458,10 @@ static int lachesis_read_config_from_hw(struct lachesis_private *priv)
 	return 0;
 }
 
-static int lachesis_claim(struct razer_mouse *m)
-{
-	struct lachesis_private *priv = m->internal;
-
-	return razer_generic_usb_claim_refcount(m->usb_ctx, &priv->claimed);
-}
-
-static void lachesis_release(struct razer_mouse *m)
-{
-	struct lachesis_private *priv = m->internal;
-
-	return razer_generic_usb_release_refcount(m->usb_ctx, &priv->claimed);
-}
-
 static int lachesis_get_fw_version(struct razer_mouse *m)
 {
 	struct lachesis_private *priv = m->internal;
 
-	/* Version is read on claim. */
-	if (!priv->claimed)
-		return -EBUSY;
 	return priv->fw_version;
 }
 
@@ -497,7 +479,7 @@ static int lachesis_led_toggle(struct razer_led *led,
 	    (new_state != RAZER_LED_ON))
 		return -EINVAL;
 
-	if (!priv->claimed)
+	if (!priv->m->claim_count)
 		return -EBUSY;
 
 	old_state = priv->led_states[led->id];
@@ -593,7 +575,7 @@ static int lachesis_set_freq(struct razer_mouse_profile *p,
 	enum razer_mouse_freq oldfreq;
 	int err;
 
-	if (!priv->claimed)
+	if (!priv->m->claim_count)
 		return -EBUSY;
 	if (p->nr >= ARRAY_SIZE(priv->cur_freq))
 		return -EINVAL;
@@ -653,7 +635,7 @@ static int lachesis_set_active_profile(struct razer_mouse *m,
 	struct razer_mouse_profile *oldprof;
 	int err;
 
-	if (!priv->claimed)
+	if (!priv->m->claim_count)
 		return -EBUSY;
 
 	oldprof = priv->cur_profile;
@@ -697,7 +679,7 @@ static int lachesis_set_dpimapping(struct razer_mouse_profile *p,
 	struct razer_mouse_dpimapping *oldmapping;
 	int err;
 
-	if (!priv->claimed)
+	if (!priv->m->claim_count)
 		return -EBUSY;
 	if (p->nr >= ARRAY_SIZE(priv->cur_dpimapping))
 		return -EINVAL;
@@ -721,7 +703,7 @@ static int lachesis_dpimapping_modify(struct razer_mouse_dpimapping *d,
 	enum razer_mouse_res oldres;
 	int err;
 
-	if (!priv->claimed)
+	if (!priv->m->claim_count)
 		return -EBUSY;
 
 	oldres = d->res;
@@ -783,7 +765,7 @@ static int lachesis_set_button_function(struct razer_mouse_profile *p,
 	uint8_t oldlogical;
 	int err;
 
-	if (!priv->claimed)
+	if (!priv->m->claim_count)
 		return -EBUSY;
 	if (p->nr > ARRAY_SIZE(priv->buttons))
 		return -EINVAL;
@@ -849,7 +831,7 @@ int razer_lachesis_init(struct razer_mouse *m,
 		priv->dpimappings[i].mouse = m;
 	}
 
-	err = lachesis_claim(m);
+	err = m->claim(m);
 	if (err) {
 		razer_error("hw_lachesis: "
 			    "Failed to initially claim the device\n");
@@ -873,8 +855,6 @@ int razer_lachesis_init(struct razer_mouse *m,
 
 	m->type = RAZER_MOUSETYPE_LACHESIS;
 
-	m->claim = lachesis_claim;
-	m->release = lachesis_release;
 	m->get_fw_version = lachesis_get_fw_version;
 	m->get_leds = lachesis_get_leds;
 	m->nr_profiles = ARRAY_SIZE(priv->profiles);
@@ -893,12 +873,12 @@ int razer_lachesis_init(struct razer_mouse *m,
 		razer_error("hw_lachesis: Failed to commit initial settings\n");
 		goto err_release;
 	}
-	lachesis_release(m);
+	m->release(m);
 
 	return 0;
 
 err_release:
-	lachesis_release(m);
+	m->release(m);
 err_free:
 	free(priv);
 
@@ -909,7 +889,5 @@ void razer_lachesis_release(struct razer_mouse *m)
 {
 	struct lachesis_private *priv = m->internal;
 
-	while (priv->claimed)
-		lachesis_release(m);
 	free(priv);
 }

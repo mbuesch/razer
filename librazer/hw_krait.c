@@ -31,7 +31,6 @@
 struct krait_private {
 	struct razer_mouse *m;
 
-	unsigned int claimed;
 	struct razer_mouse_dpimapping *cur_dpimapping;
 	struct razer_mouse_profile profile;
 	struct razer_mouse_dpimapping dpimapping[2];
@@ -76,20 +75,6 @@ static int krait_usb_read(struct krait_private *priv,
 	return 0;
 }
 #endif
-
-static int krait_claim(struct razer_mouse *m)
-{
-	struct krait_private *priv = m->internal;
-
-	return razer_generic_usb_claim_refcount(m->usb_ctx, &priv->claimed);
-}
-
-static void krait_release(struct razer_mouse *m)
-{
-	struct krait_private *priv = m->internal;
-
-	razer_generic_usb_release_refcount(m->usb_ctx, &priv->claimed);
-}
 
 static int krait_supported_resolutions(struct razer_mouse *m,
 				       enum razer_mouse_res **res_list)
@@ -149,7 +134,7 @@ static int krait_set_dpimapping(struct razer_mouse_profile *p,
 	int err;
 	char value;
 
-	if (!priv->claimed)
+	if (!priv->m->claim_count)
 		return -EBUSY;
 
 	switch (d->res) {
@@ -208,8 +193,6 @@ int razer_krait_init(struct razer_mouse *m,
 	m->type = RAZER_MOUSETYPE_KRAIT;
 	razer_generic_usb_gen_idstr(usbdev, NULL, "Krait", 1, m->idstr);
 
-	m->claim = krait_claim;
-	m->release = krait_release;
 	m->nr_profiles = 1;
 	m->get_profiles = krait_get_profiles;
 	m->get_active_profile = krait_get_active_profile;
@@ -223,7 +206,5 @@ void razer_krait_release(struct razer_mouse *m)
 {
 	struct krait_private *priv = m->internal;
 
-	while (priv->claimed)
-		krait_release(m);
 	free(priv);
 }

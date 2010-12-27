@@ -55,7 +55,6 @@ struct naga_command {
 struct naga_private {
 	struct razer_mouse *m;
 
-	unsigned int claimed;
 	/* Firmware version number. */
 	uint16_t fw_version;
 	/* The currently set LED states. */
@@ -232,20 +231,6 @@ static int naga_commit(struct naga_private *priv)
 	return 0;
 }
 
-static int naga_claim(struct razer_mouse *m)
-{
-	struct naga_private *priv = m->internal;
-
-	return razer_generic_usb_claim_refcount(m->usb_ctx, &priv->claimed);
-}
-
-static void naga_release(struct razer_mouse *m)
-{
-	struct naga_private *priv = m->internal;
-
-	razer_generic_usb_release_refcount(m->usb_ctx, &priv->claimed);
-}
-
 static int naga_get_fw_version(struct razer_mouse *m)
 {
 	struct naga_private *priv = m->internal;
@@ -267,7 +252,7 @@ static int naga_led_toggle(struct razer_led *led,
 	    (new_state != RAZER_LED_ON))
 		return -EINVAL;
 
-	if (!priv->claimed)
+	if (!priv->m->claim_count)
 		return -EBUSY;
 
 	old_state = priv->led_states[led->id];
@@ -350,7 +335,7 @@ static int naga_set_freq(struct razer_mouse_profile *p,
 	enum razer_mouse_freq old_freq;
 	int err;
 
-	if (!priv->claimed)
+	if (!priv->m->claim_count)
 		return -EBUSY;
 
 	old_freq = priv->frequency;
@@ -439,7 +424,7 @@ static int naga_set_dpimapping(struct razer_mouse_profile *p,
 	struct razer_mouse_dpimapping *oldmapping_X, *oldmapping_Y;
 	int err;
 
-	if (!priv->claimed)
+	if (!priv->m->claim_count)
 		return -EBUSY;
 	if (axis && axis->id >= ARRAY_SIZE(priv->axes))
 		return -EINVAL;
@@ -488,7 +473,7 @@ int razer_naga_init(struct razer_mouse *m,
 	if (err)
 		goto err_free;
 
-	err = naga_claim(m);
+	err = m->claim(m);
 	if (err) {
 		razer_error("hw_naga: Failed to claim device\n");
 		goto err_free;
@@ -531,8 +516,6 @@ int razer_naga_init(struct razer_mouse *m,
 	m->type = RAZER_MOUSETYPE_NAGA;
 	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, "Naga", 1, m->idstr);
 
-	m->claim = naga_claim;
-	m->release = naga_release;
 	m->get_fw_version = naga_get_fw_version;
 	m->get_leds = naga_get_leds;
 	m->nr_profiles = 1;
@@ -549,12 +532,12 @@ int razer_naga_init(struct razer_mouse *m,
 		goto err_release;
 	}
 
-	naga_release(m);
+	m->release(m);
 
 	return 0;
 
 err_release:
-	naga_release(m);
+	m->release(m);
 err_free:
 	free(priv);
 	return err;
@@ -564,7 +547,5 @@ void razer_naga_release(struct razer_mouse *m)
 {
 	struct naga_private *priv = m->internal;
 
-	while (priv->claimed)
-		naga_release(m);
 	free(priv);
 }

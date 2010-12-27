@@ -48,7 +48,6 @@ struct deathadder_125_cfg {
 struct deathadder_private {
 	struct razer_mouse *m;
 
-	unsigned int claimed;
 	/* Firmware version number. */
 	uint16_t fw_version;
 	/* The currently set LED states. */
@@ -330,20 +329,6 @@ static int deathadder_commit(struct deathadder_private *priv)
 	return 0;
 }
 
-static int deathadder_claim(struct razer_mouse *m)
-{
-	struct deathadder_private *priv = m->internal;
-
-	return razer_generic_usb_claim_refcount(m->usb_ctx, &priv->claimed);
-}
-
-static void deathadder_release(struct razer_mouse *m)
-{
-	struct deathadder_private *priv = m->internal;
-
-	razer_generic_usb_release_refcount(m->usb_ctx, &priv->claimed);
-}
-
 static int deathadder_get_fw_version(struct razer_mouse *m)
 {
 	struct deathadder_private *priv = m->internal;
@@ -365,7 +350,7 @@ static int deathadder_led_toggle(struct razer_led *led,
 	    (new_state != RAZER_LED_ON))
 		return -EINVAL;
 
-	if (!priv->claimed)
+	if (!m->claim_count)
 		return -EBUSY;
 
 	old_state = priv->led_states[led->id];
@@ -448,7 +433,7 @@ static int deathadder_set_freq(struct razer_mouse_profile *p,
 	enum razer_mouse_freq old_freq;
 	int err;
 
-	if (!priv->claimed)
+	if (!priv->m->claim_count)
 		return -EBUSY;
 
 	old_freq = priv->frequency;
@@ -531,7 +516,7 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 
 	if (magic_number != RAZER_FW_FLASH_MAGIC)
 		return -EINVAL;
-	if (!priv->claimed)
+	if (!m->claim_count)
 		return -EBUSY;
 
 	if (len != DEATHADDER_FW_IMAGE_SIZE) {
@@ -615,7 +600,7 @@ static int deathadder_set_dpimapping(struct razer_mouse_profile *p,
 	struct razer_mouse_dpimapping *oldmapping;
 	int err;
 
-	if (!priv->claimed)
+	if (!priv->m->claim_count)
 		return -EBUSY;
 
 	oldmapping = priv->cur_dpimapping;
@@ -656,7 +641,7 @@ int razer_deathadder_init(struct razer_mouse *m,
 		usbdev = m->usb_ctx->dev;
 	}
 
-	err = deathadder_claim(m);
+	err = m->claim(m);
 	if (err) {
 		razer_error("hw_deathadder: Failed to claim device\n");
 		goto err_free;
@@ -711,8 +696,6 @@ int razer_deathadder_init(struct razer_mouse *m,
 	m->type = RAZER_MOUSETYPE_DEATHADDER;
 	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, "DeathAdder", 0, m->idstr);
 
-	m->claim = deathadder_claim;
-	m->release = deathadder_release;
 	m->get_fw_version = deathadder_get_fw_version;
 	m->get_leds = deathadder_get_leds;
 	m->flash_firmware = deathadder_flash_firmware;
@@ -729,12 +712,12 @@ int razer_deathadder_init(struct razer_mouse *m,
 		goto err_release;
 	}
 
-	deathadder_release(m);
+	m->release(m);
 
 	return 0;
 
 err_release:
-	deathadder_release(m);
+	m->release(m);
 err_free:
 	free(priv);
 
@@ -745,7 +728,5 @@ void razer_deathadder_release(struct razer_mouse *m)
 {
 	struct deathadder_private *priv = m->internal;
 
-	while (priv->claimed)
-		deathadder_release(m);
 	free(priv);
 }

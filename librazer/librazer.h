@@ -347,6 +347,7 @@ struct razer_mouse {
 	/* Do not touch these pointers. */
 	const struct razer_mouse_base_ops *base_ops;
 	struct razer_usb_context *usb_ctx;
+	unsigned int claim_count;
 	void *internal; /* For use by the hardware driver */
 };
 
