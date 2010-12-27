@@ -481,6 +481,8 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 	struct razer_mouse *m;
 	int err;
 
+	libusb_ref_device(udev);
+
 	m = zalloc(sizeof(*m));
 	if (!m)
 		return NULL;
@@ -496,6 +498,7 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 	err = m->base_ops->init(m, udev);
 	if (err)
 		goto err_free_ctx;
+	udev = m->usb_ctx->dev;
 
 	mouse_apply_initial_config(m);
 
@@ -505,14 +508,13 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 	ev.u.mouse = m;
 	razer_notify_event(RAZER_EV_MOUSE_ADD, &ev);
 
-	libusb_ref_device(udev);
-
 	return m;
 
 err_free_ctx:
 	razer_free(m->usb_ctx, sizeof(*(m->usb_ctx)));
 err_free_mouse:
 	razer_free(m, sizeof(*m));
+	libusb_unref_device(udev);
 
 	return NULL;
 }
@@ -918,7 +920,8 @@ int razer_usb_force_hub_reset(struct razer_usb_context *device_ctx)
 	}
 	if (!hub) {
 		razer_error("razer_usb_force_reinit: Failed to find hub\n");
-		return -ENODEV;
+		err = -ENODEV;
+		goto error;
 	}
 	razer_debug("Resetting root hub %03u:%03u\n",
 		hub_bus_number, hub_device_address);
@@ -926,7 +929,8 @@ int razer_usb_force_hub_reset(struct razer_usb_context *device_ctx)
 	err = libusb_open(hub, &h);
 	if (err) {
 		razer_error("razer_usb_force_reinit: Failed to open hub device\n");
-		return -ENODEV;
+		err = -ENODEV;
+		goto error;
 	}
 	libusb_reset_device(h);
 	libusb_close(h);
@@ -935,13 +939,17 @@ int razer_usb_force_hub_reset(struct razer_usb_context *device_ctx)
 	if (err) {
 		razer_error("razer_usb_force_reinit: "
 			"Failed to discover the reconnected device\n");
-		return err;
+		goto error;
 	}
 	razer_debug("Hub reset completed. Device rediscovered as %03u:%03u\n",
 		libusb_get_bus_number(device_ctx->dev),
 		libusb_get_device_address(device_ctx->dev));
 
-	return 0;
+	err = 0;
+error:
+	libusb_free_device_list(devlist, 1);
+
+	return err;
 }
 
 /** razer_usb_reconnect_guard_init - Init the reconnect-guard context
