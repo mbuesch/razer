@@ -41,20 +41,18 @@ enum { /* Misc constants */
 
 /* The wire protocol data structures... */
 
-enum boomslangce_phys_button {//FIXME
+enum boomslangce_phys_button {
 	/* Physical button IDs */
 	BOOMSLANGCE_PHYSBUT_LEFT = 0x01,	/* Left button */
 	BOOMSLANGCE_PHYSBUT_RIGHT,		/* Right button */
 	BOOMSLANGCE_PHYSBUT_MIDDLE,		/* Middle button */
-	BOOMSLANGCE_PHYSBUT_LFRONT,		/* Left side, front button */
-	BOOMSLANGCE_PHYSBUT_LREAR,		/* Left side, rear button */
-	BOOMSLANGCE_PHYSBUT_RFRONT,		/* Right side, front button */
-	BOOMSLANGCE_PHYSBUT_RREAR,		/* Right side, rear button */
+	BOOMSLANGCE_PHYSBUT_LSIDE,		/* Left side */
+	BOOMSLANGCE_PHYSBUT_RSIDE,		/* Right side */
+	BOOMSLANGCE_PHYSBUT_SCROLLUP,		/* Scroll up */
+	BOOMSLANGCE_PHYSBUT_SCROLLDOWN,		/* Scroll down */
 
 	NR_BOOMSLANGCE_PHYSBUT = 7,		/* Number of physical buttons */
 };
-#define boomslangce_for_each_physbut(iterator) \
-	for (iterator = 0x01; iterator <= NR_BOOMSLANGCE_PHYSBUT; iterator++)
 
 enum boomslangce_button_function {
 	/* Logical button function IDs */
@@ -65,6 +63,8 @@ enum boomslangce_button_function {
 	BOOMSLANGCE_BUTFUNC_DPIDOWN	= 0x0D, /* DPI down */
 	BOOMSLANGCE_BUTFUNC_WIN5	= 0x0A, /* Windows button 5 */
 	BOOMSLANGCE_BUTFUNC_WIN4	= 0x0B, /* Windows button 4 */
+	BOOMSLANGCE_BUTFUNC_SCROLLUP	= 0x30, /* Scroll wheel up */
+	BOOMSLANGCE_BUTFUNC_SCROLLDOWN	= 0x31, /* Scroll wheel down */
 };
 
 struct boomslangce_one_buttonmapping {
@@ -79,13 +79,13 @@ struct boomslangce_buttonmappings {
 	uint8_t _padding1[46];
 	struct boomslangce_one_buttonmapping middle;
 	uint8_t _padding2[46];
-	struct boomslangce_one_buttonmapping lfront;
+	struct boomslangce_one_buttonmapping rside;
 	uint8_t _padding3[46];
-	struct boomslangce_one_buttonmapping lrear;
+	struct boomslangce_one_buttonmapping lside;
 	uint8_t _padding4[46];
-	struct boomslangce_one_buttonmapping rfront;
+	struct boomslangce_one_buttonmapping scrollup;
 	uint8_t _padding5[46];
-	struct boomslangce_one_buttonmapping rrear;
+	struct boomslangce_one_buttonmapping scrolldown;
 	uint8_t _padding6[42];
 } _packed;
 
@@ -133,10 +133,10 @@ static struct razer_button boomslangce_physical_buttons[] = {
 	{ .id = BOOMSLANGCE_PHYSBUT_LEFT,	.name = "Leftclick",		},
 	{ .id = BOOMSLANGCE_PHYSBUT_RIGHT,	.name = "Rightclick",		},
 	{ .id = BOOMSLANGCE_PHYSBUT_MIDDLE,	.name = "Middleclick",		},
-	{ .id = BOOMSLANGCE_PHYSBUT_LFRONT,	.name = "Leftside front",	},
-	{ .id = BOOMSLANGCE_PHYSBUT_LREAR,	.name = "Leftside rear",	},
-	{ .id = BOOMSLANGCE_PHYSBUT_RFRONT,	.name = "Rightside front",	},
-	{ .id = BOOMSLANGCE_PHYSBUT_RREAR,	.name = "Rightside rear",	},
+	{ .id = BOOMSLANGCE_PHYSBUT_LSIDE,	.name = "Leftside button",	},
+	{ .id = BOOMSLANGCE_PHYSBUT_RSIDE,	.name = "Rightside button",	},
+	{ .id = BOOMSLANGCE_PHYSBUT_SCROLLUP,	.name = "Scroll up",		},
+	{ .id = BOOMSLANGCE_PHYSBUT_SCROLLDOWN,	.name = "Scroll down",		},
 };
 
 /* A list of possible button functions. */
@@ -148,6 +148,8 @@ static struct razer_button_function boomslangce_button_functions[] = {
 	{ .id = BOOMSLANGCE_BUTFUNC_DPIDOWN,	.name = "DPI switch down",	},
 	{ .id = BOOMSLANGCE_BUTFUNC_WIN5,	.name = "Windows Button 5",	},
 	{ .id = BOOMSLANGCE_BUTFUNC_WIN4,	.name = "Windows Button 4",	},
+	{ .id = BOOMSLANGCE_BUTFUNC_SCROLLUP,	.name = "Scroll up",		},
+	{ .id = BOOMSLANGCE_BUTFUNC_SCROLLDOWN,	.name = "Scroll down",		},
 };
 /* TODO: There are more functions */
 
@@ -159,10 +161,10 @@ static const struct boomslangce_buttonmappings boomslangce_default_buttonmap = {
 	DEFINE_DEF_BUTMAP(left, LEFT, LEFT),
 	DEFINE_DEF_BUTMAP(right, RIGHT, RIGHT),
 	DEFINE_DEF_BUTMAP(middle, MIDDLE, MIDDLE),
-	DEFINE_DEF_BUTMAP(lfront, LFRONT, WIN5),
-	DEFINE_DEF_BUTMAP(lrear, LREAR, WIN4),
-	DEFINE_DEF_BUTMAP(rfront, RFRONT, DPIUP),
-	DEFINE_DEF_BUTMAP(rrear, RREAR, DPIDOWN),
+	DEFINE_DEF_BUTMAP(lside, LSIDE, WIN5),
+	DEFINE_DEF_BUTMAP(rside, RSIDE, WIN4),
+	DEFINE_DEF_BUTMAP(scrollup, SCROLLUP, SCROLLUP),
+	DEFINE_DEF_BUTMAP(scrolldown, SCROLLDOWN, SCROLLDOWN),
 };
 
 
@@ -179,14 +181,14 @@ static struct boomslangce_one_buttonmapping *
 		return &mappings->right;
 	case BOOMSLANGCE_PHYSBUT_MIDDLE:
 		return &mappings->middle;
-	case BOOMSLANGCE_PHYSBUT_LFRONT:
-		return &mappings->lfront;
-	case BOOMSLANGCE_PHYSBUT_LREAR:
-		return &mappings->lrear;
-	case BOOMSLANGCE_PHYSBUT_RFRONT:
-		return &mappings->rfront;
-	case BOOMSLANGCE_PHYSBUT_RREAR:
-		return &mappings->rrear;
+	case BOOMSLANGCE_PHYSBUT_LSIDE:
+		return &mappings->lside;
+	case BOOMSLANGCE_PHYSBUT_RSIDE:
+		return &mappings->rside;
+	case BOOMSLANGCE_PHYSBUT_SCROLLUP:
+		return &mappings->scrollup;
+	case BOOMSLANGCE_PHYSBUT_SCROLLDOWN:
+		return &mappings->scrolldown;
 	}
 	return NULL;
 }
@@ -216,16 +218,15 @@ static bool verify_buttons(const struct boomslangce_buttonmappings *map)
 	    !razer_buffer_is_all_zero(map->_padding6, sizeof(map->_padding6)))
 		return 0;
 
-/*TODO
+/*
 	if (map->left.physical != BOOMSLANGCE_PHYSBUT_LEFT ||
 	    map->right.physical != BOOMSLANGCE_PHYSBUT_RIGHT ||
 	    map->middle.physical != BOOMSLANGCE_PHYSBUT_MIDDLE ||
-	    map->lfront.physical != BOOMSLANGCE_PHYSBUT_LFRONT ||
-	    map->lrear.physical != BOOMSLANGCE_PHYSBUT_LREAR ||
-	    map->rfront.physical != BOOMSLANGCE_PHYSBUT_RFRONT ||
-	    map->rrear.physical != BOOMSLANGCE_PHYSBUT_RREAR)
-		return 0;
-*/
+	    map->lside.physical != BOOMSLANGCE_PHYSBUT_LSIDE ||
+	    map->rside.physical != BOOMSLANGCE_PHYSBUT_RSIDE ||
+	    map->scrollup.physical != BOOMSLANGCE_PHYSBUT_SCROLLUP ||
+	    map->scrolldown.physical != BOOMSLANGCE_PHYSBUT_SCROLLDOWN)
+		return 0;*/
 
 	return 1;
 }
