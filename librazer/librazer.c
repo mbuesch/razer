@@ -23,6 +23,7 @@
 #include "hw_krait.h"
 #include "hw_lachesis.h"
 #include "hw_copperhead.h"
+#include "hw_boomslangce.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -90,6 +91,12 @@ static const struct razer_mouse_base_ops razer_copperhead_base_ops = {
 	.release		= razer_copperhead_release,
 };
 
+static const struct razer_mouse_base_ops razer_boomslangce_base_ops = {
+	.type			= RAZER_MOUSETYPE_BOOMSLANGCE,
+	.init			= razer_boomslangce_init,
+	.release		= razer_boomslangce_release,
+};
+
 
 #define USBVENDOR_ANY	0xFFFF
 #define USBPRODUCT_ANY	0xFFFF
@@ -107,6 +114,7 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 	USB_MOUSE(0x1532, 0x000C, &razer_lachesis_base_ops),
 	USB_MOUSE(0x1532, 0x0015, &razer_naga_base_ops),
 	USB_MOUSE(0x1532, 0x0101, &razer_copperhead_base_ops),
+	USB_MOUSE(0x1532, 0x0005, &razer_boomslangce_base_ops),
 	{ 0, }, /* List end */
 };
 #undef USB_MOUSE

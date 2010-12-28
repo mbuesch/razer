@@ -5,6 +5,7 @@ add_library(razer SHARED
 	    config.c
 	    util.c
 	    cypress_bootloader.c
+	    hw_boomslangce.c
 	    hw_copperhead.c
 	    hw_deathadder.c
 	    hw_krait.c

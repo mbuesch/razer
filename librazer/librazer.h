@@ -113,6 +113,7 @@ enum razer_mouse_res {
   * @RAZER_MOUSETYPE_LACHESIS: A "Lachesis" mouse
   * @RAZER_MOUSETYPE_LACHESIS: A "Copperhead" mouse
   * @RAZER_MOUSETYPE_NAGA: A "Naga" mouse
+  * @RAZER_MOUSETYPE_BOOMSLANGCE: A "Boomslang Collector's Edition" mouse
   */
 enum razer_mouse_type {
 	RAZER_MOUSETYPE_DEATHADDER,
@@ -120,6 +121,7 @@ enum razer_mouse_type {
 	RAZER_MOUSETYPE_LACHESIS,
 	RAZER_MOUSETYPE_COPPERHEAD,
 	RAZER_MOUSETYPE_NAGA,
+	RAZER_MOUSETYPE_BOOMSLANGCE,
 };
 
 /** struct razer_button_function - A logical button function
