@@ -84,4 +84,14 @@ uint8_t razer_xor8_checksum(const void *_buffer, size_t size);
 
 void razer_dump(const char *prefix, const void *_buf, size_t size);
 
+static inline bool razer_buffer_is_all_zero(const void *_buf, size_t size)
+{
+	const uint8_t *buf = _buf;
+	uint8_t value = 0;
+	size_t i;
+	for (i = 0; i < size; i++)
+		value |= buf[i];
+	return value == 0;
+}
+
 #endif /* RAZER_UTIL_H_ */

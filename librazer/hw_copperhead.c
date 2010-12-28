@@ -1,6 +1,6 @@
 /*
  *   Lowlevel hardware access for the
- *   Razer Deathadder mouse
+ *   Razer Copperhead mouse
  *
  *   Important notice:
  *   This hardware driver is based on reverse engineering only.
@@ -196,6 +196,29 @@ static struct razer_mouse_dpimapping * find_dpimapping(
 	return NULL;
 }
 
+static bool verify_buttons(const struct copperhead_buttonmappings *map)
+{
+	if (!razer_buffer_is_all_zero(map->_padding0, sizeof(map->_padding0)) ||
+	    !razer_buffer_is_all_zero(map->_padding1, sizeof(map->_padding1)) ||
+	    !razer_buffer_is_all_zero(map->_padding2, sizeof(map->_padding2)) ||
+	    !razer_buffer_is_all_zero(map->_padding3, sizeof(map->_padding3)) ||
+	    !razer_buffer_is_all_zero(map->_padding4, sizeof(map->_padding4)) ||
+	    !razer_buffer_is_all_zero(map->_padding5, sizeof(map->_padding5)) ||
+	    !razer_buffer_is_all_zero(map->_padding6, sizeof(map->_padding6)))
+		return 0;
+
+	if (map->left.physical != COPPERHEAD_PHYSBUT_LEFT ||
+	    map->right.physical != COPPERHEAD_PHYSBUT_RIGHT ||
+	    map->middle.physical != COPPERHEAD_PHYSBUT_MIDDLE ||
+	    map->lfront.physical != COPPERHEAD_PHYSBUT_LFRONT ||
+	    map->lrear.physical != COPPERHEAD_PHYSBUT_LREAR ||
+	    map->rfront.physical != COPPERHEAD_PHYSBUT_RFRONT ||
+	    map->rrear.physical != COPPERHEAD_PHYSBUT_RREAR)
+		return 0;
+
+	return 1;
+}
+
 static int copperhead_usb_write(struct copperhead_private *priv,
 				int request, int command, int index,
 				const void *buf, size_t size)
@@ -310,13 +333,11 @@ static int copperhead_commit(struct copperhead_private *priv)
 		u.profcfg.buttons = priv->buttons[i];
 		u.profcfg.checksum = razer_xor16_checksum(&u.profcfg,
 					sizeof(u.profcfg) - 2);
-//razer_dump("profcfg", &u.profcfg, sizeof(u.profcfg));
 		/* The profile config is committed in 64byte chunks */
 		chunk = &u.chunks[0];
 		for (j = 0; j < 6; j++, chunk += 64) {
 			err = copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 						   j + 1, 0, chunk, 64);
-//razer_dump("chunk", chunk, 64);
 			if (err)
 				return err;
 		}
@@ -332,7 +353,6 @@ static int copperhead_commit(struct copperhead_private *priv)
 					  sizeof(u.profcfg) - 6);
 		if (err)
 			return err;
-//razer_dump("reply", &u.chunks[0], 0x156);
 		if (razer_xor16_checksum(&u.profcfg, sizeof(u.profcfg))) {
 			razer_error("hw_copperhead: Profile commit checksum mismatch\n");
 			return -EIO;
@@ -391,7 +411,6 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 					  sizeof(profcfg) - 6);
 		if (err)
 			return err;
-//razer_dump("got-prof", &profcfg, sizeof(profcfg));
 		if (razer_xor16_checksum(&profcfg, sizeof(profcfg))) {
 			razer_error("hw_copperhead: Read profile data checksum mismatch\n");
 			return -EIO;
@@ -439,7 +458,11 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 			razer_error("hw_copperhead: Got invalid frequency selection\n");
 			return -EIO;
 		}
-		priv->buttons[i] = profcfg.buttons; /* TODO: Verify buttons */
+		if (!verify_buttons(&profcfg.buttons)) {
+			razer_error("hw_copperhead: Got invalid buttons map\n");
+			return -EIO;
+		}
+		priv->buttons[i] = profcfg.buttons;
 	}
 
 	return 0;
