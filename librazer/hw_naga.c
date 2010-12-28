@@ -70,7 +70,6 @@ struct naga_private {
 	struct razer_axis axes[NAGA_NR_AXES];
 };
 
-#define NAGA_USB_TIMEOUT	3000
 
 static int naga_usb_write(struct naga_private *priv,
 			  int request, int command,
@@ -84,7 +83,7 @@ static int naga_usb_write(struct naga_private *priv,
 		LIBUSB_RECIPIENT_INTERFACE,
 		request, command, 0,
 		(unsigned char *)buf, size,
-		NAGA_USB_TIMEOUT);
+		RAZER_USB_TIMEOUT);
 	if (err != size) {
 		razer_error("razer-naga: "
 			"USB write 0x%02X 0x%02X failed: %d\n",
@@ -106,7 +105,7 @@ static int naga_usb_read(struct naga_private *priv,
 		LIBUSB_RECIPIENT_INTERFACE,
 		request, command, 0,
 		buf, size,
-		NAGA_USB_TIMEOUT);
+		RAZER_USB_TIMEOUT);
 	if (err != size) {
 		razer_error("razer-naga: "
 			"USB read 0x%02X 0x%02X failed: %d\n",

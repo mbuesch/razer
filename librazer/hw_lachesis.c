@@ -168,8 +168,6 @@ static const struct razer_buttonmapping lachesis_phys_buttons[] = {
 	{ .physical = LACHESIS_PHYSBUT_SCROLLDWN, },
 };
 
-#define LACHESIS_USB_TIMEOUT	3000
-
 /*XXX: read commands:
  *
  *	CLEAR_FEATURE
@@ -199,7 +197,7 @@ static int lachesis_usb_write(struct lachesis_private *priv,
 		LIBUSB_RECIPIENT_INTERFACE,
 		request, command, index,
 		buf, size,
-		LACHESIS_USB_TIMEOUT);
+		RAZER_USB_TIMEOUT);
 	if (err != size) {
 		razer_error("hw_lachesis: usb_write failed\n");
 		return -EIO;
@@ -220,7 +218,7 @@ static int lachesis_usb_read(struct lachesis_private *priv,
 		LIBUSB_RECIPIENT_INTERFACE,
 		request, command, index,
 		buf, size,
-		LACHESIS_USB_TIMEOUT);
+		RAZER_USB_TIMEOUT);
 	if (err != size) {
 		razer_error("hw_lachesis: usb_read failed\n");
 		return -EIO;

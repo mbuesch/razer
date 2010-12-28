@@ -63,7 +63,6 @@ struct deathadder_private {
 	struct razer_mouse_dpimapping dpimapping[4];
 };
 
-#define DEATHADDER_USB_TIMEOUT		3000
 #define DADD_FW(major, minor)		(((major) << 8) | (minor))
 #define DEATHADDER_FW_IMAGE_SIZE	0x4000
 
@@ -84,7 +83,7 @@ static int deathadder_usb_write(struct deathadder_private *priv,
 		LIBUSB_RECIPIENT_INTERFACE,
 		request, command, 0,
 		(unsigned char *)buf, size,
-		DEATHADDER_USB_TIMEOUT);
+		RAZER_USB_TIMEOUT);
 	if (err != size) {
 		razer_error("razer-deathadder: "
 			"USB write 0x%02X 0x%02X failed: %d\n",
@@ -112,7 +111,7 @@ static int deathadder_usb_read(struct deathadder_private *priv,
 		LIBUSB_RECIPIENT_INTERFACE,
 		request, command, 0,
 		buf, size,
-		DEATHADDER_USB_TIMEOUT);
+		RAZER_USB_TIMEOUT);
 	if (err != size) {
 		razer_error("razer-deathadder: "
 			"USB read 0x%02X 0x%02X failed: %d\n",

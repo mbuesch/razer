@@ -22,6 +22,9 @@ extern razer_logfunc_t razer_logfunc_debug;
 #define razer_debug(...)	call_razer_logfunc(razer_logfunc_debug, __VA_ARGS__)
 
 
+/* Default USB timeout */
+#define RAZER_USB_TIMEOUT		3000
+
 struct razer_usb_interface {
 	uint8_t bInterfaceNumber;
 	uint8_t bAlternateSetting;

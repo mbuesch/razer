@@ -169,8 +169,6 @@ static const struct boomslangce_buttonmappings boomslangce_default_buttonmap = {
 };
 
 
-#define BOOMSLANGCE_USB_TIMEOUT		3000
-
 static struct boomslangce_one_buttonmapping *
 	boomslangce_buttonid_to_mapping(struct boomslangce_buttonmappings *mappings,
 				       enum boomslangce_phys_button id)
@@ -243,7 +241,7 @@ static int boomslangce_usb_write(struct boomslangce_private *priv,
 		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_CLASS |
 		LIBUSB_RECIPIENT_OTHER,
 		request, command, index,
-		(unsigned char *)buf, size, BOOMSLANGCE_USB_TIMEOUT);
+		(unsigned char *)buf, size, RAZER_USB_TIMEOUT);
 	if (err != size) {
 		razer_error("razer-boomslangce: "
 			"USB write 0x%02X 0x%02X 0x%02X failed: %d\n",
@@ -265,7 +263,7 @@ static int boomslangce_usb_read(struct boomslangce_private *priv,
 		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_CLASS |
 		LIBUSB_RECIPIENT_OTHER,
 		request, command, index,
-		(unsigned char *)buf, size, BOOMSLANGCE_USB_TIMEOUT);
+		(unsigned char *)buf, size, RAZER_USB_TIMEOUT);
 	if (err != size) {
 		razer_error("razer-boomslangce: "
 			"USB read 0x%02X 0x%02X 0x%02X failed: %d\n",

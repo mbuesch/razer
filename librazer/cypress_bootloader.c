@@ -19,8 +19,6 @@
 #include "razer_private.h"
 
 
-#define CYPRESS_USB_TIMEOUT	1000
-
 struct cypress_command {
 	be16_t command;
 	uint8_t key[8];
@@ -103,7 +101,7 @@ static int cypress_send_command(struct cypress *c,
 //printf("cmd = 0x%02X\n", be16_to_cpu(command->command));
 	err = libusb_bulk_transfer(c->usb.h, c->ep_out,
 				   (unsigned char *)command, command_size,
-				   &transferred, CYPRESS_USB_TIMEOUT);
+				   &transferred, RAZER_USB_TIMEOUT);
 	if (err || transferred != command_size) {
 		fprintf(stderr, "cypress: Failed to send command 0x%02X\n",
 			be16_to_cpu(command->command));
@@ -112,7 +110,7 @@ static int cypress_send_command(struct cypress *c,
 	razer_msleep(100);
 	err = libusb_bulk_transfer(c->usb.h, c->ep_in,
 				   (unsigned char *)&status, sizeof(status),
-				   &transferred, CYPRESS_USB_TIMEOUT);
+				   &transferred, RAZER_USB_TIMEOUT);
 	if (err || transferred != sizeof(status)) {
 		fprintf(stderr, "cypress: Failed to receive status report\n");
 		return -1;

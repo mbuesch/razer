@@ -157,8 +157,6 @@ static const struct copperhead_buttonmappings copperhead_default_buttonmap = {
 };
 
 
-#define COPPERHEAD_USB_TIMEOUT		3000
-
 static struct copperhead_one_buttonmapping *
 	copperhead_buttonid_to_mapping(struct copperhead_buttonmappings *mappings,
 				       enum copperhead_phys_button id)
@@ -230,7 +228,7 @@ static int copperhead_usb_write(struct copperhead_private *priv,
 		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_CLASS |
 		LIBUSB_RECIPIENT_OTHER,
 		request, command, index,
-		(unsigned char *)buf, size, COPPERHEAD_USB_TIMEOUT);
+		(unsigned char *)buf, size, RAZER_USB_TIMEOUT);
 	if (err != size) {
 		razer_error("razer-copperhead: "
 			"USB write 0x%02X 0x%02X 0x%02X failed: %d\n",
@@ -252,7 +250,7 @@ static int copperhead_usb_read(struct copperhead_private *priv,
 		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_CLASS |
 		LIBUSB_RECIPIENT_OTHER,
 		request, command, index,
-		(unsigned char *)buf, size, COPPERHEAD_USB_TIMEOUT);
+		(unsigned char *)buf, size, RAZER_USB_TIMEOUT);
 	if (err != size) {
 		razer_error("razer-copperhead: "
 			"USB read 0x%02X 0x%02X 0x%02X failed: %d\n",
