@@ -20,6 +20,7 @@
 
 #include "hw_boomslangce.h"
 #include "razer_private.h"
+#include "buttonmapping.h"
 
 #include <errno.h>
 #include <stdlib.h>
