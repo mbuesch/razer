@@ -273,13 +273,6 @@ static int copperhead_commit(struct copperhead_private *priv)
 
 	BUILD_BUG_ON(sizeof(u) != 0x180);
 
-	/* Select the profile */
-	value = 1;
-	err = copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
-				   0x02, 1, &value, sizeof(value));
-	if (err)
-		return err;
-
 	/* Upload the profile config */
 	for (i = 0; i < COPPERHEAD_NR_PROFILES; i++) {
 		memset(&u, 0, sizeof(u));
@@ -345,6 +338,13 @@ static int copperhead_commit(struct copperhead_private *priv)
 			return -EIO;
 		}
 	}
+
+	/* Select the profile */
+	value = priv->cur_profile->nr + 1;
+	err = copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
+				   0x02, 1, &value, sizeof(value));
+	if (err)
+		return err;
 
 	return 0;
 }
