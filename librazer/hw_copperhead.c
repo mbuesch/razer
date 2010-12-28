@@ -29,7 +29,7 @@
 
 
 enum { /* Misc constants */
-	COPPERHEAD_NR_PROFILES		= 1,
+	COPPERHEAD_NR_PROFILES		= 5,
 	COPPERHEAD_NR_DPIMAPPINGS	= 4,
 };
 
@@ -85,16 +85,17 @@ struct copperhead_buttonmappings {
 
 struct copperhead_profcfg_cmd {
 	le16_t packetlength;
-	le32_t magic0;
-	le32_t _padding;
-	le16_t magic1;
+	le16_t magic;
+	le16_t profilenr;
+	le16_t reply_packetlength;	/* Only valid for read data */
+	le16_t reply_magic;		/* Only valid for read data */
+	le16_t reply_profilenr;
 	uint8_t dpisel;
 	uint8_t freq;
 	struct copperhead_buttonmappings buttons;
 	le16_t checksum;
 } _packed;
-#define COPPERHEAD_PROFCFG_MAGIC0	cpu_to_le32(0x00010002)
-#define COPPERHEAD_PROFCFG_MAGIC1	cpu_to_le16(0x0001)
+#define COPPERHEAD_PROFCFG_MAGIC	cpu_to_le16(0x0002)
 
 struct copperhead_private {
 	struct razer_mouse *m;
@@ -181,6 +182,20 @@ static struct copperhead_one_buttonmapping *
 	return NULL;
 }
 
+static struct razer_mouse_dpimapping * find_dpimapping(
+			struct copperhead_private *priv,
+			enum razer_mouse_res res)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(priv->dpimappings); i++) {
+		if (priv->dpimappings[i].res == res)
+			return &priv->dpimappings[i];
+	}
+
+	return NULL;
+}
+
 static int copperhead_usb_write(struct copperhead_private *priv,
 				int request, int command, int index,
 				const void *buf, size_t size)
@@ -190,7 +205,7 @@ static int copperhead_usb_write(struct copperhead_private *priv,
 	err = libusb_control_transfer(
 		priv->m->usb_ctx->h,
 		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_CLASS |
-		LIBUSB_RECIPIENT_INTERFACE,
+		LIBUSB_RECIPIENT_OTHER,
 		request, command, index,
 		(unsigned char *)buf, size, COPPERHEAD_USB_TIMEOUT);
 	if (err != size) {
@@ -212,7 +227,7 @@ static int copperhead_usb_read(struct copperhead_private *priv,
 	err = libusb_control_transfer(
 		priv->m->usb_ctx->h,
 		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_CLASS |
-		LIBUSB_RECIPIENT_INTERFACE,
+		LIBUSB_RECIPIENT_OTHER,
 		request, command, index,
 		(unsigned char *)buf, size, COPPERHEAD_USB_TIMEOUT);
 	if (err != size) {
@@ -252,7 +267,7 @@ static int copperhead_commit(struct copperhead_private *priv)
 		uint8_t chunks[64 * 6];
 	} _packed u;
 	uint8_t *chunk;
-	unsigned int i;
+	unsigned int i, j;
 	int err;
 	unsigned char value;
 
@@ -266,67 +281,77 @@ static int copperhead_commit(struct copperhead_private *priv)
 		return err;
 
 	/* Upload the profile config */
-	memset(&u, 0, sizeof(u));
-	u.profcfg.packetlength = cpu_to_le16(sizeof(u.profcfg));
-	u.profcfg.magic0 = COPPERHEAD_PROFCFG_MAGIC0;
-	u.profcfg.magic1 = COPPERHEAD_PROFCFG_MAGIC1;
-	switch (priv->cur_dpimapping[0]->res) {
-	default:
-	case RAZER_MOUSE_RES_400DPI:
-		u.profcfg.dpisel = 4;
-		break;
-	case RAZER_MOUSE_RES_800DPI:
-		u.profcfg.dpisel = 3;
-		break;
-	case RAZER_MOUSE_RES_1600DPI:
-		u.profcfg.dpisel = 2;
-		break;
-	case RAZER_MOUSE_RES_2000DPI:
-		u.profcfg.dpisel = 1;
-		break;
-	}
-	switch (priv->cur_freq[0]) {
-	default:
-	case RAZER_MOUSE_FREQ_125HZ:
-		u.profcfg.freq = 3;
-		break;
-	case RAZER_MOUSE_FREQ_500HZ:
-		u.profcfg.freq = 2;
-		break;
-	case RAZER_MOUSE_FREQ_1000HZ:
-		u.profcfg.freq = 1;
-		break;
-	}
-	u.profcfg.buttons = priv->buttons[0];
-	u.profcfg.checksum = razer_xor16_checksum(&u.profcfg,
-		sizeof(u.profcfg) - 2);
-razer_dump("profcfg", &u.profcfg, sizeof(u.profcfg));
-	/* The profile config is committed in 64byte chunks */
-	chunk = &u.chunks[0];
-	for (i = 0; i < 6; i++, chunk += 64) {
-		err = copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
-					   i + 1, 0, chunk, 64);
+	for (i = 0; i < COPPERHEAD_NR_PROFILES; i++) {
+		memset(&u, 0, sizeof(u));
+		u.profcfg.packetlength = cpu_to_le16(sizeof(u.profcfg));
+		u.profcfg.magic = COPPERHEAD_PROFCFG_MAGIC;
+		u.profcfg.profilenr = cpu_to_le16(i + 1);
+		u.profcfg.reply_profilenr = u.profcfg.profilenr;
+		switch (priv->cur_dpimapping[i]->res) {
+		default:
+		case RAZER_MOUSE_RES_400DPI:
+			u.profcfg.dpisel = 4;
+			break;
+		case RAZER_MOUSE_RES_800DPI:
+			u.profcfg.dpisel = 3;
+			break;
+		case RAZER_MOUSE_RES_1600DPI:
+			u.profcfg.dpisel = 2;
+			break;
+		case RAZER_MOUSE_RES_2000DPI:
+			u.profcfg.dpisel = 1;
+			break;
+		}
+		switch (priv->cur_freq[i]) {
+		default:
+		case RAZER_MOUSE_FREQ_125HZ:
+			u.profcfg.freq = 3;
+			break;
+		case RAZER_MOUSE_FREQ_500HZ:
+			u.profcfg.freq = 2;
+			break;
+		case RAZER_MOUSE_FREQ_1000HZ:
+			u.profcfg.freq = 1;
+			break;
+		}
+		u.profcfg.buttons = priv->buttons[i];
+		u.profcfg.checksum = razer_xor16_checksum(&u.profcfg,
+					sizeof(u.profcfg) - 2);
+//razer_dump("profcfg", &u.profcfg, sizeof(u.profcfg));
+		/* The profile config is committed in 64byte chunks */
+		chunk = &u.chunks[0];
+		for (j = 0; j < 6; j++, chunk += 64) {
+			err = copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
+						   j + 1, 0, chunk, 64);
 //razer_dump("chunk", chunk, 64);
+			if (err)
+				return err;
+		}
+		/* Commit the profile */
+		value = i + 1;
+		copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
+				     0x02, 3, &value, sizeof(value));
+		/* Read back the result */
+		BUILD_BUG_ON(0x156 + 6 != sizeof(u.profcfg));
+		memset(&u, 0, sizeof(u));
+		err = copperhead_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
+					  0x01, 0, ((uint8_t *)&u.profcfg) + 6,
+					  sizeof(u.profcfg) - 6);
 		if (err)
 			return err;
+//razer_dump("reply", &u.chunks[0], 0x156);
+		if (razer_xor16_checksum(&u.profcfg, sizeof(u.profcfg))) {
+			razer_error("hw_copperhead: Profile commit checksum mismatch\n");
+			return -EIO;
+		}
 	}
-#if 0
-	/* 2109 0200 0300 0100 01 */
-	copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
-			     0x02, 3, buf, 1);
-#endif
-	memset(&u, 0, sizeof(u));
-	err = copperhead_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
-				  0x01, 0, &u.chunks[0], 0x156);
-	if (err)
-		return err;
-	razer_dump("reply", &u.chunks[0], 0x156);
 
 	return 0;
 }
 
 static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 {
+	struct copperhead_profcfg_cmd profcfg;
 	unsigned int i;
 	unsigned char value;
 	int err;
@@ -337,28 +362,84 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 		priv->cur_freq[i] = RAZER_MOUSE_FREQ_1000HZ;
 		priv->cur_dpimapping[i] = &priv->dpimappings[0];
 	}
-	priv->cur_profile = &priv->profiles[0];
 
-	/* Read the current profile number. It's currently unused, though. */
+	/* Read the current profile number. */
 	err = copperhead_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
 				  0x01, 0, &value, sizeof(value));
 	if (err)
 		return err;
+	if (value < 1 || value > COPPERHEAD_NR_PROFILES) {
+		razer_error("hw_copperhead: Got invalid profile number\n");
+		return -EIO;
+	}
+	priv->cur_profile = &priv->profiles[value - 1];
 
-	for (i = 0; i < 64; i++) {
-		char buf[0x156];
+	/* Read the profiles config */
+	for (i = 0; i < COPPERHEAD_NR_PROFILES; i++) {
+		BUILD_BUG_ON(0x156 + 6 != sizeof(profcfg));
 
-		value = 1;
-#if 0
+		/* Request profile config */
+		value = i + 1;
 		err = copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 					   0x02, 3, &value, sizeof(value));
-//		if (err)
-//			return err;
-#endif
-		err = copperhead_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
-					  0x01, 0, buf, sizeof(buf));
 		if (err)
 			return err;
+		/* Read profile config */
+		memset(&profcfg, 0, sizeof(profcfg));
+		err = copperhead_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
+					  0x01, 0, ((uint8_t *)&profcfg) + 6,
+					  sizeof(profcfg) - 6);
+		if (err)
+			return err;
+//razer_dump("got-prof", &profcfg, sizeof(profcfg));
+		if (razer_xor16_checksum(&profcfg, sizeof(profcfg))) {
+			razer_error("hw_copperhead: Read profile data checksum mismatch\n");
+			return -EIO;
+		}
+		if (le16_to_cpu(profcfg.reply_profilenr) != i + 1) {
+			razer_error("hw_copperhead: Got invalid profile nr in profile config\n");
+			return -EIO;
+		}
+		switch (profcfg.dpisel) {
+		case 4:
+			priv->cur_dpimapping[i] = find_dpimapping(priv,
+					RAZER_MOUSE_RES_400DPI);
+			break;
+		case 3:
+			priv->cur_dpimapping[i] = find_dpimapping(priv,
+					RAZER_MOUSE_RES_800DPI);
+			break;
+		case 2:
+			priv->cur_dpimapping[i] = find_dpimapping(priv,
+					RAZER_MOUSE_RES_1600DPI);
+			break;
+		case 1:
+			priv->cur_dpimapping[i] = find_dpimapping(priv,
+					RAZER_MOUSE_RES_2000DPI);
+			break;
+		default:
+			razer_error("hw_copperhead: Got invalid DPI mapping selection\n");
+			return -EIO;
+		}
+		if (!priv->cur_dpimapping[i]) {
+			razer_error("hw_copperhead: Internal error: Did not find dpimapping\n");
+			return -ENODEV;
+		}
+		switch (profcfg.freq) {
+		case 3:
+			priv->cur_freq[i] = RAZER_MOUSE_FREQ_125HZ;
+			break;
+		case 2:
+			priv->cur_freq[i] = RAZER_MOUSE_FREQ_500HZ;
+			break;
+		case 1:
+			priv->cur_freq[i] = RAZER_MOUSE_FREQ_1000HZ;
+			break;
+		default:
+			razer_error("hw_copperhead: Got invalid frequency selection\n");
+			return -EIO;
+		}
+		priv->buttons[i] = profcfg.buttons; /* TODO: Verify buttons */
 	}
 
 	return 0;
@@ -383,6 +464,28 @@ static struct razer_mouse_profile * copperhead_get_active_profile(struct razer_m
 	struct copperhead_private *priv = m->internal;
 
 	return priv->cur_profile;
+}
+
+static int copperhead_set_active_profile(struct razer_mouse *m,
+					 struct razer_mouse_profile *p)
+{
+	struct copperhead_private *priv = m->internal;
+	struct razer_mouse_profile *oldprof;
+	int err;
+
+	if (!priv->m->claim_count)
+		return -EBUSY;
+
+	oldprof = priv->cur_profile;
+	priv->cur_profile = p;
+
+	err = copperhead_commit(priv);
+	if (err) {
+		priv->cur_profile = oldprof;
+		return err;
+	}
+
+	return err;
 }
 
 static int copperhead_supported_resolutions(struct razer_mouse *m,
@@ -644,6 +747,7 @@ int razer_copperhead_init(struct razer_mouse *m,
 	m->nr_profiles = COPPERHEAD_NR_PROFILES;
 	m->get_profiles = copperhead_get_profiles;
 	m->get_active_profile = copperhead_get_active_profile;
+	m->set_active_profile = copperhead_set_active_profile;
 	m->supported_resolutions = copperhead_supported_resolutions;
 	m->supported_freqs = copperhead_supported_freqs;
 	m->supported_dpimappings = copperhead_supported_dpimappings;
