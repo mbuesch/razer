@@ -179,6 +179,18 @@ static int cypress_cmd_verifyfl(struct cypress *c)
 				    CYPRESS_STAT_ALL);
 }
 
+static int cypress_cmd_updatechksum(struct cypress *c)
+{
+	struct cypress_command cmd;
+
+	memset(&cmd, 0, sizeof(cmd));
+	cmd.command = CYPRESS_CMD_UPCHK;
+	c->assign_key(cmd.key);
+
+	return cypress_send_command(c, &cmd, sizeof(cmd),
+				    CYPRESS_STAT_ALL);
+}
+
 static int cypress_cmd_writefl(struct cypress *c, uint16_t blocknr,
 			       uint8_t segment, const char *data)
 {
@@ -217,7 +229,6 @@ static int cypress_writeflash(struct cypress *c,
 			return -EIO;
 		}
 		image += 32;
-fprintf(stderr, ".");
 		/* Last 32 bytes */
 		err = cypress_cmd_writefl(c, block, 1, image);
 		if (err) {
@@ -226,7 +237,6 @@ fprintf(stderr, ".");
 			return -EIO;
 		}
 		image += 32;
-fprintf(stderr, "-");
 	}
 
 	return 0;
@@ -240,7 +250,7 @@ int cypress_open(struct cypress *c, struct libusb_device *dev,
 	BUILD_BUG_ON(sizeof(struct cypress_command) != 64);
 	BUILD_BUG_ON(sizeof(struct cypress_status) != 64);
 
-//return -1; //FIXME: Does not work, yet.
+return -1; //FIXME: Does not work, yet.
 
 	memset(c, 0, sizeof(*c));
 	if (!assign_key)
@@ -280,31 +290,38 @@ int cypress_upload_image(struct cypress *c,
 	if (len % 64) {
 		razer_error("cypress: Image size is not a multiple "
 			    "of the block size (64)\n");
-		return -1;
+		return -EINVAL;
 	}
 
+razer_dump("image", image, len);
 	err = cypress_cmd_enterbl(c);
 	if (err) {
 		razer_error("cypress: Failed to enter bootloader\n");
-		result = -1;
+		result = err;
 		goto out;
 	}
 	err = cypress_writeflash(c, image, len);
 	if (err) {
 		razer_error("cypress: Failed to write flash image\n");
-		result = -1;
+		result = err;
 		goto out;
 	}
 	err = cypress_cmd_verifyfl(c);
 	if (err) {
 		razer_error("cypress: Failed to verify the flash\n");
-		result = -1;
+		result = err;
+		goto out;
+	}
+	err = cypress_cmd_updatechksum(c);
+	if (err) {
+		razer_error("cypress: Failed to update the checksum\n");
+		result = err;
 		goto out;
 	}
 	err = cypress_cmd_exitbl(c);
 	if (err) {
 		razer_error("cypress: Failed to exit bootloader\n");
-		result = -1;
+		result = err;
 	}
 out:
 
