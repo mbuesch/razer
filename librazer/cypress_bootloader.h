@@ -16,26 +16,17 @@ struct cypress {
 
 
 /** is_cypress_bootloader - Check whether an USB device is a cypress bootloader. */
-static inline bool is_cypress_bootloader(struct libusb_device *dev)
+static inline bool is_cypress_bootloader(struct libusb_device_descriptor *desc)
 {
-	struct libusb_device_descriptor desc;
-	int err;
-
-	err = libusb_get_device_descriptor(dev, &desc);
-	if (err)
-		return 0;
-
-	return (desc.idVendor == CYPRESS_BOOT_VENDORID &&
-		desc.idProduct == CYPRESS_BOOT_PRODUCTID);
+	return (desc->idVendor == CYPRESS_BOOT_VENDORID &&
+		desc->idProduct == CYPRESS_BOOT_PRODUCTID);
 }
-
-/** cypress_assign_default_key - assign_key function, which uses the default key. */
-void cypress_assign_default_key(uint8_t *key);
 
 /** cypress_open - Open a device.
  * @c: context structure.
  * @dev: USB device to use (must be a cypress bootloader device).
  * @assign_key: Callback function to assign the 8-byte bootloader key.
+ *              If NULL, it uses the default key.
  */
 int cypress_open(struct cypress *c, struct libusb_device *dev,
 		 void (*assign_key)(uint8_t *key));

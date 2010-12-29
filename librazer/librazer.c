@@ -110,6 +110,7 @@ static const struct razer_mouse_base_ops razer_boomslangce_base_ops = {
 static const struct razer_usb_device razer_usbdev_table[] = {
 	USB_MOUSE(0x1532, 0x0007, &razer_deathadder_base_ops),
 	USB_MOUSE(0x1532, 0x0016, &razer_deathadder_base_ops),
+	USB_MOUSE(0x04B4, 0xE006, &razer_deathadder_base_ops), /* cypress bootloader */
 	USB_MOUSE(0x1532, 0x0003, &razer_krait_base_ops),
 	USB_MOUSE(0x1532, 0x000C, &razer_lachesis_base_ops),
 	USB_MOUSE(0x1532, 0x0015, &razer_naga_base_ops),

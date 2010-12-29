@@ -48,34 +48,38 @@ struct cypress_status {
 #define CYPRESS_STAT_ALL	0xFF
 
 
-static void cypress_print_one_status(int *ctx, FILE *fd, const char *message)
+static void cypress_print_one_status(int *ctx, char *buf, const char *message)
 {
 	if (*ctx)
-		fprintf(fd, ", ");
-	fprintf(fd, "%s", message);
+		strcat(buf, ", ");
+	strcat(buf, message);
 	(*ctx)++;
 }
 
-static void cypress_print_status(FILE *fd, uint8_t status)
+static void cypress_print_status(uint8_t status, int error)
 {
+	char buf[512] = { 0, }; /* big enough for all messages */
 	int ctx = 0;
 
-	fprintf(fd, "(");
 	if (!(status & CYPRESS_STAT_BLMODE))
-		cypress_print_one_status(&ctx, fd, "Not in bootloader mode");
+		cypress_print_one_status(&ctx, buf, "Not in bootloader mode");
 	if (status & CYPRESS_STAT_IMAGERR)
-		cypress_print_one_status(&ctx, fd, "Image verify error");
+		cypress_print_one_status(&ctx, buf, "Image verify error");
 	if (status & CYPRESS_STAT_FLCHK)
-		cypress_print_one_status(&ctx, fd, "Flash checksum error");
+		cypress_print_one_status(&ctx, buf, "Flash checksum error");
 	if (status & CYPRESS_STAT_FLPROT)
-		cypress_print_one_status(&ctx, fd, "Flash protection error");
+		cypress_print_one_status(&ctx, buf, "Flash protection error");
 	if (status & CYPRESS_STAT_COMCHK)
-		cypress_print_one_status(&ctx, fd, "Communication checksum error");
+		cypress_print_one_status(&ctx, buf, "Communication checksum error");
 	if (status & CYPRESS_STAT_INVALKEY)
-		cypress_print_one_status(&ctx, fd, "Invalid bootloader key");
+		cypress_print_one_status(&ctx, buf, "Invalid bootloader key");
 	if (status & CYPRESS_STAT_INVALCMD)
-		cypress_print_one_status(&ctx, fd, "Invalid command");
-	fprintf(fd, ")");
+		cypress_print_one_status(&ctx, buf, "Invalid command");
+
+	if (error)
+		razer_error("Bootloader status: %s\n", buf);
+	else
+		razer_info("Bootloader status: %s\n", buf);
 }
 
 static void cmd_checksum(struct cypress_command *_cmd)
@@ -96,15 +100,15 @@ static int cypress_send_command(struct cypress *c,
 	int err, transferred;
 	uint8_t stat;
 
-	cmd_checksum(command);//XXX
+	cmd_checksum(command);
 
-//printf("cmd = 0x%02X\n", be16_to_cpu(command->command));
+razer_dump("cypress command", command, sizeof(*command));
 	err = libusb_bulk_transfer(c->usb.h, c->ep_out,
 				   (unsigned char *)command, command_size,
 				   &transferred, RAZER_USB_TIMEOUT);
 	if (err || transferred != command_size) {
-		fprintf(stderr, "cypress: Failed to send command 0x%02X\n",
-			be16_to_cpu(command->command));
+		razer_error("cypress: Failed to send command 0x%02X\n",
+			    be16_to_cpu(command->command));
 		return -1;
 	}
 	razer_msleep(100);
@@ -112,26 +116,25 @@ static int cypress_send_command(struct cypress *c,
 				   (unsigned char *)&status, sizeof(status),
 				   &transferred, RAZER_USB_TIMEOUT);
 	if (err || transferred != sizeof(status)) {
-		fprintf(stderr, "cypress: Failed to receive status report\n");
+		razer_error("cypress: Failed to receive status report\n");
 		return -1;
 	}
 	status_mask |= CYPRESS_STAT_BLMODE; /* Always check the blmode bit */
 	status_mask &= ~CYPRESS_STAT_BOOTOK; /* Always ignore the bootok bit */
 	stat = (status.status0 | status.status1) & status_mask;
 	if (stat != CYPRESS_STAT_BLMODE) {
-		fprintf(stderr, "cypress: Command 0x%02X failed with "
-			"status0=0x%02X status1=0x%02X ",
-			be16_to_cpu(command->command),
-			status.status0, status.status1);
-		cypress_print_status(stderr, stat);
-		fprintf(stderr, "\n");
+		razer_error("cypress: Command 0x%04X failed with "
+			    "status0=0x%02X status1=0x%02X\n",
+			    be16_to_cpu(command->command),
+			    status.status0, status.status1);
+		cypress_print_status(stat, 1);
 		return -1;
 	}
 
 	return 0;
 }
 
-void cypress_assign_default_key(uint8_t *key)
+static void cypress_assign_default_key(uint8_t *key)
 {
 	unsigned int i;
 
@@ -201,31 +204,29 @@ static int cypress_writeflash(struct cypress *c,
 	int err;
 
 	if (len % 64) {
-		fprintf(stderr, "cypress: internal error\n");
-		return -1;
+		razer_error("cypress_writeflash: internal error\n");
+		return -EINVAL;
 	}
 
 	for (block = 0; block < len / 64; block++) {
 		/* First 32 bytes */
 		err = cypress_cmd_writefl(c, block, 0, image);
 		if (err) {
-			fprintf(stderr, "cypress: Failed to write image "
-				"(block %u, segment 0)\n",
-				block);
-			return -1;
+			razer_error("cypress: Failed to write image "
+				    "(block %u, segment 0)\n", block);
+			return -EIO;
 		}
 		image += 32;
 fprintf(stderr, ".");
 		/* Last 32 bytes */
 		err = cypress_cmd_writefl(c, block, 1, image);
 		if (err) {
-			fprintf(stderr, "cypress: Failed to write image "
-				"(block %u, segment 1)\n",
-				block);
-			return -1;
+			razer_error("cypress: Failed to write image "
+				    "(block %u, segment 1)\n", block);
+			return -EIO;
 		}
 		image += 32;
-fprintf(stderr, ".");
+fprintf(stderr, "-");
 	}
 
 	return 0;
@@ -235,52 +236,31 @@ int cypress_open(struct cypress *c, struct libusb_device *dev,
 		 void (*assign_key)(uint8_t *key))
 {
 	int err;
-//	unsigned int i;
-	bool have_in = 0, have_out = 0;
-//	struct usb_interface_descriptor *alt;
-//	struct usb_endpoint_descriptor *ep;
 
 	BUILD_BUG_ON(sizeof(struct cypress_command) != 64);
 	BUILD_BUG_ON(sizeof(struct cypress_status) != 64);
 
-return -1; //FIXME: Does not work, yet.
+//return -1; //FIXME: Does not work, yet.
 
-	if (!assign_key) {
-		fprintf(stderr, "cypress_open: assign_key must not be NULL\n");
-		return -1;
-	}
+	memset(c, 0, sizeof(*c));
+	if (!assign_key)
+		assign_key = cypress_assign_default_key;
 	c->assign_key = assign_key;
 
 	c->usb.dev = dev;
+	c->usb.bConfigurationValue = 1;
+	err = razer_usb_add_used_interface(&c->usb, 0, 0);
+	if (err)
+		return err;
 	err = razer_generic_usb_claim(&c->usb);
 	if (err) {
-		fprintf(stderr, "cypress: Failed to open and claim device\n");
-		return -1;
+		razer_error("cypress: Failed to open and claim device\n");
+		return err;
 	}
-//FIXME
-#if 0
-	alt = &c->usb.dev->config->interface->altsetting[0];
-	for (i = 0; i < alt->bNumEndpoints; i++) {
-		ep = &alt->endpoint[i];
-		if (!have_in && (ep->bEndpointAddress & USB_ENDPOINT_IN)) {
-			c->ep_in = ep->bEndpointAddress;
-			have_in = 1;
-			continue;
-		}
-		if (!have_out && !(ep->bEndpointAddress & USB_ENDPOINT_IN)) {
-			c->ep_out = ep->bEndpointAddress;
-			have_out = 1;
-		}
-		if (have_in && have_out)
-			break;
-	}
-#endif
-	if (!have_in || !have_out) {
-		fprintf(stderr, "cypress: Did not find in and out endpoints (%u %u)\n",
-			have_in, have_out);
-		razer_generic_usb_release(&c->usb);
-		return -1;
-	}
+
+	/* EP numbers are hardcoded */
+	c->ep_in = 0x81;
+	c->ep_out = 0x02;
 
 	return 0;
 }
@@ -288,7 +268,7 @@ return -1; //FIXME: Does not work, yet.
 void cypress_close(struct cypress *c)
 {
 	razer_generic_usb_release(&c->usb);
-	c->assign_key = NULL;
+	memset(c, 0, sizeof(*c));
 }
 
 int cypress_upload_image(struct cypress *c,
@@ -298,32 +278,32 @@ int cypress_upload_image(struct cypress *c,
 	int result = 0;
 
 	if (len % 64) {
-		fprintf(stderr, "cypress: Image size is not a multiple "
-			"of the block size (64)\n");
+		razer_error("cypress: Image size is not a multiple "
+			    "of the block size (64)\n");
 		return -1;
 	}
 
 	err = cypress_cmd_enterbl(c);
 	if (err) {
-		fprintf(stderr, "cypress: Failed to enter bootloader\n");
+		razer_error("cypress: Failed to enter bootloader\n");
 		result = -1;
 		goto out;
 	}
 	err = cypress_writeflash(c, image, len);
 	if (err) {
-		fprintf(stderr, "cypress: Failed to write flash image\n");
+		razer_error("cypress: Failed to write flash image\n");
 		result = -1;
 		goto out;
 	}
-/*	err = cypress_cmd_verifyfl(c);
+	err = cypress_cmd_verifyfl(c);
 	if (err) {
-		fprintf(stderr, "cypress: Failed to verify the flash\n");
+		razer_error("cypress: Failed to verify the flash\n");
 		result = -1;
 		goto out;
-	}*/
+	}
 	err = cypress_cmd_exitbl(c);
 	if (err) {
-		fprintf(stderr, "cypress: Failed to exit bootloader\n");
+		razer_error("cypress: Failed to exit bootloader\n");
 		result = -1;
 	}
 out:

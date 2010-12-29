@@ -6,6 +6,7 @@
 
 #include <libusb.h>
 #include <stdio.h>
+#include <errno.h>
 
 
 extern razer_logfunc_t razer_logfunc_info;

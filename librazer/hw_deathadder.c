@@ -47,6 +47,7 @@ struct deathadder_125_cfg {
 
 struct deathadder_private {
 	struct razer_mouse *m;
+	bool in_bootloader;
 
 	/* Firmware version number. */
 	uint16_t fw_version;
@@ -72,7 +73,7 @@ static int deathadder_usb_write(struct deathadder_private *priv,
 {
 	int err;
 
-	if (is_cypress_bootloader(priv->m->usb_ctx->dev)) {
+	if (priv->in_bootloader) {
 		/* Deathadder firmware is down and we're in the bootloader. */
 		return 0;
 	}
@@ -99,7 +100,7 @@ static int deathadder_usb_read(struct deathadder_private *priv,
 {
 	int err;
 
-	if (is_cypress_bootloader(priv->m->usb_ctx->dev)) {
+	if (priv->in_bootloader) {
 		/* Deathadder firmware is down and we're in the bootloader. */
 		memset(buf, 0, size);
 		return 0;
@@ -142,6 +143,9 @@ static int deathadder_commit(struct deathadder_private *priv)
 {
 	struct razer_usb_reconnect_guard guard;
 	int i, err;
+
+	if (priv->in_bootloader)
+		return 0;
 
 	err = razer_usb_reconnect_guard_init(&guard, priv->m->usb_ctx);
 	if (err)
@@ -526,25 +530,30 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 		return -EINVAL;
 	}
 
-	/* Enter bootloader mode */
 	razer_msleep(50);
-	value = 0;
-	err = deathadder_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
-				   0x08, &value, sizeof(value));
-	if (err) {
-		razer_error("razer-deathadder: Failed to enter the bootloader.\n");
-		return err;
-	}
-	/* Wait for the cypress device to appear. */
+	if (priv->in_bootloader) {
+		/* We're already inside of the bootloader */
+		cydev = m->usb_ctx->dev;
+	} else {
+		/* Enter bootloader mode */
+		value = 0;
+		err = deathadder_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
+					   0x08, &value, sizeof(value));
+		if (err) {
+			razer_error("razer-deathadder: Failed to enter the bootloader.\n");
+			return err;
+		}
+		/* Wait for the cypress device to appear. */
 //TODO	cydev = wait_for_usbdev(priv->usb.dev, CYPRESS_BOOT_VENDORID, CYPRESS_BOOT_PRODUCTID);
 cydev=NULL;
-	if (!cydev) {
-		razer_error("razer-deathadder: Cypress device didn't appear.\n");
-		return -1;
+		if (!cydev) {
+			razer_error("razer-deathadder: Cypress device didn't appear.\n");
+			return -1;
+		}
 	}
 	razer_msleep(100);
 
-	err = cypress_open(&cy, cydev, cypress_assign_default_key);
+	err = cypress_open(&cy, cydev, NULL);
 	if (err)
 		return err;
 	err = cypress_upload_image(&cy, data, len);
@@ -618,8 +627,15 @@ int razer_deathadder_init(struct razer_mouse *m,
 			  struct libusb_device *usbdev)
 {
 	struct deathadder_private *priv;
+	struct libusb_device_descriptor desc;
 	unsigned int i;
 	int err, fwver;
+
+	err = libusb_get_device_descriptor(usbdev, &desc);
+	if (err) {
+		razer_error("hw_deathadder: Failed to get device descriptor\n");
+		return -EIO;
+	}
 
 	priv = zalloc(sizeof(struct deathadder_private));
 	if (!priv)
@@ -627,11 +643,13 @@ int razer_deathadder_init(struct razer_mouse *m,
 	priv->m = m;
 	m->internal = priv;
 
+	priv->in_bootloader = is_cypress_bootloader(&desc);
+
 	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
 	if (err)
 		goto err_free;
 
-	if (!is_cypress_bootloader(m->usb_ctx->dev)) {
+	if (!priv->in_bootloader && desc.idProduct == 0x0007) {
 		err = razer_usb_force_hub_reset(m->usb_ctx);
 		if (err) {
 			razer_error("hw_deathadder: Failed to reinit USB device\n");
