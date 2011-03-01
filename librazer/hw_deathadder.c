@@ -6,7 +6,7 @@
  *   This hardware driver is based on reverse engineering and
  *   hardware documentation provided under NDA.
  *
- *   Copyright (C) 2007-2009 Michael Buesch <mb@bu3sch.de>
+ *   Copyright (C) 2007-2011 Michael Buesch <mb@bu3sch.de>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -328,6 +328,11 @@ static int deathadder_commit(struct deathadder_private *priv)
 				"after a config change. Try to replug it.\n");
 		}
 	}
+
+	/* The device needs to slack off a bit after changing the config.
+	 * It will fail to apply the config if other device accesses happen
+	 * right after the config upload. */
+	razer_msleep(100);
 
 	return 0;
 }
