@@ -34,6 +34,7 @@
 /* Opaque internal data structures */
 struct razer_usb_context;
 struct razer_mouse_base_ops;
+struct razer_mouse_profile_emu;
 
 struct razer_mouse;
 
@@ -228,16 +229,27 @@ struct razer_mouse_profile {
  *                      sets this to flag on detection. So the highlevel code
  *                      using the library can clear this flag to keep track of
  *                      devices it already knows about.
+ *
+ * @RAZER_MOUSEFLG_PROFEMU: Profiles are emulated in software. The device
+ *                          does only support one profile in hardware.
  */
 enum razer_mouse_flags {
 	RAZER_MOUSEFLG_NEW		= (1 << 0),
+	RAZER_MOUSEFLG_PROFEMU		= (1 << 1),
 
 	/* Internal flags */
 	RAZER_MOUSEFLG_PRESENT		= (1 << 15),
 };
 
+/** enum - Various constants
+ *
+ * @RAZER_FW_FLASH_MAGIC: Magic parameter to flash_firmware callback.
+ *
+ * @RAZER_NR_EMULATED_PROFILES: Default number of emulated profiles.
+ */
 enum {
-	RAZER_FW_FLASH_MAGIC		= 0xB00B135
+	RAZER_FW_FLASH_MAGIC		= 0xB00B135,
+	RAZER_NR_EMULATED_PROFILES	= 20,
 };
 
 /** struct razer_mouse - Representation of a mouse device
@@ -350,6 +362,7 @@ struct razer_mouse {
 	const struct razer_mouse_base_ops *base_ops;
 	struct razer_usb_context *usb_ctx;
 	unsigned int claim_count;
+	struct razer_mouse_profile_emu *profemu;
 	void *internal; /* For use by the hardware driver */
 };
 
@@ -439,7 +452,7 @@ void razer_set_logging(razer_logfunc_t info_callback,
 /** razer_init - LibRazer initialization
   * Call this before any other library function.
   */
-int razer_init(void);
+int razer_init(int enable_profile_emu);
 
 /** razer_exit - LibRazer cleanup
   * Call this after any operation with the library.

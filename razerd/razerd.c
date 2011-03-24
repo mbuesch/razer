@@ -67,6 +67,7 @@ struct commandline_args {
 	const char *pidfile;
 	int loglevel;
 	bool force;
+	bool no_profile_emu;
 } cmdargs = {
 #ifdef DEBUG
 	.loglevel	= LOGLEVEL_DEBUG,
@@ -475,7 +476,7 @@ static int setup_environment(void)
 {
 	int err;
 
-	err = razer_init();
+	err = razer_init(!cmdargs.no_profile_emu);
 	if (err) {
 		logerr("librazer initialization failed. (%d)\n", err);
 		return err;
@@ -1763,6 +1764,7 @@ static void usage(FILE *fd, int argc, char **argv)
 	fprintf(fd, "  -c|--config PATH          Use specified config file. Defaults to %s\n",
 		RAZER_DEFAULT_CONFIG);
 	fprintf(fd, "  -C|--no-config            Do not load the config file\n");
+	fprintf(fd, "  -p|--no-profemu           Disable profile emulation\n");
 	fprintf(fd, "  -P|--pidfile PATH         Create a PID-file\n");
 	fprintf(fd, "  -l|--loglevel LEVEL       Set the loglevel\n");
 	fprintf(fd, "                            0=error, 1=warning, 2=info(default), 3=debug\n");
@@ -1779,6 +1781,7 @@ static int parse_args(int argc, char **argv)
 		{ "background", no_argument, 0, 'B', },
 		{ "config", required_argument, 0, 'c', },
 		{ "no-config", no_argument, 0, 'C', },
+		{ "no-profemu", no_argument, 0, 'p', },
 		{ "pidfile", required_argument, 0, 'P', },
 		{ "loglevel", required_argument, 0, 'l', },
 		{ "force", no_argument, 0, 'f', },
@@ -1788,7 +1791,7 @@ static int parse_args(int argc, char **argv)
 	int c, idx;
 
 	while (1) {
-		c = getopt_long(argc, argv, "hvBc:CP:l:f",
+		c = getopt_long(argc, argv, "hvBc:CpP:l:f",
 				long_options, &idx);
 		if (c == -1)
 			break;
@@ -1805,6 +1808,9 @@ static int parse_args(int argc, char **argv)
 			break;
 		case 'C':
 			cmdargs.configfile = "";
+			break;
+		case 'p':
+			cmdargs.no_profile_emu = 1;
 			break;
 		case 'P':
 			cmdargs.pidfile = optarg;

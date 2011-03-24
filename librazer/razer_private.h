@@ -20,13 +20,18 @@ extern razer_logfunc_t razer_logfunc_debug;
 		__condition;						\
 	})
 
-#define razer_info(...)			call_razer_logfunc(1, razer_logfunc_info, __VA_ARGS__)
-#define razer_error(...)		call_razer_logfunc(1, razer_logfunc_error, __VA_ARGS__)
-#define razer_debug(...)		call_razer_logfunc(1, razer_logfunc_debug, __VA_ARGS__)
-
 #define razer_info_on(condition, ...)	call_razer_logfunc(condition, razer_logfunc_info, __VA_ARGS__)
 #define razer_error_on(condition, ...)	call_razer_logfunc(condition, razer_logfunc_error, __VA_ARGS__)
 #define razer_debug_on(condition, ...)	call_razer_logfunc(condition, razer_logfunc_debug, __VA_ARGS__)
+
+#define razer_info(...)			razer_info_on(1, __VA_ARGS__)
+#define razer_error(...)		razer_error_on(1, __VA_ARGS__)
+#define razer_debug(...)		razer_debug_on(1, __VA_ARGS__)
+
+#undef WARN_ON
+#define WARN_ON(condition)		razer_error_on((condition),		\
+						"WARNING at %s/%s:%d\n",	\
+						__FILE__, __func__, __LINE__)
 
 
 /* Default USB timeout */

@@ -1,7 +1,7 @@
 /*
  *   Razer device access library
  *
- *   Copyright (C) 2007-2009 Michael Buesch <mb@bu3sch.de>
+ *   Copyright (C) 2007-2011 Michael Buesch <mb@bu3sch.de>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -17,6 +17,7 @@
 #include "librazer.h"
 #include "razer_private.h"
 #include "config.h"
+#include "profile_emulation.h"
 
 #include "hw_deathadder.h"
 #include "hw_naga.h"
@@ -127,6 +128,7 @@ static struct razer_mouse *mice_list = NULL;
 /* We currently only have one handler. */
 static razer_event_handler_t event_handler;
 static struct config_file *razer_config_file = NULL;
+static bool profile_emu_enabled;
 
 razer_logfunc_t razer_logfunc_info;
 razer_logfunc_t razer_logfunc_error;
@@ -512,10 +514,13 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 		goto err_free_ctx;
 	udev = m->usb_ctx->dev;
 
-	if (razer_error_on(m->nr_profiles <= 0,
-			   "Driver set invalid number of profiles %u\n",
-			   m->nr_profiles))
+	if (WARN_ON(m->nr_profiles <= 0))
 		goto err_release;
+	if (profile_emu_enabled && m->nr_profiles == 1) {
+		err = razer_mouse_init_profile_emulation(m);
+		if (err)
+			goto err_release;
+	}
 
 	mouse_apply_initial_config(m);
 
@@ -552,6 +557,7 @@ static void razer_free_mouse(struct razer_mouse *m)
 		while (m->claim_count)
 			m->release(m);
 	}
+	razer_mouse_exit_profile_emulation(m);
 	m->base_ops->release(m);
 
 	libusb_unref_device(m->usb_ctx->dev);
@@ -653,12 +659,14 @@ void razer_free_leds(struct razer_led *led_list)
 	}
 }
 
-int razer_init(void)
+int razer_init(int enable_profile_emu)
 {
 	int err = 0;
 
 	if (!razer_initialized())
 		err = libusb_init(&libusb_ctx);
+	if (!err)
+		profile_emu_enabled = enable_profile_emu;
 
 	return err ? -EINVAL : 0;
 }

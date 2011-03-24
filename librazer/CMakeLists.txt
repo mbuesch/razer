@@ -2,6 +2,7 @@ include("${razer_SOURCE_DIR}/scripts/cmake.global")
 
 add_library(razer SHARED
 	    buttonmapping.c
+	    profile_emulation.c
 	    librazer.c
 	    config.c
 	    util.c
