@@ -64,8 +64,8 @@ static int mouse_profemu_commit(struct razer_mouse_profile_emu *emu)
 			err = mouse->supported_buttons(mouse, &buttons);
 			if (err < 0)
 				goto error;
+			WARN_ON(err != data->nr_butfuncs);
 		}
-		WARN_ON(err != data->nr_butfuncs);
 		for (i = 0; i < data->nr_butfuncs; i++) {
 			if (!data->butfuncs[i])
 				continue;
