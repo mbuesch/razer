@@ -13,14 +13,20 @@ extern razer_logfunc_t razer_logfunc_info;
 extern razer_logfunc_t razer_logfunc_error;
 extern razer_logfunc_t razer_logfunc_debug;
 
-#define call_razer_logfunc(func, ...)	do {		\
-		if (func)				\
-			func("librazer: " __VA_ARGS__);	\
-	} while (0)
+#define call_razer_logfunc(condition, func, ...) ({			\
+		__typeof__(condition) __condition = (condition);	\
+		if ((__condition) && (func))				\
+			func("librazer: " __VA_ARGS__);			\
+		__condition;						\
+	})
 
-#define razer_info(...)		call_razer_logfunc(razer_logfunc_info, __VA_ARGS__)
-#define razer_error(...)	call_razer_logfunc(razer_logfunc_error, __VA_ARGS__)
-#define razer_debug(...)	call_razer_logfunc(razer_logfunc_debug, __VA_ARGS__)
+#define razer_info(...)			call_razer_logfunc(1, razer_logfunc_info, __VA_ARGS__)
+#define razer_error(...)		call_razer_logfunc(1, razer_logfunc_error, __VA_ARGS__)
+#define razer_debug(...)		call_razer_logfunc(1, razer_logfunc_debug, __VA_ARGS__)
+
+#define razer_info_on(condition, ...)	call_razer_logfunc(condition, razer_logfunc_info, __VA_ARGS__)
+#define razer_error_on(condition, ...)	call_razer_logfunc(condition, razer_logfunc_error, __VA_ARGS__)
+#define razer_debug_on(condition, ...)	call_razer_logfunc(condition, razer_logfunc_debug, __VA_ARGS__)
 
 
 /* Default USB timeout */

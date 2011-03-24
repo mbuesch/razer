@@ -517,7 +517,6 @@ int razer_naga_init(struct razer_mouse *m,
 
 	m->get_fw_version = naga_get_fw_version;
 	m->get_leds = naga_get_leds;
-	m->nr_profiles = 1;
 	m->get_profiles = naga_get_profiles;
 	m->get_active_profile = naga_get_active_profile;
 	m->supported_axes = naga_supported_axes;

@@ -721,7 +721,6 @@ int razer_deathadder_init(struct razer_mouse *m,
 	m->get_fw_version = deathadder_get_fw_version;
 	m->get_leds = deathadder_get_leds;
 	m->flash_firmware = deathadder_flash_firmware;
-	m->nr_profiles = 1;
 	m->get_profiles = deathadder_get_profiles;
 	m->get_active_profile = deathadder_get_active_profile;
 	m->supported_resolutions = deathadder_supported_resolutions;

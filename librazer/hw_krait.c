@@ -192,7 +192,6 @@ int razer_krait_init(struct razer_mouse *m,
 	m->type = RAZER_MOUSETYPE_KRAIT;
 	razer_generic_usb_gen_idstr(usbdev, NULL, "Krait", 1, m->idstr);
 
-	m->nr_profiles = 1;
 	m->get_profiles = krait_get_profiles;
 	m->get_active_profile = krait_get_active_profile;
 	m->supported_resolutions = krait_supported_resolutions;

@@ -499,15 +499,23 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 	if (!m->usb_ctx)
 		goto err_free_mouse;
 
+	/* Set default values and callbacks */
+	m->nr_profiles = 1;
 	m->claim = mouse_default_claim;
 	m->release = mouse_default_release;
 
+	/* Call the driver init */
 	m->flags |= RAZER_MOUSEFLG_NEW;
 	m->base_ops = id->u.mouse_ops;
 	err = m->base_ops->init(m, udev);
 	if (err)
 		goto err_free_ctx;
 	udev = m->usb_ctx->dev;
+
+	if (razer_error_on(m->nr_profiles <= 0,
+			   "Driver set invalid number of profiles %u\n",
+			   m->nr_profiles))
+		goto err_release;
 
 	mouse_apply_initial_config(m);
 
@@ -519,6 +527,8 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 
 	return m;
 
+err_release:
+	m->base_ops->release(m);
 err_free_ctx:
 	razer_free(m->usb_ctx, sizeof(*(m->usb_ctx)));
 err_free_mouse:
