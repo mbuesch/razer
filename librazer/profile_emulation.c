@@ -47,6 +47,8 @@ static int mouse_profemu_commit(struct razer_mouse_profile_emu *emu)
 			WARN_ON(err != data->nr_dpimappings);
 		}
 		for (i = 0; i < data->nr_dpimappings; i++) {
+			if (!data->dpimappings[i])
+				continue;
 			err = hw_profile->set_dpimapping(
 						hw_profile,
 						axes ? &axes[i] : NULL,
@@ -65,6 +67,8 @@ static int mouse_profemu_commit(struct razer_mouse_profile_emu *emu)
 		}
 		WARN_ON(err != data->nr_butfuncs);
 		for (i = 0; i < data->nr_butfuncs; i++) {
+			if (!data->butfuncs[i])
+				continue;
 			err = hw_profile->set_button_function(
 						hw_profile,
 						buttons ? &buttons[i] : NULL,
@@ -144,16 +148,22 @@ static int mouse_profemu_set_dpimapping(struct razer_mouse_profile *p,
 	struct razer_mouse *mouse = p->mouse;
 	struct razer_mouse_profile_emu *emu = mouse->profemu;
 	struct razer_mouse_profile_emu_data *data;
-	unsigned int axis_index;
+	unsigned int i;
 
 	if (WARN_ON(p->nr >= ARRAY_SIZE(emu->profiles)))
 		return -EINVAL;
 	data = &emu->data[p->nr];
-	axis_index = axis ? axis->id : 0;
-	if (WARN_ON(axis_index >= ARRAY_SIZE(data->dpimappings)))
-		return -EINVAL;
 
-	data->dpimappings[axis_index] = d;
+	if (axis) {
+		if (WARN_ON(axis->id >= ARRAY_SIZE(data->dpimappings)))
+			return -EINVAL;
+		data->dpimappings[axis->id] = d;
+	} else {
+		for (i = 0; i < data->nr_dpimappings; i++) {
+			if (data->dpimappings[i])
+				data->dpimappings[i] = d;
+		}
+	}
 
 	if (p == emu->active_profile)
 		return mouse_profemu_commit(emu);
@@ -282,9 +292,11 @@ int razer_mouse_init_profile_emulation(struct razer_mouse *m)
 			for (j = 0; j < nr_axes; j++) {
 				if (WARN_ON(j >= ARRAY_SIZE(data->dpimappings)))
 					break;
-				data->dpimappings[j] = hw_profile->get_dpimapping(
+				if (!axes || (axes[j].flags & RAZER_AXIS_INDEPENDENT_DPIMAPPING)) {
+					data->dpimappings[j] = hw_profile->get_dpimapping(
 								hw_profile,
 								axes ? &axes[j] : NULL);
+				}
 			}
 			data->nr_dpimappings = j;
 		}

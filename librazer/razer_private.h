@@ -30,7 +30,7 @@ extern razer_logfunc_t razer_logfunc_debug;
 
 #undef WARN_ON
 #define WARN_ON(condition)		razer_error_on((condition),		\
-						"WARNING at %s/%s:%d\n",	\
+						"WARNING at %s/%s():%d\n",	\
 						__FILE__, __func__, __LINE__)
 
 
