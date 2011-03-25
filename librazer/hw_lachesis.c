@@ -419,7 +419,7 @@ static int lachesis_read_config_from_hw(struct lachesis_private *priv)
 
 static int lachesis_get_fw_version(struct razer_mouse *m)
 {
-	struct lachesis_private *priv = m->internal;
+	struct lachesis_private *priv = m->drv_data;
 
 	return priv->fw_version;
 }
@@ -428,7 +428,7 @@ static int lachesis_led_toggle(struct razer_led *led,
 			       enum razer_led_state new_state)
 {
 	struct razer_mouse *m = led->u.mouse;
-	struct lachesis_private *priv = m->internal;
+	struct lachesis_private *priv = m->drv_data;
 	int err;
 	enum razer_led_state old_state;
 
@@ -456,7 +456,7 @@ static int lachesis_led_toggle(struct razer_led *led,
 static int lachesis_get_leds(struct razer_mouse *m,
 			     struct razer_led **leds_list)
 {
-	struct lachesis_private *priv = m->internal;
+	struct lachesis_private *priv = m->drv_data;
 	struct razer_led *scroll, *logo;
 
 	scroll = malloc(sizeof(struct razer_led));
@@ -491,7 +491,7 @@ static int lachesis_get_leds(struct razer_mouse *m,
 static int lachesis_supported_axes(struct razer_mouse *m,
 				   struct razer_axis **axes_list)
 {
-	struct lachesis_private *priv = m->internal;
+	struct lachesis_private *priv = m->drv_data;
 
 	*axes_list = priv->axes;
 
@@ -519,7 +519,7 @@ static int lachesis_supported_freqs(struct razer_mouse *m,
 
 static enum razer_mouse_freq lachesis_get_freq(struct razer_mouse_profile *p)
 {
-	struct lachesis_private *priv = p->mouse->internal;
+	struct lachesis_private *priv = p->mouse->drv_data;
 
 	if (p->nr >= ARRAY_SIZE(priv->cur_freq))
 		return -EINVAL;
@@ -530,7 +530,7 @@ static enum razer_mouse_freq lachesis_get_freq(struct razer_mouse_profile *p)
 static int lachesis_set_freq(struct razer_mouse_profile *p,
 			     enum razer_mouse_freq freq)
 {
-	struct lachesis_private *priv = p->mouse->internal;
+	struct lachesis_private *priv = p->mouse->drv_data;
 	enum razer_mouse_freq oldfreq;
 	int err;
 
@@ -575,14 +575,14 @@ static int lachesis_supported_resolutions(struct razer_mouse *m,
 
 static struct razer_mouse_profile * lachesis_get_profiles(struct razer_mouse *m)
 {
-	struct lachesis_private *priv = m->internal;
+	struct lachesis_private *priv = m->drv_data;
 
 	return &priv->profiles[0];
 }
 
 static struct razer_mouse_profile * lachesis_get_active_profile(struct razer_mouse *m)
 {
-	struct lachesis_private *priv = m->internal;
+	struct lachesis_private *priv = m->drv_data;
 
 	return priv->cur_profile;
 }
@@ -590,7 +590,7 @@ static struct razer_mouse_profile * lachesis_get_active_profile(struct razer_mou
 static int lachesis_set_active_profile(struct razer_mouse *m,
 				       struct razer_mouse_profile *p)
 {
-	struct lachesis_private *priv = m->internal;
+	struct lachesis_private *priv = m->drv_data;
 	struct razer_mouse_profile *oldprof;
 	int err;
 
@@ -612,7 +612,7 @@ static int lachesis_set_active_profile(struct razer_mouse *m,
 static int lachesis_supported_dpimappings(struct razer_mouse *m,
 					  struct razer_mouse_dpimapping **res_ptr)
 {
-	struct lachesis_private *priv = m->internal;
+	struct lachesis_private *priv = m->drv_data;
 
 	*res_ptr = &priv->dpimappings[0];
 
@@ -622,7 +622,7 @@ static int lachesis_supported_dpimappings(struct razer_mouse *m,
 static struct razer_mouse_dpimapping * lachesis_get_dpimapping(struct razer_mouse_profile *p,
 							       struct razer_axis *axis)
 {
-	struct lachesis_private *priv = p->mouse->internal;
+	struct lachesis_private *priv = p->mouse->drv_data;
 
 	if (p->nr >= ARRAY_SIZE(priv->cur_dpimapping))
 		return NULL;
@@ -634,7 +634,7 @@ static int lachesis_set_dpimapping(struct razer_mouse_profile *p,
 				   struct razer_axis *axis,
 				   struct razer_mouse_dpimapping *d)
 {
-	struct lachesis_private *priv = p->mouse->internal;
+	struct lachesis_private *priv = p->mouse->drv_data;
 	struct razer_mouse_dpimapping *oldmapping;
 	int err;
 
@@ -658,7 +658,7 @@ static int lachesis_set_dpimapping(struct razer_mouse_profile *p,
 static int lachesis_dpimapping_modify(struct razer_mouse_dpimapping *d,
 				      enum razer_mouse_res res)
 {
-	struct lachesis_private *priv = d->mouse->internal;
+	struct lachesis_private *priv = d->mouse->drv_data;
 	enum razer_mouse_res oldres;
 	int err;
 
@@ -694,7 +694,7 @@ static int lachesis_supported_button_functions(struct razer_mouse *m,
 static struct razer_button_function * lachesis_get_button_function(struct razer_mouse_profile *p,
 								   struct razer_button *b)
 {
-	struct lachesis_private *priv = p->mouse->internal;
+	struct lachesis_private *priv = p->mouse->drv_data;
 	struct lachesis_buttons *bm;
 	unsigned int i, j;
 
@@ -718,7 +718,7 @@ static int lachesis_set_button_function(struct razer_mouse_profile *p,
 					struct razer_button *b,
 					struct razer_button_function *f)
 {
-	struct lachesis_private *priv = p->mouse->internal;
+	struct lachesis_private *priv = p->mouse->drv_data;
 	struct lachesis_buttons *bm;
 	unsigned int i;
 	uint8_t oldlogical;
@@ -760,7 +760,7 @@ int razer_lachesis_init(struct razer_mouse *m,
 	if (!priv)
 		return -ENOMEM;
 	priv->m = m;
-	m->internal = priv;
+	m->drv_data = priv;
 
 	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
 	err |= razer_usb_add_used_interface(m->usb_ctx, 1, 0);
@@ -852,7 +852,7 @@ err_free:
 
 void razer_lachesis_release(struct razer_mouse *m)
 {
-	struct lachesis_private *priv = m->internal;
+	struct lachesis_private *priv = m->drv_data;
 
 	free(priv);
 }

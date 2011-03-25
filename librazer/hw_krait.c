@@ -95,14 +95,14 @@ static int krait_supported_resolutions(struct razer_mouse *m,
 
 static struct razer_mouse_profile * krait_get_profiles(struct razer_mouse *m)
 {
-	struct krait_private *priv = m->internal;
+	struct krait_private *priv = m->drv_data;
 
 	return &priv->profile;
 }
 
 static struct razer_mouse_profile * krait_get_active_profile(struct razer_mouse *m)
 {
-	struct krait_private *priv = m->internal;
+	struct krait_private *priv = m->drv_data;
 
 	return &priv->profile;
 }
@@ -110,7 +110,7 @@ static struct razer_mouse_profile * krait_get_active_profile(struct razer_mouse 
 static int krait_supported_dpimappings(struct razer_mouse *m,
 				       struct razer_mouse_dpimapping **res_ptr)
 {
-	struct krait_private *priv = m->internal;
+	struct krait_private *priv = m->drv_data;
 
 	*res_ptr = &priv->dpimapping[0];
 
@@ -120,7 +120,7 @@ static int krait_supported_dpimappings(struct razer_mouse *m,
 static struct razer_mouse_dpimapping * krait_get_dpimapping(struct razer_mouse_profile *p,
 							    struct razer_axis *axis)
 {
-	struct krait_private *priv = p->mouse->internal;
+	struct krait_private *priv = p->mouse->drv_data;
 
 	return priv->cur_dpimapping;
 }
@@ -129,7 +129,7 @@ static int krait_set_dpimapping(struct razer_mouse_profile *p,
 				struct razer_axis *axis,
 				struct razer_mouse_dpimapping *d)
 {
-	struct krait_private *priv = p->mouse->internal;
+	struct krait_private *priv = p->mouse->drv_data;
 	int err;
 	char value;
 
@@ -164,7 +164,7 @@ int razer_krait_init(struct razer_mouse *m,
 	if (!priv)
 		return -ENOMEM;
 	priv->m = m;
-	m->internal = priv;
+	m->drv_data = priv;
 
 	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
 	if (err) {
@@ -202,7 +202,7 @@ int razer_krait_init(struct razer_mouse *m,
 
 void razer_krait_release(struct razer_mouse *m)
 {
-	struct krait_private *priv = m->internal;
+	struct krait_private *priv = m->drv_data;
 
 	free(priv);
 }

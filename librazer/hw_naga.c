@@ -232,7 +232,7 @@ static int naga_commit(struct naga_private *priv)
 
 static int naga_get_fw_version(struct razer_mouse *m)
 {
-	struct naga_private *priv = m->internal;
+	struct naga_private *priv = m->drv_data;
 
 	return priv->fw_version;
 }
@@ -241,7 +241,7 @@ static int naga_led_toggle(struct razer_led *led,
 				 enum razer_led_state new_state)
 {
 	struct razer_mouse *m = led->u.mouse;
-	struct naga_private *priv = m->internal;
+	struct naga_private *priv = m->drv_data;
 	int err;
 	enum razer_led_state old_state;
 
@@ -269,7 +269,7 @@ static int naga_led_toggle(struct razer_led *led,
 static int naga_get_leds(struct razer_mouse *m,
 			       struct razer_led **leds_list)
 {
-	struct naga_private *priv = m->internal;
+	struct naga_private *priv = m->drv_data;
 	struct razer_led *scroll, *logo;
 
 	scroll = zalloc(sizeof(struct razer_led));
@@ -322,7 +322,7 @@ static int naga_supported_freqs(struct razer_mouse *m,
 
 static enum razer_mouse_freq naga_get_freq(struct razer_mouse_profile *p)
 {
-	struct naga_private *priv = p->mouse->internal;
+	struct naga_private *priv = p->mouse->drv_data;
 
 	return priv->frequency;
 }
@@ -330,7 +330,7 @@ static enum razer_mouse_freq naga_get_freq(struct razer_mouse_profile *p)
 static int naga_set_freq(struct razer_mouse_profile *p,
 			       enum razer_mouse_freq freq)
 {
-	struct naga_private *priv = p->mouse->internal;
+	struct naga_private *priv = p->mouse->drv_data;
 	enum razer_mouse_freq old_freq;
 	int err;
 
@@ -352,7 +352,7 @@ static int naga_set_freq(struct razer_mouse_profile *p,
 static int naga_supported_axes(struct razer_mouse *m,
 			       struct razer_axis **axes_list)
 {
-	struct naga_private *priv = m->internal;
+	struct naga_private *priv = m->drv_data;
 
 	*axes_list = priv->axes;
 
@@ -378,14 +378,14 @@ static int naga_supported_resolutions(struct razer_mouse *m,
 
 static struct razer_mouse_profile * naga_get_profiles(struct razer_mouse *m)
 {
-	struct naga_private *priv = m->internal;
+	struct naga_private *priv = m->drv_data;
 
 	return &priv->profile;
 }
 
 static struct razer_mouse_profile * naga_get_active_profile(struct razer_mouse *m)
 {
-	struct naga_private *priv = m->internal;
+	struct naga_private *priv = m->drv_data;
 
 	return &priv->profile;
 }
@@ -393,7 +393,7 @@ static struct razer_mouse_profile * naga_get_active_profile(struct razer_mouse *
 static int naga_supported_dpimappings(struct razer_mouse *m,
 				      struct razer_mouse_dpimapping **res_ptr)
 {
-	struct naga_private *priv = m->internal;
+	struct naga_private *priv = m->drv_data;
 
 	*res_ptr = &priv->dpimapping[0];
 
@@ -403,7 +403,7 @@ static int naga_supported_dpimappings(struct razer_mouse *m,
 static struct razer_mouse_dpimapping * naga_get_dpimapping(struct razer_mouse_profile *p,
 							   struct razer_axis *axis)
 {
-	struct naga_private *priv = p->mouse->internal;
+	struct naga_private *priv = p->mouse->drv_data;
 
 	if (!axis)
 		axis = &priv->axes[0];
@@ -419,7 +419,7 @@ static int naga_set_dpimapping(struct razer_mouse_profile *p,
 			       struct razer_axis *axis,
 			       struct razer_mouse_dpimapping *d)
 {
-	struct naga_private *priv = p->mouse->internal;
+	struct naga_private *priv = p->mouse->drv_data;
 	struct razer_mouse_dpimapping *oldmapping_X, *oldmapping_Y;
 	int err;
 
@@ -466,7 +466,7 @@ int razer_naga_init(struct razer_mouse *m,
 	if (!priv)
 		return -ENOMEM;
 	priv->m = m;
-	m->internal = priv;
+	m->drv_data = priv;
 
 	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
 	if (err)
@@ -543,7 +543,7 @@ err_free:
 
 void razer_naga_release(struct razer_mouse *m)
 {
-	struct naga_private *priv = m->internal;
+	struct naga_private *priv = m->drv_data;
 
 	free(priv);
 }

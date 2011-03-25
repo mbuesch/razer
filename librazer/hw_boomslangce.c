@@ -489,21 +489,21 @@ static int boomslangce_read_config_from_hw(struct boomslangce_private *priv)
 
 static int boomslangce_get_fw_version(struct razer_mouse *m)
 {
-	struct boomslangce_private *priv = m->internal;
+	struct boomslangce_private *priv = m->drv_data;
 
 	return priv->fw_version;
 }
 
 static struct razer_mouse_profile * boomslangce_get_profiles(struct razer_mouse *m)
 {
-	struct boomslangce_private *priv = m->internal;
+	struct boomslangce_private *priv = m->drv_data;
 
 	return &priv->profiles[0];
 }
 
 static struct razer_mouse_profile * boomslangce_get_active_profile(struct razer_mouse *m)
 {
-	struct boomslangce_private *priv = m->internal;
+	struct boomslangce_private *priv = m->drv_data;
 
 	return priv->cur_profile;
 }
@@ -511,7 +511,7 @@ static struct razer_mouse_profile * boomslangce_get_active_profile(struct razer_
 static int boomslangce_set_active_profile(struct razer_mouse *m,
 					 struct razer_mouse_profile *p)
 {
-	struct boomslangce_private *priv = m->internal;
+	struct boomslangce_private *priv = m->drv_data;
 	struct razer_mouse_profile *oldprof;
 	int err;
 
@@ -570,7 +570,7 @@ static int boomslangce_supported_freqs(struct razer_mouse *m,
 
 static enum razer_mouse_freq boomslangce_get_freq(struct razer_mouse_profile *p)
 {
-	struct boomslangce_private *priv = p->mouse->internal;
+	struct boomslangce_private *priv = p->mouse->drv_data;
 
 	if (p->nr >= ARRAY_SIZE(priv->cur_freq))
 		return -EINVAL;
@@ -581,7 +581,7 @@ static enum razer_mouse_freq boomslangce_get_freq(struct razer_mouse_profile *p)
 static int boomslangce_set_freq(struct razer_mouse_profile *p,
 			       enum razer_mouse_freq freq)
 {
-	struct boomslangce_private *priv = p->mouse->internal;
+	struct boomslangce_private *priv = p->mouse->drv_data;
 	enum razer_mouse_freq oldfreq;
 	int err;
 
@@ -605,7 +605,7 @@ static int boomslangce_set_freq(struct razer_mouse_profile *p,
 static int boomslangce_supported_dpimappings(struct razer_mouse *m,
 					    struct razer_mouse_dpimapping **res_ptr)
 {
-	struct boomslangce_private *priv = m->internal;
+	struct boomslangce_private *priv = m->drv_data;
 
 	*res_ptr = &priv->dpimappings[0];
 
@@ -615,7 +615,7 @@ static int boomslangce_supported_dpimappings(struct razer_mouse *m,
 static struct razer_mouse_dpimapping * boomslangce_get_dpimapping(struct razer_mouse_profile *p,
 								 struct razer_axis *axis)
 {
-	struct boomslangce_private *priv = p->mouse->internal;
+	struct boomslangce_private *priv = p->mouse->drv_data;
 
 	if (p->nr >= ARRAY_SIZE(priv->cur_dpimapping))
 		return NULL;
@@ -627,7 +627,7 @@ static int boomslangce_set_dpimapping(struct razer_mouse_profile *p,
 				     struct razer_axis *axis,
 				     struct razer_mouse_dpimapping *d)
 {
-	struct boomslangce_private *priv = p->mouse->internal;
+	struct boomslangce_private *priv = p->mouse->drv_data;
 	struct razer_mouse_dpimapping *oldmapping;
 	int err;
 
@@ -652,7 +652,7 @@ static int boomslangce_led_toggle(struct razer_led *led,
 				  enum razer_led_state new_state)
 {
 	struct razer_mouse *m = led->u.mouse;
-	struct boomslangce_private *priv = m->internal;
+	struct boomslangce_private *priv = m->drv_data;
 	int err;
 	enum razer_led_state old_state;
 
@@ -680,7 +680,7 @@ static int boomslangce_led_toggle(struct razer_led *led,
 static int boomslangce_get_leds(struct razer_mouse *m,
 				struct razer_led **leds_list)
 {
-	struct boomslangce_private *priv = m->internal;
+	struct boomslangce_private *priv = m->drv_data;
 	struct razer_led *scroll, *logo;
 
 	scroll = malloc(sizeof(struct razer_led));
@@ -729,7 +729,7 @@ static int boomslangce_supported_button_functions(struct razer_mouse *m,
 static struct razer_button_function * boomslangce_get_button_function(struct razer_mouse_profile *p,
 								     struct razer_button *b)
 {
-	struct boomslangce_private *priv = p->mouse->internal;
+	struct boomslangce_private *priv = p->mouse->drv_data;
 	struct boomslangce_buttonmappings *m;
 	struct boomslangce_one_buttonmapping *one;
 	unsigned int i;
@@ -753,7 +753,7 @@ static int boomslangce_set_button_function(struct razer_mouse_profile *p,
 					  struct razer_button *b,
 					  struct razer_button_function *f)
 {
-	struct boomslangce_private *priv = p->mouse->internal;
+	struct boomslangce_private *priv = p->mouse->drv_data;
 	struct boomslangce_buttonmappings *m;
 	struct boomslangce_one_buttonmapping *one;
 	uint8_t oldlogical;
@@ -792,7 +792,7 @@ int razer_boomslangce_init(struct razer_mouse *m,
 	if (!priv)
 		return -ENOMEM;
 	priv->m = m;
-	m->internal = priv;
+	m->drv_data = priv;
 
 	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
 	err |= razer_usb_add_used_interface(m->usb_ctx, 1, 0);
@@ -879,7 +879,7 @@ err_free:
 
 void razer_boomslangce_release(struct razer_mouse *m)
 {
-	struct boomslangce_private *priv = m->internal;
+	struct boomslangce_private *priv = m->drv_data;
 
 	free(priv);
 }

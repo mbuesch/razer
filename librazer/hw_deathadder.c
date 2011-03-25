@@ -339,7 +339,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 
 static int deathadder_get_fw_version(struct razer_mouse *m)
 {
-	struct deathadder_private *priv = m->internal;
+	struct deathadder_private *priv = m->drv_data;
 
 	return priv->fw_version;
 }
@@ -348,7 +348,7 @@ static int deathadder_led_toggle(struct razer_led *led,
 				 enum razer_led_state new_state)
 {
 	struct razer_mouse *m = led->u.mouse;
-	struct deathadder_private *priv = m->internal;
+	struct deathadder_private *priv = m->drv_data;
 	int err;
 	enum razer_led_state old_state;
 
@@ -376,7 +376,7 @@ static int deathadder_led_toggle(struct razer_led *led,
 static int deathadder_get_leds(struct razer_mouse *m,
 			       struct razer_led **leds_list)
 {
-	struct deathadder_private *priv = m->internal;
+	struct deathadder_private *priv = m->drv_data;
 	struct razer_led *scroll, *logo;
 
 	scroll = malloc(sizeof(struct razer_led));
@@ -429,7 +429,7 @@ static int deathadder_supported_freqs(struct razer_mouse *m,
 
 static enum razer_mouse_freq deathadder_get_freq(struct razer_mouse_profile *p)
 {
-	struct deathadder_private *priv = p->mouse->internal;
+	struct deathadder_private *priv = p->mouse->drv_data;
 
 	return priv->frequency;
 }
@@ -437,7 +437,7 @@ static enum razer_mouse_freq deathadder_get_freq(struct razer_mouse_profile *p)
 static int deathadder_set_freq(struct razer_mouse_profile *p,
 			       enum razer_mouse_freq freq)
 {
-	struct deathadder_private *priv = p->mouse->internal;
+	struct deathadder_private *priv = p->mouse->drv_data;
 	enum razer_mouse_freq old_freq;
 	int err;
 
@@ -461,7 +461,7 @@ static int deathadder_set_freq(struct razer_mouse_profile *p,
 static int deathadder_supported_resolutions(struct razer_mouse *m,
 					    enum razer_mouse_res **res_list)
 {
-	struct deathadder_private *priv = m->internal;
+	struct deathadder_private *priv = m->drv_data;
 	enum razer_mouse_res *list;
 	const int count = (priv->fw_version >= DADD_FW(2,0)) ? 4 : 3;
 
@@ -516,7 +516,7 @@ static int deathadder_flash_firmware(struct razer_mouse *m,
 				     const char *data, size_t len,
 				     unsigned int magic_number)
 {
-	struct deathadder_private *priv = m->internal;
+	struct deathadder_private *priv = m->drv_data;
 	int err;
 	char value;
 	struct libusb_device *cydev;
@@ -573,14 +573,14 @@ cydev=NULL;
 
 static struct razer_mouse_profile * deathadder_get_profiles(struct razer_mouse *m)
 {
-	struct deathadder_private *priv = m->internal;
+	struct deathadder_private *priv = m->drv_data;
 
 	return &priv->profile;
 }
 
 static struct razer_mouse_profile * deathadder_get_active_profile(struct razer_mouse *m)
 {
-	struct deathadder_private *priv = m->internal;
+	struct deathadder_private *priv = m->drv_data;
 
 	return &priv->profile;
 }
@@ -588,7 +588,7 @@ static struct razer_mouse_profile * deathadder_get_active_profile(struct razer_m
 static int deathadder_supported_dpimappings(struct razer_mouse *m,
 					    struct razer_mouse_dpimapping **res_ptr)
 {
-	struct deathadder_private *priv = m->internal;
+	struct deathadder_private *priv = m->drv_data;
 
 	*res_ptr = &priv->dpimapping[0];
 
@@ -600,7 +600,7 @@ static int deathadder_supported_dpimappings(struct razer_mouse *m,
 static struct razer_mouse_dpimapping * deathadder_get_dpimapping(struct razer_mouse_profile *p,
 								 struct razer_axis *axis)
 {
-	struct deathadder_private *priv = p->mouse->internal;
+	struct deathadder_private *priv = p->mouse->drv_data;
 
 	return priv->cur_dpimapping;
 }
@@ -609,7 +609,7 @@ static int deathadder_set_dpimapping(struct razer_mouse_profile *p,
 				     struct razer_axis *axis,
 				     struct razer_mouse_dpimapping *d)
 {
-	struct deathadder_private *priv = p->mouse->internal;
+	struct deathadder_private *priv = p->mouse->drv_data;
 	struct razer_mouse_dpimapping *oldmapping;
 	int err;
 
@@ -646,7 +646,7 @@ int razer_deathadder_init(struct razer_mouse *m,
 	if (!priv)
 		return -ENOMEM;
 	priv->m = m;
-	m->internal = priv;
+	m->drv_data = priv;
 
 	priv->in_bootloader = is_cypress_bootloader(&desc);
 
@@ -747,7 +747,7 @@ err_free:
 
 void razer_deathadder_release(struct razer_mouse *m)
 {
-	struct deathadder_private *priv = m->internal;
+	struct deathadder_private *priv = m->drv_data;
 
 	free(priv);
 }

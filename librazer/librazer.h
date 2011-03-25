@@ -363,7 +363,7 @@ struct razer_mouse {
 	struct razer_usb_context *usb_ctx;
 	unsigned int claim_count;
 	struct razer_mouse_profile_emu *profemu;
-	void *internal; /* For use by the hardware driver */
+	void *drv_data; /* For use by the hardware driver */
 };
 
 /** razer_free_freq_list - Free an array of frequencies.

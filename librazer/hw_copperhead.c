@@ -468,21 +468,21 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 
 static int copperhead_get_fw_version(struct razer_mouse *m)
 {
-	struct copperhead_private *priv = m->internal;
+	struct copperhead_private *priv = m->drv_data;
 
 	return priv->fw_version;
 }
 
 static struct razer_mouse_profile * copperhead_get_profiles(struct razer_mouse *m)
 {
-	struct copperhead_private *priv = m->internal;
+	struct copperhead_private *priv = m->drv_data;
 
 	return &priv->profiles[0];
 }
 
 static struct razer_mouse_profile * copperhead_get_active_profile(struct razer_mouse *m)
 {
-	struct copperhead_private *priv = m->internal;
+	struct copperhead_private *priv = m->drv_data;
 
 	return priv->cur_profile;
 }
@@ -490,7 +490,7 @@ static struct razer_mouse_profile * copperhead_get_active_profile(struct razer_m
 static int copperhead_set_active_profile(struct razer_mouse *m,
 					 struct razer_mouse_profile *p)
 {
-	struct copperhead_private *priv = m->internal;
+	struct copperhead_private *priv = m->drv_data;
 	struct razer_mouse_profile *oldprof;
 	int err;
 
@@ -550,7 +550,7 @@ static int copperhead_supported_freqs(struct razer_mouse *m,
 
 static enum razer_mouse_freq copperhead_get_freq(struct razer_mouse_profile *p)
 {
-	struct copperhead_private *priv = p->mouse->internal;
+	struct copperhead_private *priv = p->mouse->drv_data;
 
 	if (p->nr >= ARRAY_SIZE(priv->cur_freq))
 		return -EINVAL;
@@ -561,7 +561,7 @@ static enum razer_mouse_freq copperhead_get_freq(struct razer_mouse_profile *p)
 static int copperhead_set_freq(struct razer_mouse_profile *p,
 			       enum razer_mouse_freq freq)
 {
-	struct copperhead_private *priv = p->mouse->internal;
+	struct copperhead_private *priv = p->mouse->drv_data;
 	enum razer_mouse_freq oldfreq;
 	int err;
 
@@ -585,7 +585,7 @@ static int copperhead_set_freq(struct razer_mouse_profile *p,
 static int copperhead_supported_dpimappings(struct razer_mouse *m,
 					    struct razer_mouse_dpimapping **res_ptr)
 {
-	struct copperhead_private *priv = m->internal;
+	struct copperhead_private *priv = m->drv_data;
 
 	*res_ptr = &priv->dpimappings[0];
 
@@ -595,7 +595,7 @@ static int copperhead_supported_dpimappings(struct razer_mouse *m,
 static struct razer_mouse_dpimapping * copperhead_get_dpimapping(struct razer_mouse_profile *p,
 								 struct razer_axis *axis)
 {
-	struct copperhead_private *priv = p->mouse->internal;
+	struct copperhead_private *priv = p->mouse->drv_data;
 
 	if (p->nr >= ARRAY_SIZE(priv->cur_dpimapping))
 		return NULL;
@@ -607,7 +607,7 @@ static int copperhead_set_dpimapping(struct razer_mouse_profile *p,
 				     struct razer_axis *axis,
 				     struct razer_mouse_dpimapping *d)
 {
-	struct copperhead_private *priv = p->mouse->internal;
+	struct copperhead_private *priv = p->mouse->drv_data;
 	struct razer_mouse_dpimapping *oldmapping;
 	int err;
 
@@ -645,7 +645,7 @@ static int copperhead_supported_button_functions(struct razer_mouse *m,
 static struct razer_button_function * copperhead_get_button_function(struct razer_mouse_profile *p,
 								     struct razer_button *b)
 {
-	struct copperhead_private *priv = p->mouse->internal;
+	struct copperhead_private *priv = p->mouse->drv_data;
 	struct copperhead_buttonmappings *m;
 	struct copperhead_one_buttonmapping *one;
 	unsigned int i;
@@ -669,7 +669,7 @@ static int copperhead_set_button_function(struct razer_mouse_profile *p,
 					  struct razer_button *b,
 					  struct razer_button_function *f)
 {
-	struct copperhead_private *priv = p->mouse->internal;
+	struct copperhead_private *priv = p->mouse->drv_data;
 	struct copperhead_buttonmappings *m;
 	struct copperhead_one_buttonmapping *one;
 	uint8_t oldlogical;
@@ -708,7 +708,7 @@ int razer_copperhead_init(struct razer_mouse *m,
 	if (!priv)
 		return -ENOMEM;
 	priv->m = m;
-	m->internal = priv;
+	m->drv_data = priv;
 
 	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
 	err |= razer_usb_add_used_interface(m->usb_ctx, 1, 0);
@@ -795,7 +795,7 @@ err_free:
 
 void razer_copperhead_release(struct razer_mouse *m)
 {
-	struct copperhead_private *priv = m->internal;
+	struct copperhead_private *priv = m->drv_data;
 
 	free(priv);
 }
