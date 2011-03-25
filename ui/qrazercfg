@@ -2,7 +2,7 @@
 #
 #   Razer device QT configuration tool
 #
-#   Copyright (C) 2007-2009 Michael Buesch <mb@bu3sch.de>
+#   Copyright (C) 2007-2011 Michael Buesch <mb@bu3sch.de>
 #
 #   This program is free software; you can redistribute it and/or
 #   modify it under the terms of the GNU General Public License
@@ -419,7 +419,8 @@ class MouseWidget(QWidget):
 			self.leds.show()
 
 		ver = razer.getFwVer(self.mouse)
-		if ver[0] == 0xFF and ver[1] == 0xFF:
+		if (ver[0] == 0xFF and ver[1] == 0xFF) or\
+		   (ver[0] == 0 and ver[1] == 0):
 			self.fwVer.hide()
 		else:
 			self.fwVer.setText(self.tr("Firmware version: %u.%u" % (ver[0], ver[1])))
@@ -494,7 +495,7 @@ class MainWindow(QMainWindow):
 		QMessageBox.information(self, self.tr("About"),
 					self.tr("Razer device configuration tool\n"
 						"Version %s\n"
-						"Copyright (c) 2007-2010 Michael Buesch"
+						"Copyright (c) 2007-2011 Michael Buesch"
 						% RAZER_VERSION))
 
 def exit(exitcode):

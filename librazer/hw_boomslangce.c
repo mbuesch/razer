@@ -278,15 +278,10 @@ static int boomslangce_read_fw_ver(struct boomslangce_private *priv)
 {
 	char buf[2];
 	uint16_t ver;
-//	int err;
 
-//FIXME this is wrong
-//	err = boomslangce_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
-//				  0x05, 0, buf, sizeof(buf));
-buf[0]=0;
-buf[1]=0;
-//	if (err)
-//		return err;
+	buf[0] = 0;//TODO
+	buf[1] = 0;
+
 	ver = buf[0];
 	ver <<= 8;
 	ver |= buf[1];
