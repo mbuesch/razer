@@ -383,13 +383,6 @@ static struct razer_mouse_profile * naga_get_profiles(struct razer_mouse *m)
 	return &priv->profile;
 }
 
-static struct razer_mouse_profile * naga_get_active_profile(struct razer_mouse *m)
-{
-	struct naga_private *priv = m->drv_data;
-
-	return &priv->profile;
-}
-
 static int naga_supported_dpimappings(struct razer_mouse *m,
 				      struct razer_mouse_dpimapping **res_ptr)
 {
@@ -518,7 +511,6 @@ int razer_naga_init(struct razer_mouse *m,
 	m->get_fw_version = naga_get_fw_version;
 	m->get_leds = naga_get_leds;
 	m->get_profiles = naga_get_profiles;
-	m->get_active_profile = naga_get_active_profile;
 	m->supported_axes = naga_supported_axes;
 	m->supported_resolutions = naga_supported_resolutions;
 	m->supported_freqs = naga_supported_freqs;

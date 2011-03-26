@@ -578,13 +578,6 @@ static struct razer_mouse_profile * deathadder_get_profiles(struct razer_mouse *
 	return &priv->profile;
 }
 
-static struct razer_mouse_profile * deathadder_get_active_profile(struct razer_mouse *m)
-{
-	struct deathadder_private *priv = m->drv_data;
-
-	return &priv->profile;
-}
-
 static int deathadder_supported_dpimappings(struct razer_mouse *m,
 					    struct razer_mouse_dpimapping **res_ptr)
 {
@@ -722,7 +715,6 @@ int razer_deathadder_init(struct razer_mouse *m,
 	m->get_leds = deathadder_get_leds;
 	m->flash_firmware = deathadder_flash_firmware;
 	m->get_profiles = deathadder_get_profiles;
-	m->get_active_profile = deathadder_get_active_profile;
 	m->supported_resolutions = deathadder_supported_resolutions;
 	m->supported_freqs = deathadder_supported_freqs;
 	m->supported_dpimappings = deathadder_supported_dpimappings;

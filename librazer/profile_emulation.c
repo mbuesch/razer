@@ -247,7 +247,7 @@ int razer_mouse_init_profile_emulation(struct razer_mouse *m)
 		return -ENOMEM;
 	emu->mouse = m;
 
-	hw_profile = m->get_active_profile(m);
+	hw_profile = m->get_profiles(m);
 	emu->hw_profile = hw_profile;
 	if (WARN_ON(!emu->hw_profile))
 		goto err_free;

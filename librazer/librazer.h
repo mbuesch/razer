@@ -282,14 +282,16 @@ enum {
   *     The magic is used to project against accidental calls.
   *
   * @nr_profiles: The number of profiles supported by this device.
+  *	Defaults to 1.
   *
   * @get_profiles: Returns an array of supported profiles.
   *	Array length is nr_profiles.
   *
   * @get_active_profile: Returns the currently active profile.
+  *	May be NULL, if nr_profiles is 1.
   *
   * @set_active_profile: Selects the active profile.
-  *	May be NULL, if there's only one profile.
+  *	May be NULL, if nr_profiles is 1.
   *
   * @supported_axes: Returns a list of supported device axes
   *	for this mouse in res_ptr.

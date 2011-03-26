@@ -100,13 +100,6 @@ static struct razer_mouse_profile * krait_get_profiles(struct razer_mouse *m)
 	return &priv->profile;
 }
 
-static struct razer_mouse_profile * krait_get_active_profile(struct razer_mouse *m)
-{
-	struct krait_private *priv = m->drv_data;
-
-	return &priv->profile;
-}
-
 static int krait_supported_dpimappings(struct razer_mouse *m,
 				       struct razer_mouse_dpimapping **res_ptr)
 {
@@ -193,7 +186,6 @@ int razer_krait_init(struct razer_mouse *m,
 	razer_generic_usb_gen_idstr(usbdev, NULL, "Krait", 1, m->idstr);
 
 	m->get_profiles = krait_get_profiles;
-	m->get_active_profile = krait_get_active_profile;
 	m->supported_resolutions = krait_supported_resolutions;
 	m->supported_dpimappings = krait_supported_dpimappings;
 

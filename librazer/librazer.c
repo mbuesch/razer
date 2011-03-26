@@ -516,6 +516,8 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 
 	if (WARN_ON(m->nr_profiles <= 0))
 		goto err_release;
+	if (m->nr_profiles == 1 && !m->get_active_profile)
+		m->get_active_profile = m->get_profiles;
 	if (profile_emu_enabled && m->nr_profiles == 1) {
 		err = razer_mouse_init_profile_emulation(m);
 		if (err)
