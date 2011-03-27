@@ -332,7 +332,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 	/* The device needs to slack off a bit after changing the config.
 	 * It will fail to apply the config if other device accesses happen
 	 * right after the config upload. */
-	razer_msleep(100);
+	razer_msleep(250);
 
 	return 0;
 }
