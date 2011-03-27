@@ -77,9 +77,8 @@ int razer_parse_buttonmap(void *rawdata, size_t rawsize,
 		rawptr += sizeof(*mapping);
 		if (!razer_buffer_is_all_zero(&raw[rawptr],
 					      min(struct_spacing, rawsize - rawptr))) {
-			razer_error("razer_parse_buttonmap: Buttonmap spacing contains "
+			razer_debug("razer_parse_buttonmap: Buttonmap spacing contains "
 				"nonzero data\n");
-			return -EINVAL;
 		}
 		rawptr += struct_spacing;
 	}
