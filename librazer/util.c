@@ -140,6 +140,22 @@ bool razer_timeval_after(const struct timeval *a, const struct timeval *b)
 	return 0;
 }
 
+/* Return a-b in milliseconds */
+int razer_timeval_msec_diff(const struct timeval *a, const struct timeval *b)
+{
+	int64_t usec_a, usec_b, usec_diff;
+
+	usec_a = (int64_t)a->tv_sec * 1000000;
+	usec_a += (int64_t)a->tv_usec;
+
+	usec_b = (int64_t)b->tv_sec * 1000000;
+	usec_b += (int64_t)b->tv_usec;
+
+	usec_diff = usec_a - usec_b;
+
+	return usec_diff / 1000;
+}
+
 void razer_msleep(unsigned int msecs)
 {
 	int err;

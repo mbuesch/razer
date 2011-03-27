@@ -108,4 +108,14 @@ struct razer_mouse_dpimapping * razer_mouse_get_dpimapping_by_res(
 		struct razer_mouse_dpimapping *mappings, size_t nr_mappings,
 		enum razer_mouse_res res);
 
+struct razer_event_spacing {
+	unsigned int spacing_msec;
+	struct timeval last_event;
+};
+
+void razer_event_spacing_init(struct razer_event_spacing *es,
+			      unsigned int msec);
+void razer_event_spacing_enter(struct razer_event_spacing *es);
+void razer_event_spacing_leave(struct razer_event_spacing *es);
+
 #endif /* RAZER_PRIVATE_H_ */

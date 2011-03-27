@@ -62,6 +62,8 @@ struct deathadder_private {
 
 	struct razer_mouse_profile profile;
 	struct razer_mouse_dpimapping dpimapping[4];
+
+	struct razer_event_spacing commit_spacing;
 };
 
 #define DADD_FW(major, minor)		(((major) << 8) | (minor))
@@ -147,9 +149,11 @@ static int deathadder_commit(struct deathadder_private *priv)
 	if (priv->in_bootloader)
 		return 0;
 
+	razer_event_spacing_enter(&priv->commit_spacing);
+
 	err = razer_usb_reconnect_guard_init(&guard, priv->m->usb_ctx);
 	if (err)
-		return err;
+		goto out;
 
 	if (priv->fw_version < DADD_FW(1,25)) {
 		char value, freq_value, res_value;
@@ -167,7 +171,8 @@ static int deathadder_commit(struct deathadder_private *priv)
 			freq_value = 1;
 			break;
 		default:
-			return -EINVAL;
+			err = -EINVAL;
+			goto out;
 		}
 
 		/* Translate resolution setting. */
@@ -183,7 +188,8 @@ static int deathadder_commit(struct deathadder_private *priv)
 			res_value = 1;
 			break;
 		default:
-			return -EINVAL;
+			err = -EINVAL;
+			goto out;
 		}
 
 		if (priv->old_frequency != priv->frequency) {
@@ -191,14 +197,14 @@ static int deathadder_commit(struct deathadder_private *priv)
 			err = deathadder_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 						   0x07, &freq_value, sizeof(freq_value));
 			if (err)
-				return err;
+				goto out;
 
 			/* The frequency setting changed. The device firmware
 			 * will reboot the mouse now. This will cause a reconnect
 			 * on the USB bus. Call the guard... */
 			err = razer_usb_reconnect_guard_wait(&guard, 0);
 			if (err)
-				return err;
+				goto out;
 			/* The device needs a bit of punching in the face after reconnect. */
 			for (i = 0; i < 5; i++) {
 				int ver = deathadder_read_fw_ver(priv);
@@ -221,13 +227,13 @@ static int deathadder_commit(struct deathadder_private *priv)
 		err = deathadder_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 					   0x06, &value, sizeof(value));
 		if (err)
-			return err;
+			goto out;
 
 		/* Commit resolution setting. */
 		err = deathadder_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 					   0x09, &res_value, sizeof(res_value));
 		if (err)
-			return err;
+			goto out;
 	} else {
 		struct deathadder_125_cfg config = { 0, };
 
@@ -244,7 +250,8 @@ static int deathadder_commit(struct deathadder_private *priv)
 			config.freq = 1;
 			break;
 		default:
-			return -EINVAL;
+			err = -EINVAL;
+			goto out;
 		}
 
 		/* Translate resolution setting. */
@@ -264,7 +271,8 @@ static int deathadder_commit(struct deathadder_private *priv)
 				config.res = 1;
 				break;
 			default:
-				return -EINVAL;
+				err = -EINVAL;
+				goto out;
 			}
 		} else {
 			switch (priv->cur_dpimapping->res) {
@@ -279,7 +287,8 @@ static int deathadder_commit(struct deathadder_private *priv)
 				config.res = 1;
 				break;
 			default:
-				return -EINVAL;
+				err = -EINVAL;
+				goto out;
 			}
 		}
 
@@ -297,7 +306,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 		err = deathadder_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 					   0x10, &config, sizeof(config));
 		if (err)
-			return err;
+			goto out;
 
 		if (priv->frequency != priv->old_frequency) {
 			/* The frequency setting changed. The device firmware
@@ -305,14 +314,14 @@ static int deathadder_commit(struct deathadder_private *priv)
 			 * on the USB bus. Call the guard... */
 			err = razer_usb_reconnect_guard_wait(&guard, 0);
 			if (err)
-				return err;
+				goto out;
 			/* The device has reconnected, so write the config
 			 * another time to ensure all settings are active.
 			 */
 			err = deathadder_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 						   0x10, &config, sizeof(config));
 			if (err)
-				return err;
+				goto out;
 		}
 
 		/* The device needs a bit of punching in the face.
@@ -328,13 +337,11 @@ static int deathadder_commit(struct deathadder_private *priv)
 				"after a config change. Try to replug it.\n");
 		}
 	}
+	err = 0;
+out:
+	razer_event_spacing_leave(&priv->commit_spacing);
 
-	/* The device needs to slack off a bit after changing the config.
-	 * It will fail to apply the config if other device accesses happen
-	 * right after the config upload. */
-	razer_msleep(250);
-
-	return 0;
+	return err;
 }
 
 static int deathadder_get_fw_version(struct razer_mouse *m)
@@ -642,6 +649,9 @@ int razer_deathadder_init(struct razer_mouse *m,
 	m->drv_data = priv;
 
 	priv->in_bootloader = is_cypress_bootloader(&desc);
+
+	/* We need to wait some time between commits */
+	razer_event_spacing_init(&priv->commit_spacing, 250);
 
 	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
 	if (err)

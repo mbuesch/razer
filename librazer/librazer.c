@@ -1213,3 +1213,36 @@ struct razer_mouse_dpimapping * razer_mouse_get_dpimapping_by_res(
 
 	return mapping;
 }
+
+void razer_event_spacing_init(struct razer_event_spacing *es,
+			      unsigned int msec)
+{
+	memset(es, 0, sizeof(*es));
+	es->spacing_msec = msec;
+}
+
+void razer_event_spacing_enter(struct razer_event_spacing *es)
+{
+	struct timeval now, deadline;
+	int wait_msec;
+
+	gettimeofday(&now, NULL);
+	deadline = es->last_event;
+	razer_timeval_add_msec(&deadline, es->spacing_msec);
+
+	if (razer_timeval_after(&deadline, &now)) {
+		/* We have to sleep long enough to ensure we're
+		 * after the deadline. */
+		wait_msec = razer_timeval_msec_diff(&deadline, &now);
+		WARN_ON(wait_msec < 0);
+		razer_msleep(wait_msec + 1);
+		gettimeofday(&now, NULL);
+		razer_error_on(razer_timeval_after(&deadline, &now),
+			       "Failed to maintain event spacing\n");
+	}
+}
+
+void razer_event_spacing_leave(struct razer_event_spacing *es)
+{
+	gettimeofday(&es->last_event, NULL);
+}
