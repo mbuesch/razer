@@ -65,30 +65,30 @@ class OpGetFreq(Operation):
 		freqs = getRazer().getSupportedFreqs(idstr)
 		profiles = getRazer().getProfiles(idstr)
 		for profile in profiles:
-			sys.stdout.write("Profile %u:   " % (profile + 1))
+			sys.stdout.write("Profile %2u:   " % (profile + 1))
 			curFreq = getRazer().getCurrentFreq(idstr, profile)
 			output = []
 			for freq in freqs:
 				if freq == curFreq:
-					output.append(">>%u Hz<<" % freq)
+					output.append("*%u Hz" % freq)
 				else:
-					output.append("%u Hz" % freq)
-			print ",  ".join(output)
+					output.append(" %u Hz" % freq)
+			print ", ".join(output)
 
 class OpGetRes(Operation):
 	def run(self, idstr):
 		mappings = getRazer().getSupportedDpiMappings(idstr)
 		profiles = getRazer().getProfiles(idstr)
 		for profile in profiles:
-			sys.stdout.write("Profile %u:   " % (profile + 1))
+			sys.stdout.write("Profile %2u:   " % (profile + 1))
 			curMapping = getRazer().getDpiMapping(idstr, profile)
 			output = []
 			for mapping in mappings:
 				if mapping[0] == curMapping:
-					output.append(">>%u (%u DPI)<<" % (mapping[0] + 1, mapping[1]))
+					output.append("*%u (%u DPI)" % (mapping[0] + 1, mapping[1]))
 				else:
-					output.append("%u (%u DPI)" % (mapping[0] + 1, mapping[1]))
-			print ",  ".join(output)
+					output.append(" %u (%u DPI)" % (mapping[0] + 1, mapping[1]))
+			print ", ".join(output)
 
 class OpPrintLeds(Operation):
 	def run(self, idstr):
