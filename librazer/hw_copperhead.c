@@ -87,6 +87,8 @@ struct copperhead_private {
 
 	/* The active button mapping; per profile. */
 	struct copperhead_buttons buttons[COPPERHEAD_NR_PROFILES];
+
+	struct razer_event_spacing commit_spacing;
 };
 
 /* A list of physical buttons on the device. */
@@ -192,6 +194,8 @@ static int copperhead_commit(struct copperhead_private *priv)
 
 	BUILD_BUG_ON(sizeof(u) != 0x180);
 
+	razer_event_spacing_enter(&priv->commit_spacing);
+
 	/* Upload the profile config */
 	for (i = 0; i < COPPERHEAD_NR_PROFILES; i++) {
 		memset(&u, 0, sizeof(u));
@@ -230,7 +234,7 @@ static int copperhead_commit(struct copperhead_private *priv)
 					     priv->buttons[i].mapping,
 					     ARRAY_SIZE(priv->buttons[i].mapping), 46);
 		if (err)
-			return err;
+			goto out;
 		u.profcfg.checksum = razer_xor16_checksum(&u.profcfg,
 					sizeof(u.profcfg) - 2);
 		/* The profile config is committed in 64byte chunks */
@@ -239,7 +243,7 @@ static int copperhead_commit(struct copperhead_private *priv)
 			err = copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 						   j + 1, 0, chunk, 64);
 			if (err)
-				return err;
+				goto out;
 		}
 		/* Commit the profile */
 		value = i + 1;
@@ -252,10 +256,11 @@ static int copperhead_commit(struct copperhead_private *priv)
 					  0x01, 0, ((uint8_t *)&u.profcfg) + 6,
 					  sizeof(u.profcfg) - 6);
 		if (err)
-			return err;
+			goto out;
 		if (razer_xor16_checksum(&u.profcfg, sizeof(u.profcfg))) {
 			razer_error("hw_copperhead: Profile commit checksum mismatch\n");
-			return -EIO;
+			err = -EIO;
+			goto out;
 		}
 	}
 
@@ -264,9 +269,13 @@ static int copperhead_commit(struct copperhead_private *priv)
 	err = copperhead_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 				   0x02, 1, &value, sizeof(value));
 	if (err)
-		return err;
+		goto out;
 
-	return 0;
+	err = 0;
+out:
+	razer_event_spacing_leave(&priv->commit_spacing);
+
+	return err;
 }
 
 static int copperhead_read_config_from_hw(struct copperhead_private *priv)
@@ -604,6 +613,9 @@ int razer_copperhead_init(struct razer_mouse *m,
 		return -ENOMEM;
 	priv->m = m;
 	m->drv_data = priv;
+
+	/* We need to wait some time between commits */
+	razer_event_spacing_init(&priv->commit_spacing, 250);
 
 	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
 	err |= razer_usb_add_used_interface(m->usb_ctx, 1, 0);
