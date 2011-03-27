@@ -1150,7 +1150,7 @@ int razer_load_config(const char *path)
 	if (!path)
 		path = RAZER_DEFAULT_CONFIG;
 	if (strlen(path)) {
-		conf = config_file_parse(path);
+		conf = config_file_parse(path, 1);
 		if (!conf)
 			return -ENOENT;
 	}

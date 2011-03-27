@@ -70,7 +70,7 @@ int config_get_bool(struct config_file *f,
 		    int _default,
 		    unsigned int flags);
 
-struct config_file * config_file_parse(const char *path);
+struct config_file * config_file_parse(const char *path, bool ignore_enoent);
 void config_file_free(struct config_file *f);
 
 #endif /* CONFIG_FILE_H_ */

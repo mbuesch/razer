@@ -194,7 +194,7 @@ static void append_item(struct config_section *s, struct config_item *i)
 	list_append(s, items, i);
 }
 
-struct config_file * config_file_parse(const char *path)
+struct config_file * config_file_parse(const char *path, bool ignore_enoent)
 {
 	struct config_file *f;
 	struct config_section *s = NULL;
@@ -215,8 +215,13 @@ struct config_file * config_file_parse(const char *path)
 		goto err_free_f;
 	fd = fopen(path, "rb");
 	if (!fd) {
-		razer_error("Failed to open config file %s: %s\n",
-			path, strerror(errno));
+		if (errno == ENOENT && ignore_enoent) {
+			razer_info("No config file %s present. Ignoring.\n",
+				   path);
+		} else {
+			razer_error("Failed to open config file %s: %s\n",
+				path, strerror(errno));
+		}
 		goto err_free_path;
 	}
 
