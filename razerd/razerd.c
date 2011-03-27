@@ -676,17 +676,24 @@ static int send_u32(struct client *client, uint32_t v)
 
 static int send_string(struct client *client, const char *str)
 {
-	char buf[2048];
-	struct reply *r = (struct reply *)buf;
-	size_t len;
+	struct reply *r;
+	size_t len = strlen(str);
+	int err;
+
+	r = malloc(len + REPLY_SIZE(string));
+	if (!r) {
+		logerr("Out of memory\n");
+		return -ENOMEM;
+	}
 
 	r->hdr.id = REPLY_ID_STR;
-	len = min(sizeof(buf) - REPLY_SIZE(string) - 1,
-		  strlen(str));
 	r->string.len = cpu_to_be16(len);
-	strncpy(r->string.str, str, len);
+	memcpy(r->string.str, str, len);
+	err = send_reply(client, r, REPLY_SIZE(string) + len);
 
-	return send_reply(client, r, REPLY_SIZE(string) + len);
+	free(r);
+
+	return err;
 }
 
 static int recv_bulk(struct client *client, char *buf, unsigned int len)
