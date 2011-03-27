@@ -1188,3 +1188,20 @@ void razer_init_axes(struct razer_axis *axes,
 	do_init_axis(&axes[1], 1, name1, flags1);
 	do_init_axis(&axes[2], 2, name2, flags2);
 }
+
+struct razer_mouse_dpimapping * razer_mouse_get_dpimapping_by_res(
+		struct razer_mouse_dpimapping *mappings, size_t nr_mappings,
+		enum razer_mouse_res res)
+{
+	struct razer_mouse_dpimapping *mapping = NULL;
+	size_t i;
+
+	for (i = 0; i < nr_mappings; i++) {
+		if (mappings[i].res == res) {
+			mapping = &mappings[i];
+			break;
+		}
+	}
+
+	return mapping;
+}

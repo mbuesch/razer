@@ -192,20 +192,6 @@ static struct boomslangce_one_buttonmapping *
 	return NULL;
 }
 
-static struct razer_mouse_dpimapping * find_dpimapping(
-			struct boomslangce_private *priv,
-			enum razer_mouse_res res)
-{
-	unsigned int i;
-
-	for (i = 0; i < ARRAY_SIZE(priv->dpimappings); i++) {
-		if (priv->dpimappings[i].res == res)
-			return &priv->dpimappings[i];
-	}
-
-	return NULL;
-}
-
 static bool verify_buttons(const struct boomslangce_buttonmappings *map)
 {
 	if (!razer_buffer_is_all_zero(map->_padding0, sizeof(map->_padding0)) ||
@@ -435,15 +421,18 @@ static int boomslangce_read_config_from_hw(struct boomslangce_private *priv)
 		}
 		switch (profcfg.dpisel) {
 		case 4:
-			priv->cur_dpimapping[i] = find_dpimapping(priv,
+			priv->cur_dpimapping[i] = razer_mouse_get_dpimapping_by_res(
+					priv->dpimappings, ARRAY_SIZE(priv->dpimappings),
 					RAZER_MOUSE_RES_400DPI);
 			break;
 		case 3:
-			priv->cur_dpimapping[i] = find_dpimapping(priv,
+			priv->cur_dpimapping[i] = razer_mouse_get_dpimapping_by_res(
+					priv->dpimappings, ARRAY_SIZE(priv->dpimappings),
 					RAZER_MOUSE_RES_800DPI);
 			break;
 		case 2:
-			priv->cur_dpimapping[i] = find_dpimapping(priv,
+			priv->cur_dpimapping[i] = razer_mouse_get_dpimapping_by_res(
+					priv->dpimappings, ARRAY_SIZE(priv->dpimappings),
 					RAZER_MOUSE_RES_1800DPI);
 			break;
 		default:
