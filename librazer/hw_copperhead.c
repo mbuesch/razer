@@ -196,6 +196,7 @@ static struct razer_mouse_dpimapping * find_dpimapping(
 
 static bool verify_buttons(const struct copperhead_buttonmappings *map)
 {
+/*
 	if (!razer_buffer_is_all_zero(map->_padding0, sizeof(map->_padding0)) ||
 	    !razer_buffer_is_all_zero(map->_padding1, sizeof(map->_padding1)) ||
 	    !razer_buffer_is_all_zero(map->_padding2, sizeof(map->_padding2)) ||
@@ -203,7 +204,7 @@ static bool verify_buttons(const struct copperhead_buttonmappings *map)
 	    !razer_buffer_is_all_zero(map->_padding4, sizeof(map->_padding4)) ||
 	    !razer_buffer_is_all_zero(map->_padding5, sizeof(map->_padding5)) ||
 	    !razer_buffer_is_all_zero(map->_padding6, sizeof(map->_padding6)))
-		return 0;
+		return 0;*/
 
 	if (map->left.physical != COPPERHEAD_PHYSBUT_LEFT ||
 	    map->right.physical != COPPERHEAD_PHYSBUT_RIGHT ||
