@@ -20,6 +20,7 @@
 
 #include "hw_copperhead.h"
 #include "razer_private.h"
+#include "buttonmapping.h"
 
 #include <errno.h>
 #include <stdlib.h>
@@ -47,41 +48,6 @@ enum copperhead_phys_button {
 
 	NR_COPPERHEAD_PHYSBUT = 7,	/* Number of physical buttons */
 };
-#define copperhead_for_each_physbut(iterator) \
-	for (iterator = 0x01; iterator <= NR_COPPERHEAD_PHYSBUT; iterator++)
-
-enum copperhead_button_function {
-	/* Logical button function IDs */
-	COPPERHEAD_BUTFUNC_LEFT		= 0x01, /* Left button */
-	COPPERHEAD_BUTFUNC_RIGHT	= 0x02, /* Right button */
-	COPPERHEAD_BUTFUNC_MIDDLE	= 0x03, /* Middle button */
-	COPPERHEAD_BUTFUNC_DPIUP	= 0x0C, /* DPI down */
-	COPPERHEAD_BUTFUNC_DPIDOWN	= 0x0D, /* DPI down */
-	COPPERHEAD_BUTFUNC_WIN5		= 0x0A, /* Windows button 5 */
-	COPPERHEAD_BUTFUNC_WIN4		= 0x0B, /* Windows button 4 */
-};
-
-struct copperhead_one_buttonmapping {
-	uint8_t physical;
-	uint8_t logical;
-} _packed;
-
-struct copperhead_buttonmappings {
-	struct copperhead_one_buttonmapping left;
-	uint8_t _padding0[46];
-	struct copperhead_one_buttonmapping right;
-	uint8_t _padding1[46];
-	struct copperhead_one_buttonmapping middle;
-	uint8_t _padding2[46];
-	struct copperhead_one_buttonmapping lfront;
-	uint8_t _padding3[46];
-	struct copperhead_one_buttonmapping lrear;
-	uint8_t _padding4[46];
-	struct copperhead_one_buttonmapping rfront;
-	uint8_t _padding5[46];
-	struct copperhead_one_buttonmapping rrear;
-	uint8_t _padding6[42];
-} _packed;
 
 struct copperhead_profcfg_cmd {
 	le16_t packetlength;
@@ -92,10 +58,14 @@ struct copperhead_profcfg_cmd {
 	le16_t reply_profilenr;
 	uint8_t dpisel;
 	uint8_t freq;
-	struct copperhead_buttonmappings buttons;
+	uint8_t buttonmap[48 * NR_COPPERHEAD_PHYSBUT - 4];
 	le16_t checksum;
 } _packed;
 #define COPPERHEAD_PROFCFG_MAGIC	cpu_to_le16(0x0002)
+
+struct copperhead_buttons {
+	struct razer_buttonmapping mapping[NR_COPPERHEAD_PHYSBUT];
+};
 
 struct copperhead_private {
 	struct razer_mouse *m;
@@ -116,7 +86,7 @@ struct copperhead_private {
 	enum razer_mouse_freq cur_freq[COPPERHEAD_NR_PROFILES];
 
 	/* The active button mapping; per profile. */
-	struct copperhead_buttonmappings buttons[COPPERHEAD_NR_PROFILES];
+	struct copperhead_buttons buttons[COPPERHEAD_NR_PROFILES];
 };
 
 /* A list of physical buttons on the device. */
@@ -132,53 +102,23 @@ static struct razer_button copperhead_physical_buttons[] = {
 
 /* A list of possible button functions. */
 static struct razer_button_function copperhead_button_functions[] = {
-	{ .id = COPPERHEAD_BUTFUNC_LEFT,	.name = "Leftclick",		},
-	{ .id = COPPERHEAD_BUTFUNC_RIGHT,	.name = "Rightclick",		},
-	{ .id = COPPERHEAD_BUTFUNC_MIDDLE,	.name = "Middleclick",		},
-	{ .id = COPPERHEAD_BUTFUNC_DPIUP,	.name = "DPI switch up",	},
-	{ .id = COPPERHEAD_BUTFUNC_DPIDOWN,	.name = "DPI switch down",	},
-	{ .id = COPPERHEAD_BUTFUNC_WIN5,	.name = "Windows Button 5",	},
-	{ .id = COPPERHEAD_BUTFUNC_WIN4,	.name = "Windows Button 4",	},
+	BUTTONFUNC_LEFT,
+	BUTTONFUNC_RIGHT,
+	BUTTONFUNC_MIDDLE,
+	BUTTONFUNC_PROFDOWN,
+	BUTTONFUNC_PROFUP,
+	BUTTONFUNC_DPIUP,
+	BUTTONFUNC_DPIDOWN,
+	BUTTONFUNC_DPI1,
+	BUTTONFUNC_DPI2,
+	BUTTONFUNC_DPI3,
+	BUTTONFUNC_DPI4,
+	BUTTONFUNC_DPI5,
+	BUTTONFUNC_WIN5,
+	BUTTONFUNC_WIN4,
+	BUTTONFUNC_SCROLLUP,
+	BUTTONFUNC_SCROLLDWN,
 };
-/* TODO: There are more functions */
-
-#define DEFINE_DEF_BUTMAP(mappingptr, phys, func)			\
-	.mappingptr = { .physical = COPPERHEAD_PHYSBUT_##phys,		\
-			.logical = COPPERHEAD_BUTFUNC_##func,		\
-	}
-static const struct copperhead_buttonmappings copperhead_default_buttonmap = {
-	DEFINE_DEF_BUTMAP(left, LEFT, LEFT),
-	DEFINE_DEF_BUTMAP(right, RIGHT, RIGHT),
-	DEFINE_DEF_BUTMAP(middle, MIDDLE, MIDDLE),
-	DEFINE_DEF_BUTMAP(lfront, LFRONT, WIN5),
-	DEFINE_DEF_BUTMAP(lrear, LREAR, WIN4),
-	DEFINE_DEF_BUTMAP(rfront, RFRONT, DPIUP),
-	DEFINE_DEF_BUTMAP(rrear, RREAR, DPIDOWN),
-};
-
-
-static struct copperhead_one_buttonmapping *
-	copperhead_buttonid_to_mapping(struct copperhead_buttonmappings *mappings,
-				       enum copperhead_phys_button id)
-{
-	switch (id) {
-	case COPPERHEAD_PHYSBUT_LEFT:
-		return &mappings->left;
-	case COPPERHEAD_PHYSBUT_RIGHT:
-		return &mappings->right;
-	case COPPERHEAD_PHYSBUT_MIDDLE:
-		return &mappings->middle;
-	case COPPERHEAD_PHYSBUT_LFRONT:
-		return &mappings->lfront;
-	case COPPERHEAD_PHYSBUT_LREAR:
-		return &mappings->lrear;
-	case COPPERHEAD_PHYSBUT_RFRONT:
-		return &mappings->rfront;
-	case COPPERHEAD_PHYSBUT_RREAR:
-		return &mappings->rrear;
-	}
-	return NULL;
-}
 
 static struct razer_mouse_dpimapping * find_dpimapping(
 			struct copperhead_private *priv,
@@ -192,30 +132,6 @@ static struct razer_mouse_dpimapping * find_dpimapping(
 	}
 
 	return NULL;
-}
-
-static bool verify_buttons(const struct copperhead_buttonmappings *map)
-{
-/*
-	if (!razer_buffer_is_all_zero(map->_padding0, sizeof(map->_padding0)) ||
-	    !razer_buffer_is_all_zero(map->_padding1, sizeof(map->_padding1)) ||
-	    !razer_buffer_is_all_zero(map->_padding2, sizeof(map->_padding2)) ||
-	    !razer_buffer_is_all_zero(map->_padding3, sizeof(map->_padding3)) ||
-	    !razer_buffer_is_all_zero(map->_padding4, sizeof(map->_padding4)) ||
-	    !razer_buffer_is_all_zero(map->_padding5, sizeof(map->_padding5)) ||
-	    !razer_buffer_is_all_zero(map->_padding6, sizeof(map->_padding6)))
-		return 0;*/
-
-	if (map->left.physical != COPPERHEAD_PHYSBUT_LEFT ||
-	    map->right.physical != COPPERHEAD_PHYSBUT_RIGHT ||
-	    map->middle.physical != COPPERHEAD_PHYSBUT_MIDDLE ||
-	    map->lfront.physical != COPPERHEAD_PHYSBUT_LFRONT ||
-	    map->lrear.physical != COPPERHEAD_PHYSBUT_LREAR ||
-	    map->rfront.physical != COPPERHEAD_PHYSBUT_RFRONT ||
-	    map->rrear.physical != COPPERHEAD_PHYSBUT_RREAR)
-		return 0;
-
-	return 1;
 }
 
 static int copperhead_usb_write(struct copperhead_private *priv,
@@ -329,7 +245,11 @@ static int copperhead_commit(struct copperhead_private *priv)
 			u.profcfg.freq = 1;
 			break;
 		}
-		u.profcfg.buttons = priv->buttons[i];
+		err = razer_create_buttonmap(u.profcfg.buttonmap, sizeof(u.profcfg.buttonmap),
+					     priv->buttons[i].mapping,
+					     ARRAY_SIZE(priv->buttons[i].mapping), 46);
+		if (err)
+			return err;
 		u.profcfg.checksum = razer_xor16_checksum(&u.profcfg,
 					sizeof(u.profcfg) - 2);
 		/* The profile config is committed in 64byte chunks */
@@ -374,13 +294,6 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 	unsigned int i;
 	unsigned char value;
 	int err;
-
-	/* Assign sane defaults. */
-	for (i = 0; i < COPPERHEAD_NR_PROFILES; i++) {
-		priv->buttons[i] = copperhead_default_buttonmap;
-		priv->cur_freq[i] = RAZER_MOUSE_FREQ_1000HZ;
-		priv->cur_dpimapping[i] = &priv->dpimappings[0];
-	}
 
 	/* Read the current profile number. */
 	err = copperhead_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
@@ -457,11 +370,11 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 			razer_error("hw_copperhead: Got invalid frequency selection\n");
 			return -EIO;
 		}
-		if (!verify_buttons(&profcfg.buttons)) {
-			razer_error("hw_copperhead: Got invalid buttons map\n");
-			return -EIO;
-		}
-		priv->buttons[i] = profcfg.buttons;
+		err = razer_parse_buttonmap(profcfg.buttonmap, sizeof(profcfg.buttonmap),
+					    priv->buttons[i].mapping,
+					    ARRAY_SIZE(priv->buttons[i].mapping), 46);
+		if (err)
+			return err;
 	}
 
 	return 0;
@@ -647,23 +560,16 @@ static struct razer_button_function * copperhead_get_button_function(struct raze
 								     struct razer_button *b)
 {
 	struct copperhead_private *priv = p->mouse->drv_data;
-	struct copperhead_buttonmappings *m;
-	struct copperhead_one_buttonmapping *one;
-	unsigned int i;
+	struct copperhead_buttons *buttons;
 
 	if (p->nr > ARRAY_SIZE(priv->buttons))
 		return NULL;
-	m = &priv->buttons[p->nr];
+	buttons = &priv->buttons[p->nr];
 
-	one = copperhead_buttonid_to_mapping(m, b->id);
-	if (!one)
-		return NULL;
-	for (i = 0; i < ARRAY_SIZE(copperhead_button_functions); i++) {
-		if (copperhead_button_functions[i].id == one->logical)
-			return &copperhead_button_functions[i];
-	}
-
-	return NULL;
+	return razer_get_buttonfunction_by_button(
+			buttons->mapping, ARRAY_SIZE(buttons->mapping),
+			copperhead_button_functions, ARRAY_SIZE(copperhead_button_functions),
+			b);
 }
 
 static int copperhead_set_button_function(struct razer_mouse_profile *p,
@@ -671,8 +577,8 @@ static int copperhead_set_button_function(struct razer_mouse_profile *p,
 					  struct razer_button_function *f)
 {
 	struct copperhead_private *priv = p->mouse->drv_data;
-	struct copperhead_buttonmappings *m;
-	struct copperhead_one_buttonmapping *one;
+	struct copperhead_buttons *buttons;
+	struct razer_buttonmapping *mapping;
 	uint8_t oldlogical;
 	int err;
 
@@ -680,16 +586,19 @@ static int copperhead_set_button_function(struct razer_mouse_profile *p,
 		return -EBUSY;
 	if (p->nr > ARRAY_SIZE(priv->buttons))
 		return -EINVAL;
-	m = &priv->buttons[p->nr];
+	buttons = &priv->buttons[p->nr];
 
-	one = copperhead_buttonid_to_mapping(m, b->id);
-	if (!one)
+	mapping = razer_get_buttonmapping_by_physid(
+			buttons->mapping, ARRAY_SIZE(buttons->mapping),
+			b->id);
+	if (!mapping)
 		return -ENODEV;
-	oldlogical = one->logical;
-	one->logical = f->id;
+
+	oldlogical = mapping->logical;
+	mapping->logical = f->id;
 	err = copperhead_commit(priv);
 	if (err) {
-		one->logical = oldlogical;
+		mapping->logical = oldlogical;
 		return err;
 	}
 

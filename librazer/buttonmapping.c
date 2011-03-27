@@ -1,7 +1,7 @@
 /*
  *   Physical->logical button mapping
  *
- *   Copyright (C) 2010 Michael Buesch <mb@bu3sch.de>
+ *   Copyright (C) 2010-2011 Michael Buesch <mb@bu3sch.de>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -28,15 +28,19 @@ int razer_create_buttonmap(void *buffer, size_t bufsize,
 	struct razer_buttonmapping *mapping;
 	size_t i, bufptr = 0;
 
+	memset(buffer, 0, bufsize);
+
 	for (i = 0; i < nr_mappings; i++) {
 		mapping = &mappings[i];
 
-		if (bufptr + sizeof(*mapping) >= bufsize) {
+		if (bufptr + 2 >= bufsize) {
 			razer_error("razer_create_buttonmap: Buffer overflow\n");
 			return -ENOSPC;
 		}
-		memcpy(buf + bufptr, mapping, sizeof(*mapping));
-		bufptr += sizeof(*mapping);
+		buf[bufptr + 0] = mapping->physical;
+		buf[bufptr + 1] = mapping->logical;
+
+		bufptr += 2;
 		bufptr += struct_spacing;
 	}
 
@@ -48,49 +52,93 @@ int razer_parse_buttonmap(void *rawdata, size_t rawsize,
 			  unsigned int struct_spacing)
 {
 	uint8_t *raw = rawdata;
-	size_t i, rawptr = 0, count;
-	struct razer_buttonmapping *mapping, *target;
+	size_t rawptr = 0, count;
+	struct razer_buttonmapping mapping, *target;
 
-	for (i = 0; i < nr_mappings; i++)
-		mappings[i].logical = 0;
+	memset(mappings, 0, nr_mappings * sizeof(*mappings));
 
+	target = mappings;
 	for (count = 0; count < nr_mappings; count++) {
-		if (rawptr + sizeof(*mapping) >= rawsize) {
+		if (rawptr + 2 >= rawsize) {
 			razer_error("razer_parse_buttonmap: Raw data does not "
 				"contain all mappings\n");
 			return -EINVAL;
 		}
-		mapping = (struct razer_buttonmapping *)&raw[rawptr];
-		target = NULL;
-		for (i = 0; i < nr_mappings; i++) {
-			if (mappings[i].physical == mapping->physical) {
-				target = &mappings[i];
-				break;
-			}
-		}
-		if (!target) {
-			razer_error("razer_parse_buttonmap: Got physical mapping 0x%02X, "
-				"but that is not in the map\n", mapping->physical);
+		mapping.physical = raw[rawptr + 0];
+		mapping.logical = raw[rawptr + 1];
+		if (mapping.physical == 0) {
+			razer_error("razer_parse_buttonmap: Physical mapping for %u "
+				"is invalid\n", (unsigned int)count);
 			return -EINVAL;
 		}
-		target->logical = mapping->logical; /* Assign the mapping */
-		rawptr += sizeof(*mapping);
+		if (mapping.logical == 0) {
+			razer_error("razer_parse_buttonmap: Logical mapping for 0x%02X "
+				"is invalid\n", mapping.physical);
+			return -EINVAL;
+		}
+
+		target->physical = mapping.physical;
+		target->logical = mapping.logical;
+
+		rawptr += 2;
 		if (!razer_buffer_is_all_zero(&raw[rawptr],
 					      min(struct_spacing, rawsize - rawptr))) {
 			razer_debug("razer_parse_buttonmap: Buttonmap spacing contains "
 				"nonzero data\n");
 		}
 		rawptr += struct_spacing;
-	}
-
-	for (i = 0; i < nr_mappings; i++) {
-		mapping = &mappings[i];
-		if (mapping->logical == 0) {
-			razer_error("razer_parse_buttonmap: Logical mapping for 0x%02X "
-				"was not found or is invalid\n", mapping->physical);
-			return -EINVAL;
-		}
+		target++;
 	}
 
 	return 0;
+}
+
+struct razer_button_function * razer_get_buttonfunction_by_id(
+		struct razer_button_function *functions, size_t nr_functions,
+		uint8_t logical_id)
+{
+	struct razer_button_function *func = NULL;
+	size_t i;
+
+	for (i = 0; i < nr_functions; i++) {
+		if (functions[i].id == logical_id) {
+			func = &functions[i];
+			break;
+		}
+	}
+
+	return func;
+}
+
+struct razer_button_function * razer_get_buttonfunction_by_button(
+		struct razer_buttonmapping *mappings, size_t nr_mappings,
+		struct razer_button_function *functions, size_t nr_functions,
+		const struct razer_button *button)
+{
+	struct razer_buttonmapping *mapping;
+
+	mapping = razer_get_buttonmapping_by_physid(mappings, nr_mappings,
+						    button->id);
+	if (!mapping)
+		return NULL;
+
+	return razer_get_buttonfunction_by_id(functions, nr_functions,
+					      mapping->logical);
+}
+
+struct razer_buttonmapping * razer_get_buttonmapping_by_physid(
+		struct razer_buttonmapping *mappings, size_t nr_mappings,
+		uint8_t physical_id)
+{
+	struct razer_buttonmapping *mapping = NULL;
+	size_t i;
+
+	for (i = 0; i < nr_mappings; i++) {
+		if (mappings[i].physical == physical_id) {
+			mapping = &mappings[i];
+			break;
+		}
+	}
+
+	return mapping;
 }

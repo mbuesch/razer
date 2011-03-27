@@ -154,20 +154,6 @@ static struct razer_button_function lachesis_button_functions[] = {
 	BUTTONFUNC_SCROLLDWN,
 };
 
-static const struct razer_buttonmapping lachesis_phys_buttons[] = {
-	{ .physical = LACHESIS_PHYSBUT_LEFT, },
-	{ .physical = LACHESIS_PHYSBUT_RIGHT, },
-	{ .physical = LACHESIS_PHYSBUT_MIDDLE, },
-	{ .physical = LACHESIS_PHYSBUT_LFRONT, },
-	{ .physical = LACHESIS_PHYSBUT_LREAR, },
-	{ .physical = LACHESIS_PHYSBUT_RFRONT, },
-	{ .physical = LACHESIS_PHYSBUT_RREAR, },
-	{ .physical = LACHESIS_PHYSBUT_TFRONT, },
-	{ .physical = LACHESIS_PHYSBUT_TREAR, },
-	{ .physical = LACHESIS_PHYSBUT_SCROLLUP, },
-	{ .physical = LACHESIS_PHYSBUT_SCROLLDWN, },
-};
-
 /*XXX: read commands:
  *
  *	CLEAR_FEATURE
@@ -695,23 +681,16 @@ static struct razer_button_function * lachesis_get_button_function(struct razer_
 								   struct razer_button *b)
 {
 	struct lachesis_private *priv = p->mouse->drv_data;
-	struct lachesis_buttons *bm;
-	unsigned int i, j;
+	struct lachesis_buttons *buttons;
 
 	if (p->nr > ARRAY_SIZE(priv->buttons))
 		return NULL;
-	bm = &priv->buttons[p->nr];
+	buttons = &priv->buttons[p->nr];
 
-	for (i = 0; i < ARRAY_SIZE(bm->mapping); i++) {
-		if (bm->mapping[i].physical == b->id) {
-			for (j = 0; j < ARRAY_SIZE(lachesis_button_functions); j++) {
-				if (lachesis_button_functions[j].id == bm->mapping[i].logical)
-					return &lachesis_button_functions[j];
-			}
-		}
-	}
-
-	return NULL;
+	return razer_get_buttonfunction_by_button(
+			buttons->mapping, ARRAY_SIZE(buttons->mapping),
+			lachesis_button_functions, ARRAY_SIZE(lachesis_button_functions),
+			b);
 }
 
 static int lachesis_set_button_function(struct razer_mouse_profile *p,
@@ -719,8 +698,8 @@ static int lachesis_set_button_function(struct razer_mouse_profile *p,
 					struct razer_button_function *f)
 {
 	struct lachesis_private *priv = p->mouse->drv_data;
-	struct lachesis_buttons *bm;
-	unsigned int i;
+	struct lachesis_buttons *buttons;
+	struct razer_buttonmapping *mapping;
 	uint8_t oldlogical;
 	int err;
 
@@ -728,22 +707,23 @@ static int lachesis_set_button_function(struct razer_mouse_profile *p,
 		return -EBUSY;
 	if (p->nr > ARRAY_SIZE(priv->buttons))
 		return -EINVAL;
-	bm = &priv->buttons[p->nr];
+	buttons = &priv->buttons[p->nr];
 
-	for (i = 0; i < ARRAY_SIZE(bm->mapping); i++) {
-		if (bm->mapping[i].physical == b->id) {
-			oldlogical = bm->mapping[i].logical;
-			bm->mapping[i].logical = f->id;
-			err = lachesis_commit(priv);
-			if (err) {
-				bm->mapping[i].logical = oldlogical;
-				return err;
-			}
-			return 0;
-		}
+	mapping = razer_get_buttonmapping_by_physid(
+			buttons->mapping, ARRAY_SIZE(buttons->mapping),
+			b->id);
+	if (!mapping)
+		return -ENODEV;
+
+	oldlogical = mapping->logical;
+	mapping->logical = f->id;
+	err = lachesis_commit(priv);
+	if (err) {
+		mapping->logical = oldlogical;
+		return err;
 	}
 
-	return -ENODEV;
+	return 0;
 }
 
 int razer_lachesis_init(struct razer_mouse *m,
@@ -788,12 +768,6 @@ int razer_lachesis_init(struct razer_mouse *m,
 		priv->dpimappings[i].res = RAZER_MOUSE_RES_UNKNOWN;
 		priv->dpimappings[i].change = lachesis_dpimapping_modify;
 		priv->dpimappings[i].mouse = m;
-	}
-
-	BUILD_BUG_ON(sizeof(lachesis_phys_buttons) != sizeof(priv->buttons[i].mapping));
-	for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
-		memcpy(priv->buttons[i].mapping, lachesis_phys_buttons,
-		       sizeof(lachesis_phys_buttons));
 	}
 
 	err = m->claim(m);

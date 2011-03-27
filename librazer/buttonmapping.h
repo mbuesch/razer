@@ -57,7 +57,7 @@ enum razer_button_function_id {
 struct razer_buttonmapping {
 	uint8_t physical;
 	uint8_t logical;
-} _packed;
+};
 
 /** razer_create_buttonmap - Create an on-wire button map. */
 int razer_create_buttonmap(void *buffer, size_t bufsize,
@@ -68,5 +68,21 @@ int razer_create_buttonmap(void *buffer, size_t bufsize,
 int razer_parse_buttonmap(void *rawdata, size_t rawsize,
 			  struct razer_buttonmapping *mappings, size_t nr_mappings,
 			  unsigned int struct_spacing);
+
+/** razer_get_buttonfunction_by_id - find a function in a list, by ID */
+struct razer_button_function * razer_get_buttonfunction_by_id(
+		struct razer_button_function *functions, size_t nr_functions,
+		uint8_t logical_id);
+
+/** razer_get_buttonfunction_by_button - find a function in a list, by button */
+struct razer_button_function * razer_get_buttonfunction_by_button(
+		struct razer_buttonmapping *mappings, size_t nr_mappings,
+		struct razer_button_function *functions, size_t nr_functions,
+		const struct razer_button *button);
+
+/** razer_get_buttonmapping_by_physid - find a button mapping by physical ID */
+struct razer_buttonmapping * razer_get_buttonmapping_by_physid(
+		struct razer_buttonmapping *mappings, size_t nr_mappings,
+		uint8_t physical_id);
 
 #endif /* LIBRAZER_BUTTONMAPPING_H_ */
