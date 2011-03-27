@@ -421,6 +421,8 @@ static bool mouse_apply_one_config(struct config_file *f,
 		}
 		razer_free_leds(leds);
 		goto error;
+	} else if (strcasecmp(item, "disabled") == 0) {
+		goto ok;
 	} else
 		goto invalid;
 ok:
