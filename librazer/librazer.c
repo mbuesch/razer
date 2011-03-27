@@ -444,6 +444,12 @@ static void mouse_apply_initial_config(struct razer_mouse *m)
 				mouse_idstr_glob_match);
 	if (!section)
 		return;
+	if (config_get_bool(razer_config_file, section,
+			    "disabled", 0, CONF_NOCASE)) {
+		razer_debug("Initial config for \"%s\" is disabled. Not applying.\n",
+			    m->idstr);
+		return;
+	}
 	razer_debug("Applying config section \"%s\" to \"%s\"\n",
 		section, m->idstr);
 	err = m->claim(m);
