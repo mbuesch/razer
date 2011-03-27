@@ -5,7 +5,7 @@
  *   Important notice:
  *   This hardware driver is based on reverse engineering only.
  *
- *   Copyright (C) 2009-2010 Michael Buesch <mb@bu3sch.de>
+ *   Copyright (C) 2009-2011 Michael Buesch <mb@bu3sch.de>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -182,15 +182,10 @@ static int copperhead_read_fw_ver(struct copperhead_private *priv)
 {
 	char buf[2];
 	uint16_t ver;
-//	int err;
 
-//FIXME this is wrong
-//	err = copperhead_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
-//				  0x05, 0, buf, sizeof(buf));
-buf[0]=0;
-buf[1]=0;
-//	if (err)
-//		return err;
+	buf[0]=0; //TODO
+	buf[1]=0;
+
 	ver = buf[0];
 	ver <<= 8;
 	ver |= buf[1];
