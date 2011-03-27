@@ -1,6 +1,6 @@
 ******************************************
 *  Razer device configuration tool       *
-* Copyright (c) 2007-2010 Michael Buesch *
+* Copyright (c) 2007-2011 Michael Buesch *
 ******************************************
 
 This is a configuration utility for Razer devices on Linux systems.
@@ -9,7 +9,7 @@ This is a configuration utility for Razer devices on Linux systems.
 DEPENDENCIES
 ============
 
- * python 2.x
+ * python 2.5 or 2.6
    http://www.python.org/
    Debian Linux:
 	aptitude install python
@@ -25,7 +25,7 @@ DEPENDENCIES
    Debian Linux:
 	aptitude install python-qt4
 
- * cmake (for building only)
+ * cmake 2.4 or later (for building only)
    http://www.cmake.org/
    Debian Linux:
 	aptitude install cmake
@@ -70,7 +70,7 @@ To install it, invoke the following commands:
 
 UDEV notification:
 
-The  make install  step did already install the UDEV script automatically.
+The  'make install'  step did already install the UDEV script automatically.
 It installed the script to
   /etc/udev/rules.d/01-razer-udev.rules
 This should work on most distributions.
@@ -91,8 +91,11 @@ If no configuration file is available, razerd will work with default settings.
 X11-WINDOW (X.ORG) CONFIGURATION
 ================================
 
+If you don't have an xorg.conf, you don't have to do anything and it
+should work out-of-the-box.
+
 The X-server must _not_ be configured to a specific mouse device like /dev/input/mouse0,
-because on configuration events razerd has to temporarly unregister the mouse from the
+because on configuration events razerd may have to temporarly unregister the mouse from the
 system. This will confuse the X-server, if it's configured to a specific device.
 Configure it to the generic /dev/input/mice device instead. This will enable the X-server
 to pick up the mouse again after a configuration event from razerd.
@@ -144,9 +147,9 @@ The architecture layout of the razer tools looks like this:
 | hardware driver 1 |--x---| librazer |----| razerd |----| pyrazer |
  -------------------   |    ----------      --------      ---------
                        |                        |           ^ ^ ^
- -------------------   |                   -----------      | | |
-| hardware driver n |--^                  | librazerd |     | | |
- -------------------                       -----------      | | |
+ -------------------   |     ---------------------------    | | |
+| hardware driver n |--^    | (to be written) librazerd |   | | |
+ -------------------         ---------------------------    | | |
                                               ^ ^ ^         | | |
                                               | | |         | | |
                            ---------------    | | |         | | |
