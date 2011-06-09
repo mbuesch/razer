@@ -659,6 +659,7 @@ int razer_deathadder_init(struct razer_mouse *m,
 	struct libusb_device_descriptor desc;
 	unsigned int i;
 	int err, fwver;
+	const char *devname = "";
 
 	err = libusb_get_device_descriptor(usbdev, &desc);
 	if (err) {
@@ -753,7 +754,18 @@ int razer_deathadder_init(struct razer_mouse *m,
 	}
 
 	m->type = RAZER_MOUSETYPE_DEATHADDER;
-	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, "DeathAdder", 0, m->idstr);
+	switch (priv->type) {
+	case DEATHADDER_CLASSIC:
+		devname = "DeathAdder Classic";
+		break;
+	case DEATHADDER_3500:
+		devname = "DeathAdder 3500DPI";
+		break;
+	case DEATHADDER_BLACK:
+		devname = "DeathAdder Black Edition";
+		break;
+	}
+	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, devname, 0, m->idstr);
 
 	m->get_fw_version = deathadder_get_fw_version;
 	m->get_leds = deathadder_get_leds;
