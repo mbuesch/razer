@@ -325,7 +325,9 @@ static int deathadder_commit(struct deathadder_private *priv)
 		if (err)
 			goto out;
 
-		if (priv->frequency != priv->old_frequency) {
+		if ((priv->type == DEATHADDER_CLASSIC ||
+		     priv->type == DEATHADDER_3500) &&
+		    priv->frequency != priv->old_frequency) {
 			/* The frequency setting changed. The device firmware
 			 * will reboot the mouse now. This will cause a reconnect
 			 * on the USB bus. Call the guard... */
