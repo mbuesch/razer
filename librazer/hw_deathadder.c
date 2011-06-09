@@ -30,6 +30,12 @@
 #include <string.h>
 
 
+enum deathadder_type {
+	DEATHADDER_CLASSIC,	/* DeathAdder Classic */
+	DEATHADDER_3500,	/* DeathAdder 3500DPI */
+	DEATHADDER_BLACK,	/* DeathAdder Black Edition */
+};
+
 enum {
 	DEATHADDER_LED_SCROLL = 0,
 	DEATHADDER_LED_LOGO,
@@ -47,6 +53,10 @@ struct deathadder_125_cfg {
 
 struct deathadder_private {
 	struct razer_mouse *m;
+
+	/* The deathadder hardware revision type */
+	enum deathadder_type type;
+
 	bool in_bootloader;
 
 	/* Firmware version number. */
@@ -155,7 +165,8 @@ static int deathadder_commit(struct deathadder_private *priv)
 	if (err)
 		goto out;
 
-	if (priv->fw_version < DADD_FW(1,25)) {
+	if (priv->type == DEATHADDER_CLASSIC &&
+	    priv->fw_version < DADD_FW(1,25)) {
 		char value, freq_value, res_value;
 
 		/* Translate frequency setting. */
@@ -255,7 +266,23 @@ static int deathadder_commit(struct deathadder_private *priv)
 		}
 
 		/* Translate resolution setting. */
-		if (priv->fw_version >= DADD_FW(2,0)) {
+		if (priv->type == DEATHADDER_CLASSIC) {
+			switch (priv->cur_dpimapping->res) {
+			case RAZER_MOUSE_RES_450DPI:
+				config.res = 3;
+				break;
+			case RAZER_MOUSE_RES_900DPI:
+				config.res = 2;
+				break;
+			case RAZER_MOUSE_RES_1800DPI:
+			case RAZER_MOUSE_RES_UNKNOWN:
+				config.res = 1;
+				break;
+			default:
+				err = -EINVAL;
+				goto out;
+			}
+		} else {
 			switch (priv->cur_dpimapping->res) {
 			case RAZER_MOUSE_RES_450DPI:
 				config.res = 4;
@@ -274,32 +301,22 @@ static int deathadder_commit(struct deathadder_private *priv)
 				err = -EINVAL;
 				goto out;
 			}
-		} else {
-			switch (priv->cur_dpimapping->res) {
-			case RAZER_MOUSE_RES_450DPI:
-				config.res = 3;
-				break;
-			case RAZER_MOUSE_RES_900DPI:
-				config.res = 2;
-				break;
-			case RAZER_MOUSE_RES_1800DPI:
-			case RAZER_MOUSE_RES_UNKNOWN:
-				config.res = 1;
-				break;
-			default:
-				err = -EINVAL;
-				goto out;
-			}
 		}
 
 		/* The profile ID. */
 		config.profile = 1;
 
 		/* Translate the LED states. */
-		if (priv->led_states[DEATHADDER_LED_LOGO])
-			config.leds |= 0x01;
-		if (priv->led_states[DEATHADDER_LED_SCROLL])
-			config.leds |= 0x02;
+		if (priv->type == DEATHADDER_BLACK) {
+			/* There are no LEDs.
+			 * Bit 0 and 1 are always set, though. */
+			config.leds = 0x03;
+		} else {
+			if (priv->led_states[DEATHADDER_LED_LOGO])
+				config.leds |= 0x01;
+			if (priv->led_states[DEATHADDER_LED_SCROLL])
+				config.leds |= 0x02;
+		}
 
 
 		/* Commit the settings. */
@@ -365,6 +382,8 @@ static int deathadder_led_toggle(struct razer_led *led,
 	    (new_state != RAZER_LED_ON))
 		return -EINVAL;
 
+	if (priv->type == DEATHADDER_BLACK)
+		return -ENODEV;
 	if (!m->claim_count)
 		return -EBUSY;
 
@@ -385,6 +404,9 @@ static int deathadder_get_leds(struct razer_mouse *m,
 {
 	struct deathadder_private *priv = m->drv_data;
 	struct razer_led *scroll, *logo;
+
+	if (priv->type == DEATHADDER_BLACK)
+		return 0; /* No LEDs */
 
 	scroll = malloc(sizeof(struct razer_led));
 	if (!scroll)
@@ -470,7 +492,7 @@ static int deathadder_supported_resolutions(struct razer_mouse *m,
 {
 	struct deathadder_private *priv = m->drv_data;
 	enum razer_mouse_res *list;
-	const int count = (priv->fw_version >= DADD_FW(2,0)) ? 4 : 3;
+	const int count = (priv->type == DEATHADDER_CLASSIC) ? 3 : 4;
 
 	list = malloc(sizeof(*list) * count);
 	if (!list)
@@ -479,7 +501,7 @@ static int deathadder_supported_resolutions(struct razer_mouse *m,
 	list[0] = RAZER_MOUSE_RES_450DPI;
 	list[1] = RAZER_MOUSE_RES_900DPI;
 	list[2] = RAZER_MOUSE_RES_1800DPI;
-	if (priv->fw_version >= DADD_FW(2,0))
+	if (priv->type != DEATHADDER_CLASSIC)
 		list[3] = RAZER_MOUSE_RES_3500DPI;
 
 	*res_list = list;
@@ -592,9 +614,9 @@ static int deathadder_supported_dpimappings(struct razer_mouse *m,
 
 	*res_ptr = &priv->dpimapping[0];
 
-	if (priv->fw_version >= DADD_FW(2,0))
-		return ARRAY_SIZE(priv->dpimapping);
-	return ARRAY_SIZE(priv->dpimapping) - 1;
+	if (priv->type == DEATHADDER_CLASSIC)
+		return ARRAY_SIZE(priv->dpimapping) - 1;
+	return ARRAY_SIZE(priv->dpimapping);
 }
 
 static struct razer_mouse_dpimapping * deathadder_get_dpimapping(struct razer_mouse_profile *p,
@@ -681,6 +703,15 @@ int razer_deathadder_init(struct razer_mouse *m,
 	}
 	priv->fw_version = fwver;
 
+	/* Determine the hardware revision */
+	priv->type = DEATHADDER_CLASSIC;
+	if (desc.idVendor == 0x1532 && desc.idProduct == 0x0029) {
+		priv->type = DEATHADDER_BLACK;
+	} else {
+		if (fwver >= DADD_FW(2,0))
+			priv->type = DEATHADDER_3500;
+	}
+
 	priv->frequency = RAZER_MOUSE_FREQ_1000HZ;
 	priv->old_frequency = priv->frequency;
 	for (i = 0; i < DEATHADDER_NR_LEDS; i++)
@@ -708,15 +739,16 @@ int razer_deathadder_init(struct razer_mouse *m,
 	priv->dpimapping[2].change = NULL;
 	priv->dpimapping[2].mouse = m;
 
-	if (priv->fw_version >= DADD_FW(2,0)) {
+	if (priv->type == DEATHADDER_CLASSIC) {
+		priv->cur_dpimapping = &priv->dpimapping[2];
+	} else {
 		priv->dpimapping[3].nr = 3;
 		priv->dpimapping[3].res = RAZER_MOUSE_RES_3500DPI;
 		priv->dpimapping[3].change = NULL;
 		priv->dpimapping[3].mouse = m;
 
 		priv->cur_dpimapping = &priv->dpimapping[3];
-	} else
-		priv->cur_dpimapping = &priv->dpimapping[2];
+	}
 
 	m->type = RAZER_MOUSETYPE_DEATHADDER;
 	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, "DeathAdder", 0, m->idstr);

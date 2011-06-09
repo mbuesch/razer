@@ -109,8 +109,9 @@ static const struct razer_mouse_base_ops razer_boomslangce_base_ops = {
 
 /* Table of supported USB devices. */
 static const struct razer_usb_device razer_usbdev_table[] = {
-	USB_MOUSE(0x1532, 0x0007, &razer_deathadder_base_ops),
-	USB_MOUSE(0x1532, 0x0016, &razer_deathadder_base_ops),
+	USB_MOUSE(0x1532, 0x0007, &razer_deathadder_base_ops), /* classic */
+	USB_MOUSE(0x1532, 0x0016, &razer_deathadder_base_ops), /* 3500 DPI */
+	USB_MOUSE(0x1532, 0x0029, &razer_deathadder_base_ops), /* black edition */
 //	USB_MOUSE(0x04B4, 0xE006, &razer_deathadder_base_ops), /* cypress bootloader */
 	USB_MOUSE(0x1532, 0x0003, &razer_krait_base_ops),
 	USB_MOUSE(0x1532, 0x000C, &razer_lachesis_base_ops),
@@ -401,10 +402,12 @@ static bool mouse_apply_one_config(struct config_file *f,
 		if (err)
 			goto error;
 		if (!m->get_leds)
-			goto invalid;
+			goto ok; /* No LEDs. Ignore config. */
 		err = m->get_leds(m, &leds);
 		if (err < 0)
 			goto error;
+		if (err == 0)
+			goto ok; /* No LEDs. Ignore config. */
 		for (led = leds; led; led = led->next) {
 			if (strcasecmp(led->name, ledname) != 0)
 				continue;
