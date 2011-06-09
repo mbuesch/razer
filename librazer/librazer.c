@@ -243,6 +243,42 @@ static int parse_idstr(char *idstr, char **devtype, char **devname,
 	return 0;
 }
 
+static bool simple_globcmp(const char *string,
+			   const char *template)
+{
+	char s, t, tnext;
+
+	while (1) {
+		s = string[0];
+		t = template[0];
+
+		if (s == '\0' && t == '\0')
+			break;
+
+		if (t == '*') {
+			tnext = template[1];
+			if (s == '\0') {
+				if (tnext == '\0')
+					break;
+				return 0;
+			}
+			if (s == tnext) {
+				template++;
+				continue;
+			}
+		} else {
+			if (s == '\0' || t == '\0')
+				return 0;
+			if (s != t)
+				return 0;
+			template++;
+		}
+		string++;
+	}
+
+	return 1; /* Match */
+}
+
 static bool mouse_idstr_glob_match(struct config_file *f,
 				   void *context, void *data,
 				   const char *section)
@@ -271,17 +307,13 @@ static bool mouse_idstr_glob_match(struct config_file *f,
 		return 1;
 	}
 
-	if (strcmp(globstr_devtype, "*") != 0 &&
-	    strcmp(globstr_devtype, idstr_devtype) != 0)
+	if (!simple_globcmp(idstr_devtype, globstr_devtype))
 		return 1;
-	if (strcmp(globstr_devname, "*") != 0 &&
-	    strcmp(globstr_devname, idstr_devname) != 0)
+	if (!simple_globcmp(idstr_devname, globstr_devname))
 		return 1;
-	if (strcmp(globstr_buspos, "*") != 0 &&
-	    strcmp(globstr_buspos, idstr_buspos) != 0)
+	if (!simple_globcmp(idstr_buspos, globstr_buspos))
 		return 1;
-	if (strcmp(globstr_devid, "*") != 0 &&
-	    strcmp(globstr_devid, idstr_devid) != 0)
+	if (!simple_globcmp(idstr_devid, globstr_devid))
 		return 1;
 
 	*matched_section = section;
