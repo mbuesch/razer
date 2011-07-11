@@ -343,17 +343,19 @@ static int deathadder_commit(struct deathadder_private *priv)
 				goto out;
 		}
 
-		/* The device needs a bit of punching in the face.
-		 * Ensure it properly responds to read accesses. */
-		for (i = 0; i < 5; i++) {
-			int ver = deathadder_read_fw_ver(priv);
-			if ((ver > 0) && ((ver & 0xFFFF) == priv->fw_version))
-				break;
-			razer_msleep(100);
-		}
-		if (i >= 5) {
-			razer_error("razer-deathadder: The device didn't wake up "
-				"after a config change. Try to replug it.\n");
+		if (priv->type == DEATHADDER_CLASSIC) {
+			/* The device needs a bit of punching in the face.
+			 * Ensure it properly responds to read accesses. */
+			for (i = 0; i < 5; i++) {
+				int ver = deathadder_read_fw_ver(priv);
+				if ((ver > 0) && ((ver & 0xFFFF) == priv->fw_version))
+					break;
+				razer_msleep(100);
+			}
+			if (i >= 5) {
+				razer_error("razer-deathadder: The device didn't wake up "
+					"after a config change. Try to replug it.\n");
+			}
 		}
 	}
 	err = 0;
