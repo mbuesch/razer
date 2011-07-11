@@ -678,7 +678,7 @@ int razer_deathadder_init(struct razer_mouse *m,
 	priv->in_bootloader = is_cypress_bootloader(&desc);
 
 	/* We need to wait some time between commits */
-	razer_event_spacing_init(&priv->commit_spacing, 250);
+	razer_event_spacing_init(&priv->commit_spacing, 1000);
 
 	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
 	if (err)
