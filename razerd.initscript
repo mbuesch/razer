@@ -9,26 +9,29 @@
 # Description:       Razer device state daemon
 ### END INIT INFO
 
-# Path to the PID-file
-PIDFILE="/var/run/razerd/razerd.pid"
-
 export PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+NAME=razerd
+DAEMON="$(which $NAME)"
+PIDFILE="/run/razerd/razerd.pid"
+DESC="Razer device state daemon"
+
+. /lib/lsb/init-functions
 
 case "$1" in
 	start)
-		if razerd -f -B -P "$PIDFILE"; then
-			echo "Service razerd started."
-		else
-			echo "Failed to start razerd."
-		fi
+		log_begin_msg "Starting $DESC: $NAME"
+		start-stop-daemon --start --quiet --pidfile $PIDFILE \
+			--oknodo --exec "$DAEMON" -- \
+			-f -B -P $PIDFILE
+		log_end_msg $?
 		;;
 	stop)
-		if [ -r "$PIDFILE" ]; then
-			kill `cat $PIDFILE`
-			echo "Service razerd stopped."
-		else
-			echo "Service razerd is not running."
-		fi
+		log_begin_msg "Stopping $DESC: $NAME"
+		start-stop-daemon --stop --quiet --pidfile $PIDFILE \
+			--name "$NAME"
+		RES=$?
+		rm -f $PIDFILE
+		log_end_msg $RES
 		;;
 	restart|reload|force-reload)
 		$0 stop
