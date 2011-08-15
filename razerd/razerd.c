@@ -505,7 +505,6 @@ static void cleanup_environment(void)
 {
 	cleanup_var_run();
 	razer_exit();
-	remove_pidfile();
 }
 
 static void signal_handler(int signum)
