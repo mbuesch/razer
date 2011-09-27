@@ -410,6 +410,15 @@ static int lachesis_get_fw_version(struct razer_mouse *m)
 	return priv->fw_version;
 }
 
+static int lachesis_reconfigure(struct razer_mouse *m)
+{
+	struct lachesis_private *priv = m->drv_data;
+
+	if (!m->claim_count)
+		return -EBUSY;
+	return lachesis_commit(priv);
+}
+
 static int lachesis_led_toggle(struct razer_led *led,
 			       enum razer_led_state new_state)
 {
@@ -795,6 +804,7 @@ int razer_lachesis_init(struct razer_mouse *m,
 	m->type = RAZER_MOUSETYPE_LACHESIS;
 
 	m->get_fw_version = lachesis_get_fw_version;
+	m->reconfigure = lachesis_reconfigure;
 	m->get_leds = lachesis_get_leds;
 	m->nr_profiles = ARRAY_SIZE(priv->profiles);
 	m->get_profiles = lachesis_get_profiles;

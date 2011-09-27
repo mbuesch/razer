@@ -75,6 +75,38 @@ static int krait_usb_read(struct krait_private *priv,
 }
 #endif
 
+static int krait_commit(struct krait_private *priv)
+{
+	uint8_t value;
+	int err;
+
+	switch (priv->cur_dpimapping->res) {
+	case RAZER_MOUSE_RES_400DPI:
+		value = 6;
+		break;
+	case RAZER_MOUSE_RES_1600DPI:
+		value = 4;
+		break;
+	default:
+		return -EINVAL;
+	}
+	err = krait_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
+			      0x02, &value, sizeof(value));
+	if (err)
+		return err;
+
+	return 0;
+}
+
+static int krait_reconfigure(struct razer_mouse *m)
+{
+	struct krait_private *priv = m->drv_data;
+
+	if (!m->claim_count)
+		return -EBUSY;
+	return krait_commit(priv);
+}
+
 static int krait_supported_resolutions(struct razer_mouse *m,
 				       enum razer_mouse_res **res_list)
 {
@@ -123,28 +155,21 @@ static int krait_set_dpimapping(struct razer_mouse_profile *p,
 				struct razer_mouse_dpimapping *d)
 {
 	struct krait_private *priv = p->mouse->drv_data;
+	struct razer_mouse_dpimapping *old_d;
 	int err;
-	char value;
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
 
-	switch (d->res) {
-	case RAZER_MOUSE_RES_400DPI:
-		value = 6;
-		break;
-	case RAZER_MOUSE_RES_1600DPI:
-		value = 4;
-		break;
-	default:
-		return -EINVAL;
+	old_d = priv->cur_dpimapping;
+	priv->cur_dpimapping = d;
+	err = krait_commit(priv);
+	if (err) {
+		priv->cur_dpimapping = old_d;
+		return err;
 	}
-	err = krait_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
-			      0x02, &value, sizeof(value));
-	if (!err)
-		priv->cur_dpimapping = d;
 
-	return err;
+	return 0;
 }
 
 int razer_krait_init(struct razer_mouse *m,
@@ -185,6 +210,7 @@ int razer_krait_init(struct razer_mouse *m,
 	m->type = RAZER_MOUSETYPE_KRAIT;
 	razer_generic_usb_gen_idstr(usbdev, NULL, "Krait", 1, m->idstr);
 
+	m->reconfigure = krait_reconfigure;
 	m->get_profiles = krait_get_profiles;
 	m->supported_resolutions = krait_supported_resolutions;
 	m->supported_dpimappings = krait_supported_dpimappings;

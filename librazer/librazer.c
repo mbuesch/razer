@@ -681,6 +681,26 @@ struct razer_mouse * razer_rescan_mice(void)
 	return mice_list;
 }
 
+int razer_reconfig_mice(void)
+{
+	struct razer_mouse *m, *next;
+	int err;
+
+	razer_for_each_mouse(m, next, mice_list) {
+		if (m->reconfigure) {
+			err = m->claim(m);
+			if (err)
+				return err;
+			err = m->reconfigure(m);
+			m->release(m);
+			if (err)
+				return err;
+		}
+	}
+
+	return 0;
+}
+
 void razer_free_freq_list(enum razer_mouse_freq *freq_list, int count)
 {
 	if (freq_list)

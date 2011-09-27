@@ -1,0 +1,20 @@
+#!/bin/sh
+
+razer_suspend()
+{
+	true # Do nothing
+}
+
+razer_resume()
+{
+	$$INSTDIR$$/bin/razercfg -B -K
+}
+
+case $1 in
+	hibernate|suspend)
+		razer_suspend
+		;;
+	resume|thaw)
+		razer_resume
+		;;
+esac

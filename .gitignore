@@ -3,7 +3,8 @@ CMakeCache.txt
 CMakeFiles
 cmake_install.cmake
 install_manifest.txt
-01-razer-udev.rules
+udev.rules
+pm-hook.sh
 
 *.swp
 *.o

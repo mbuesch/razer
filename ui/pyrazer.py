@@ -128,6 +128,7 @@ class Razer:
 	COMMAND_ID_GETBUTFUNC = 19	# Get the current function of a button.
 	COMMAND_ID_SETBUTFUNC = 20	# Set the current function of a button.
 	COMMAND_ID_SUPPAXES = 21	# Get a list of supported axes.
+	COMMAND_ID_RECONFIGMICE = 22	# Reconfigure all mice
 
 	COMMAND_PRIV_FLASHFW = 128	# Upload and flash a firmware image
 	COMMAND_PRIV_CLAIM = 129	# Claim the device.
@@ -301,6 +302,10 @@ class Razer:
 		"Send the command to rescan for mice to the daemon."
 		self.__sendCommand(self.COMMAND_ID_RESCANMICE)
 
+	def rescanDevices(self):
+		"Rescan for new devices."
+		self.rescanMice()
+
 	def getMice(self):
 		"Returns a list of ID-strings for the detected mice."
 		self.__sendCommand(self.COMMAND_ID_GETMICE)
@@ -309,6 +314,14 @@ class Razer:
 		for i in range(0, count):
 			mice.append(self.__recvString())
 		return mice
+
+	def reconfigureMice(self):
+		"Reconfigure all mice."
+		self.__sendCommand(self.COMMAND_ID_RECONFIGMICE)
+
+	def reconfigureDevices(self):
+		"Reconfigure all devices."
+		self.reconfigureMice()
 
 	def getFwVer(self, idstr):
 		"Returns the firmware version. The returned value is a tuple (major, minor)."

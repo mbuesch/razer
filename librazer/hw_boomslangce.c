@@ -487,6 +487,15 @@ static int boomslangce_get_fw_version(struct razer_mouse *m)
 	return priv->fw_version;
 }
 
+static int boomslangce_reconfigure(struct razer_mouse *m)
+{
+	struct boomslangce_private *priv = m->drv_data;
+
+	if (!m->claim_count)
+		return -EBUSY;
+	return boomslangce_commit(priv);
+}
+
 static struct razer_mouse_profile * boomslangce_get_profiles(struct razer_mouse *m)
 {
 	struct boomslangce_private *priv = m->drv_data;
@@ -844,6 +853,7 @@ int razer_boomslangce_init(struct razer_mouse *m,
 	razer_generic_usb_gen_idstr(usbdev, NULL, "Boomslang-CE", 1, m->idstr);
 
 	m->get_fw_version = boomslangce_get_fw_version;
+	m->reconfigure = boomslangce_reconfigure;
 	m->get_leds = boomslangce_get_leds;
 	m->nr_profiles = BOOMSLANGCE_NR_PROFILES;
 	m->get_profiles = boomslangce_get_profiles;

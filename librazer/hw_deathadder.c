@@ -372,6 +372,15 @@ static int deathadder_get_fw_version(struct razer_mouse *m)
 	return priv->fw_version;
 }
 
+static int deathadder_reconfigure(struct razer_mouse *m)
+{
+	struct deathadder_private *priv = m->drv_data;
+
+	if (!m->claim_count)
+		return -EBUSY;
+	return deathadder_commit(priv);
+}
+
 static int deathadder_led_toggle(struct razer_led *led,
 				 enum razer_led_state new_state)
 {
@@ -770,6 +779,7 @@ int razer_deathadder_init(struct razer_mouse *m,
 	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, devname, 0, m->idstr);
 
 	m->get_fw_version = deathadder_get_fw_version;
+	m->reconfigure = deathadder_reconfigure;
 	m->get_leds = deathadder_get_leds;
 	m->flash_firmware = deathadder_flash_firmware;
 	m->get_profiles = deathadder_get_profiles;

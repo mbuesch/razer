@@ -24,15 +24,40 @@ install(TARGETS razer DESTINATION lib)
 
 
 add_custom_target(razer_udev_rules
-		   COMMAND ${CMAKE_SOURCE_DIR}/scripts/gen_udev_rules.sh
-		   ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${CMAKE_INSTALL_PREFIX}
-		   DEPENDS ${CMAKE_SOURCE_DIR}/01-razer-udev.rules.template
-		   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-		   COMMENT "Generate udev rules")
+		  COMMAND ${CMAKE_SOURCE_DIR}/scripts/paths_replace.sh
+			  ${CMAKE_SOURCE_DIR}/udev.rules.template
+			  ${CMAKE_BINARY_DIR}/udev.rules
+			  ${CMAKE_INSTALL_PREFIX}
+		  DEPENDS ${CMAKE_SOURCE_DIR}/udev.rules.template
+		  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+		  COMMENT "Generate udev rules")
 add_dependencies(razer razer_udev_rules)
 
-install(FILES ${CMAKE_BINARY_DIR}/01-razer-udev.rules
-	DESTINATION /etc/udev/rules.d/)
+install(FILES ${CMAKE_BINARY_DIR}/udev.rules
+	DESTINATION /etc/udev/rules.d/
+	RENAME 01-razer-udev.rules
+	PERMISSIONS OWNER_READ OWNER_WRITE
+		    GROUP_READ
+		    WORLD_READ)
+
+
+add_custom_target(razer_pm_hook
+		  COMMAND ${CMAKE_SOURCE_DIR}/scripts/paths_replace.sh
+			  ${CMAKE_SOURCE_DIR}/pm-hook.sh.template
+			  ${CMAKE_BINARY_DIR}/pm-hook.sh
+			  ${CMAKE_INSTALL_PREFIX}
+		  DEPENDS ${CMAKE_SOURCE_DIR}/pm-hook.sh.template
+		  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+		  COMMENT "Generate PM hook")
+add_dependencies(razer razer_pm_hook)
+
+install(FILES ${CMAKE_BINARY_DIR}/pm-hook.sh
+	DESTINATION /etc/pm/sleep.d/
+	RENAME 50-razer
+	PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+		    GROUP_READ GROUP_EXECUTE
+		    WORLD_READ WORLD_EXECUTE)
+
 
 install_exec_cmd("udevadm control --reload-rules"
 		 "Please reload udev manually or reboot the system")

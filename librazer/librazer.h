@@ -272,6 +272,9 @@ enum {
   * @get_fw_version: Read the firmware version from the device.
   *     Returns the firmware version or a negative error code.
   *
+  * @reconfigure: Reconfigure the hardware.
+  *	May be NULL.
+  *
   * @get_leds: Get a linked list of available LEDs.
   * 	Returns the number of LEDs or a negative error code.
   * 	leds_list points to the first LED in the list.
@@ -334,6 +337,8 @@ struct razer_mouse {
 
 	int (*get_fw_version)(struct razer_mouse *m);
 
+	int (*reconfigure)(struct razer_mouse *m);
+
 	int (*get_leds)(struct razer_mouse *m,
 			struct razer_led **leds_list);
 
@@ -393,6 +398,11 @@ void razer_free_leds(struct razer_led *led_list);
   * in case of an error.
   */
 struct razer_mouse * razer_rescan_mice(void);
+
+/** razer_reconfig_mice - Reconfigure all detected razer mice.
+  * Returns 0 on success or an error code.
+  */
+int razer_reconfig_mice(void);
 
 /** razer_for_each_mouse - Convenience helper for traversing a mouse list
  *

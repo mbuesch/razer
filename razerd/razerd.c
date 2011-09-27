@@ -113,6 +113,7 @@ enum {
 	COMMAND_ID_GETBUTFUNC,		/* Get the current function of a button. */
 	COMMAND_ID_SETBUTFUNC,		/* Set the current function of a button. */
 	COMMAND_ID_SUPPAXES,		/* Get a list of supported axes. */
+	COMMAND_ID_RECONFIGMICE,	/* Reconfigure all mice. */
 
 	/* Privileged commands */
 	COMMAND_PRIV_FLASHFW = 128,	/* Upload and flash a firmware image */
@@ -1086,6 +1087,11 @@ static void command_rescanmice(struct client *client, const struct command *cmd,
 	mice = razer_rescan_mice();
 }
 
+static void command_reconfigmice(struct client *client, const struct command *cmd, unsigned int len)
+{
+	razer_reconfig_mice();
+}
+
 static void command_getleds(struct client *client, const struct command *cmd, unsigned int len)
 {
 	struct razer_mouse *mouse;
@@ -1622,6 +1628,9 @@ static void handle_received_command(struct client *client, const char *_cmd, uns
 		break;
 	case COMMAND_ID_SUPPAXES:
 		command_suppaxes(client, cmd, len);
+		break;
+	case COMMAND_ID_RECONFIGMICE:
+		command_reconfigmice(client, cmd, len);
 		break;
 	default:
 		/* Unknown command. */

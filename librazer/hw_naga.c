@@ -237,6 +237,15 @@ static int naga_get_fw_version(struct razer_mouse *m)
 	return priv->fw_version;
 }
 
+static int naga_reconfigure(struct razer_mouse *m)
+{
+	struct naga_private *priv = m->drv_data;
+
+	if (!m->claim_count)
+		return -EBUSY;
+	return naga_commit(priv);
+}
+
 static int naga_led_toggle(struct razer_led *led,
 				 enum razer_led_state new_state)
 {
@@ -509,6 +518,7 @@ int razer_naga_init(struct razer_mouse *m,
 	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, "Naga", 1, m->idstr);
 
 	m->get_fw_version = naga_get_fw_version;
+	m->reconfigure = naga_reconfigure;
 	m->get_leds = naga_get_leds;
 	m->get_profiles = naga_get_profiles;
 	m->supported_axes = naga_supported_axes;

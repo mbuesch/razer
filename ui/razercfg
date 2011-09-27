@@ -198,9 +198,9 @@ def scanDevices():
 	for mouse in mice:
 		print mouse
 
-def backgroundRescan():
-	if os.fork() == 0:
-		getRazer().rescanMice()
+def reconfigureDevices():
+	getRazer().rescanDevices()
+	getRazer().reconfigureDevices()
 
 def exit(exitcode):
 	sys.exit(exitcode)
@@ -216,7 +216,9 @@ def usage():
 	print ""
 	print "-h|--help            Print this help text"
 	print "-v|--version         Print the program version number"
+	print "-B|--background      Fork into the background"
 	print "-s|--scan            Scan for devices and print the bus IDs"
+	print "-K|--reconfigure     Force-reconfigure all detected devices"
 	print ""
 	print "-d|--device DEV      Selects the device with the bus ID \"DEV\""
 	print "    Use the special value \"mouse\" for DEV to select"
@@ -254,8 +256,9 @@ def parse_args():
 
 	try:
 		(opts, args) = getopt.getopt(sys.argv[1:],
-			"hvsd:r:Rf:FLl:Vc:S:X:",
-			[ "help", "version", "scan", "bg-rescan", "device=", "res=",
+			"hvBsKd:r:Rf:FLl:Vc:S:X:",
+			[ "help", "version", "background",
+			  "scan", "reconfigure", "device=", "res=",
 			  "getres", "freq=", "getfreq", "leds", "setled=",
 			  "fwver", "config=", "sleep=", "flashfw=", ])
 	except getopt.GetoptError:
@@ -269,11 +272,14 @@ def parse_args():
 		if o in ("-v", "--version"):
 			prVersion()
 			exit(0)
+		if o in ("-B", "--background"):
+			if os.fork() != 0:
+				exit(0) # Exit parent
 		if o in ("-s", "--scan"):
 			scanDevices()
 			exit(0)
-		if o in ("--bg-rescan", ):
-			backgroundRescan()
+		if o in ("-K", "--reconfigure"):
+			reconfigureDevices()
 			exit(0)
 		if o in ("-d", "--device"):
 			if v == "mouse": # magic; select the first mouse
