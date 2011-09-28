@@ -5,7 +5,7 @@
  *   Important notice:
  *   This hardware driver is based on reverse engineering, only.
  *
- *   Copyright (C) 2007-2010 Michael Buesch <mb@bu3sch.de>
+ *   Copyright (C) 2007-2010 Michael Buesch <m@bues.ch>
  *   Copyright (C) 2010 Bernd Michael Helm <naga@rw23.de>
  *
  *   This program is free software; you can redistribute it and/or

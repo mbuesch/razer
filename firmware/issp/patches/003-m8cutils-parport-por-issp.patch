@@ -22,7 +22,7 @@ Add a driver for the Parallel Port based PowerOnReset In System Serial Programme
 +/*
 + * ppporissp.c - Parallel Port based PowerOnReset In System Serial Programmer
 + *
-+ * Copyright (c) 2009 Michael Buesch <mb@bu3sch.de>
++ * Copyright (c) 2009 Michael Buesch <m@bues.ch>
 + * Derived from wadsp.c  Copyright 2006 Werner Almesberger
 + * Derived from watpp.c  Copyright 2006 Werner Almesberger
 + */

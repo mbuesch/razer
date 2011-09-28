@@ -7,7 +7,7 @@ Sheet 1 1
 Title "Parallel port based M8C PowerOnReset-ISSP adapter"
 Date "20 jun 2009"
 Rev "1"
-Comp "(c) 2009 Michael Buesch <mb@bu3sch.de>"
+Comp "(c) 2009 Michael Buesch <m@bues.ch>"
 Comment1 ""
 Comment2 ""
 Comment3 ""
