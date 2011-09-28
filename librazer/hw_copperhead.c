@@ -678,7 +678,8 @@ int razer_copperhead_init(struct razer_mouse *m,
 	}
 
 	m->type = RAZER_MOUSETYPE_COPPERHEAD;
-	razer_generic_usb_gen_idstr(usbdev, NULL, "Copperhead", 1, m->idstr);
+	razer_generic_usb_gen_idstr(usbdev, NULL, "Copperhead", 1,
+				    NULL, m->idstr);
 
 	m->get_fw_version = copperhead_get_fw_version;
 	m->reconfigure = copperhead_reconfigure;

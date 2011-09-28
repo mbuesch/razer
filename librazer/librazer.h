@@ -93,6 +93,7 @@ enum razer_mouse_freq {
   */
 enum razer_mouse_res {
 	RAZER_MOUSE_RES_UNKNOWN		= 0,
+	RAZER_MOUSE_RES_100DPI		= 100,
 	RAZER_MOUSE_RES_125DPI		= 125,
 	RAZER_MOUSE_RES_250DPI		= 250,
 	RAZER_MOUSE_RES_400DPI		= 400,

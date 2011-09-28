@@ -850,7 +850,8 @@ int razer_boomslangce_init(struct razer_mouse *m,
 	}
 
 	m->type = RAZER_MOUSETYPE_BOOMSLANGCE;
-	razer_generic_usb_gen_idstr(usbdev, NULL, "Boomslang-CE", 1, m->idstr);
+	razer_generic_usb_gen_idstr(usbdev, NULL, "Boomslang-CE", 1,
+				    NULL, m->idstr);
 
 	m->get_fw_version = boomslangce_get_fw_version;
 	m->reconfigure = boomslangce_reconfigure;

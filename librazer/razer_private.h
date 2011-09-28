@@ -97,6 +97,7 @@ void razer_generic_usb_gen_idstr(struct libusb_device *udev,
 				 struct libusb_device_handle *h,
 				 const char *devname,
 				 bool include_devicenr,
+				 const char *serial,
 				 char *idstr_buf);
 
 void razer_init_axes(struct razer_axis *axes,

@@ -208,7 +208,8 @@ int razer_krait_init(struct razer_mouse *m,
 	priv->cur_dpimapping = &priv->dpimapping[1];
 
 	m->type = RAZER_MOUSETYPE_KRAIT;
-	razer_generic_usb_gen_idstr(usbdev, NULL, "Krait", 1, m->idstr);
+	razer_generic_usb_gen_idstr(usbdev, NULL, "Krait", 1,
+				    NULL, m->idstr);
 
 	m->reconfigure = krait_reconfigure;
 	m->get_profiles = krait_get_profiles;

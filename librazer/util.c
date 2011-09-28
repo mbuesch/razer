@@ -192,6 +192,11 @@ le16_t razer_xor16_checksum(const void *_buffer, size_t size)
 	return cpu_to_le16(sum);
 }
 
+be16_t razer_xor16_checksum_be(const void *_buffer, size_t size)
+{
+	return (be16_t)bswap_16((uint16_t)razer_xor16_checksum(_buffer, size));
+}
+
 uint8_t razer_xor8_checksum(const void *_buffer, size_t size)
 {
 	const uint8_t *buffer = _buffer;

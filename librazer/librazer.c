@@ -114,7 +114,8 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 	USB_MOUSE(0x1532, 0x0029, &razer_deathadder_base_ops), /* black edition */
 //	USB_MOUSE(0x04B4, 0xE006, &razer_deathadder_base_ops), /* cypress bootloader */
 	USB_MOUSE(0x1532, 0x0003, &razer_krait_base_ops),
-	USB_MOUSE(0x1532, 0x000C, &razer_lachesis_base_ops),
+	USB_MOUSE(0x1532, 0x000C, &razer_lachesis_base_ops), /* classic */
+//	USB_MOUSE(0x1532, 0x001E, &razer_lachesis_base_ops), /* 5600 DPI */
 	USB_MOUSE(0x1532, 0x0015, &razer_naga_base_ops),
 	USB_MOUSE(0x1532, 0x0101, &razer_copperhead_base_ops),
 	USB_MOUSE(0x1532, 0x0005, &razer_boomslangce_base_ops),
@@ -925,10 +926,11 @@ void razer_generic_usb_gen_idstr(struct libusb_device *udev,
 				 struct libusb_device_handle *h,
 				 const char *devname,
 				 bool include_devicenr,
+				 const char *serial,
 				 char *idstr_buf)
 {
 	char devid[64];
-	char serial[64];
+	char serial_buf[64];
 	char buspos[512];
 	unsigned int serial_index = 0;
 	int err;
@@ -944,24 +946,28 @@ void razer_generic_usb_gen_idstr(struct libusb_device *udev,
 			"device descriptor (%d)\n", err);
 		return;
 	}
-	serial_index = devdesc.iSerialNumber;
-	err = -EINVAL;
-	if (serial_index) {
-		err = 0;
-		if (!h)
-			err = razer_generic_usb_claim(&usbctx);
-		if (err) {
-			razer_error("Failed to claim device for serial fetching.\n");
-		} else {
-			err = libusb_get_string_descriptor_ascii(
-				usbctx.h, serial_index,
-				(unsigned char *)serial, sizeof(serial));
+
+	if (!serial || !strlen(serial)) {
+		serial_index = devdesc.iSerialNumber;
+		err = -EINVAL;
+		if (serial_index) {
+			err = 0;
 			if (!h)
-				razer_generic_usb_release(&usbctx);
+				err = razer_generic_usb_claim(&usbctx);
+			if (err) {
+				razer_error("Failed to claim device for serial fetching.\n");
+			} else {
+				err = libusb_get_string_descriptor_ascii(
+					usbctx.h, serial_index,
+					(unsigned char *)serial_buf, sizeof(serial_buf));
+				if (!h)
+					razer_generic_usb_release(&usbctx);
+			}
 		}
+		if (err <= 0)
+			strcpy(serial_buf, "0");
+		serial = serial_buf;
 	}
-	if (err <= 0)
-		strcpy(serial, "0");
 
 	snprintf(devid, sizeof(devid), "%04X-%04X-%s",
 		 devdesc.idVendor,

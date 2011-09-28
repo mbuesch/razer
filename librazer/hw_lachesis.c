@@ -5,7 +5,7 @@
  *   Important notice:
  *   This hardware driver is based on reverse engineering, only.
  *
- *   Copyright (C) 2008-2010 Michael Buesch <m@bues.ch>
+ *   Copyright (C) 2008-2011 Michael Buesch <m@bues.ch>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -29,6 +29,11 @@
 #include <string.h>
 
 
+enum lachesis_type {
+	LACHESIS_CLASSIC,	/* Lachesis Classic */
+	LACHESIS_5600,		/* Lachesis 5600DPI */
+};
+
 enum { /* LED IDs */
 	LACHESIS_LED_SCROLL = 0,
 	LACHESIS_LED_LOGO,
@@ -39,6 +44,7 @@ enum { /* Misc constants */
 	LACHESIS_NR_PROFILES	= 5,
 	LACHESIS_NR_DPIMAPPINGS	= 5,
 	LACHESIS_NR_AXES	= 3,
+	LACHESIS_SERIAL_MAX_LEN	= 32,
 };
 
 /* The wire protocol data structures... */
@@ -85,6 +91,35 @@ struct lachesis_dpimap_cmd {
 	uint8_t _padding[81];
 } _packed;
 
+struct lachesis5k6_request {
+	uint8_t magic;
+	uint8_t flags;
+	uint8_t rw;
+	uint8_t command;
+	uint8_t request;
+	uint8_t _padding[3];
+	uint8_t payload[80];
+	be16_t checksum;
+} _packed;
+
+#define LACHESIS5K6_REQ_MAGIC		0x01
+#define LACHESIS5K6_REQ_FLG_RXOK	0x02
+#define LACHESIS5K6_REQ_READ		0x01
+#define LACHESIS5K6_REQ_WRITE		0x00
+
+struct lachesis5k6_request_devinfo {
+	uint8_t serial[LACHESIS_SERIAL_MAX_LEN];
+	uint8_t fwver[2];
+} _packed;
+
+struct lachesis5k6_request_sensor {
+	uint8_t profile;
+	uint8_t freq;
+	uint8_t dpistage; //XXX
+	uint8_t dpival0;
+	uint8_t dpival1;
+} _packed;
+
 struct lachesis_buttons {
 	struct razer_buttonmapping mapping[NR_LACHESIS_PHYSBUT];
 };
@@ -93,7 +128,11 @@ struct lachesis_buttons {
 struct lachesis_private {
 	struct razer_mouse *m;
 
+	/* The lachesis hardware revision type */
+	enum lachesis_type type;
+
 	uint16_t fw_version;
+	char serial[LACHESIS_SERIAL_MAX_LEN + 1];
 
 	/* The currently set LED states. */
 	enum razer_led_state led_states[LACHESIS_NR_LEDS];
@@ -154,7 +193,9 @@ static struct razer_button_function lachesis_button_functions[] = {
 	BUTTONFUNC_SCROLLDWN,
 };
 
-/*XXX: read commands:
+/*XXX: lachesis-CLASSIC notes
+ *
+ *	read commands:
  *
  *	CLEAR_FEATURE
  *		0x10:	Read DPI map
@@ -192,6 +233,17 @@ static int lachesis_usb_write(struct lachesis_private *priv,
 	return 0;
 }
 
+static int lachesis5k6_request_send(struct lachesis_private *priv,
+				    struct lachesis5k6_request *req)
+{
+	req->magic = LACHESIS5K6_REQ_MAGIC;
+	req->checksum = razer_xor16_checksum_be(req,
+				sizeof(*req) - sizeof(req->checksum));
+
+	return lachesis_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
+				  0x300, 0, req, sizeof(*req));
+}
+
 static int lachesis_usb_read(struct lachesis_private *priv,
 			     int request, int command, int index,
 			     void *buf, size_t size)
@@ -213,24 +265,142 @@ static int lachesis_usb_read(struct lachesis_private *priv,
 	return 0;
 }
 
-static int lachesis_read_fw_ver(struct lachesis_private *priv)
+static int lachesis5k6_request_receive(struct lachesis_private *priv,
+				       struct lachesis5k6_request *req)
 {
-	char buf[2];
-	uint16_t ver;
 	int err;
+	be16_t checksum;
 
+	memset(req, 0, sizeof(*req));
 	err = lachesis_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
-				0x06, 0, buf, sizeof(buf));
+				0x300, 0, req, sizeof(*req));
 	if (err)
-		return -EIO;
-	ver = buf[0];
-	ver <<= 8;
-	ver |= buf[1];
+		return err;
+	checksum = razer_xor16_checksum_be(req, sizeof(*req) - sizeof(checksum));
+	if (checksum != req->checksum) {
+		razer_error("hw_lachesis: Received request with "
+			    "invalid checksum (expected %04X, got %04X)\n",
+			    be16_to_cpu(checksum), be16_to_cpu(req->checksum));
+//		return -EIO;
+	}
 
-	return ver;
+	return 0;
 }
 
-static int lachesis_commit(struct lachesis_private *priv)
+static int lachesis5k6_request_write(struct lachesis_private *priv,
+				     uint8_t command, uint8_t request,
+				     const void *payload, size_t payload_len)
+{
+	struct lachesis5k6_request req, nullreq;
+	int err;
+
+	memset(&req, 0, sizeof(req));
+	req.rw = LACHESIS5K6_REQ_WRITE;
+	req.command = command;
+	req.request = request;
+	if (payload) {
+		if (WARN_ON(payload_len > sizeof(req.payload)))
+			return -EINVAL;
+		memcpy(req.payload, payload, payload_len);
+	}
+	err = lachesis5k6_request_send(priv, &req);
+	if (err)
+		return err;
+	err = lachesis5k6_request_receive(priv, &req);
+	if (err)
+		return err;
+	memset(&nullreq, 0, sizeof(nullreq));
+	err = lachesis5k6_request_send(priv, &nullreq);
+	if (err)
+		return err;
+
+	//TODO checks
+
+	return 0;
+}
+
+static int lachesis5k6_request_read(struct lachesis_private *priv,
+				    uint8_t command, uint8_t request,
+				    void *payload, size_t payload_len)
+{
+	struct lachesis5k6_request req, nullreq;
+	int err;
+
+	memset(&req, 0, sizeof(req));
+	req.rw = LACHESIS5K6_REQ_READ;
+	req.command = command;
+	req.request = request;
+	err = lachesis5k6_request_send(priv, &req);
+	if (err)
+		return err;
+	err = lachesis5k6_request_receive(priv, &req);
+	if (err)
+		return err;
+	memset(&nullreq, 0, sizeof(nullreq));
+	err = lachesis5k6_request_send(priv, &nullreq);
+	if (err)
+		return err;
+
+	if (payload) {
+		if (WARN_ON(payload_len > sizeof(req.payload)))
+			return -EINVAL;
+		memcpy(payload, req.payload, payload_len);
+	}
+
+//razer_dump("RD", &req, sizeof(req)); //XXX
+
+	if (req.magic != LACHESIS5K6_REQ_MAGIC) {
+		razer_error("hw_lachesis: Invalid magic on received request\n");
+		return -EIO;
+	}
+	if (!(req.flags & LACHESIS5K6_REQ_FLG_RXOK)) {
+		razer_error("hw_lachesis: Failed to receive request. (RXOK flag)\n");
+		return -EIO;
+	}
+	if (req.rw != LACHESIS5K6_REQ_READ) {
+		razer_error("hw_lachesis: Invalid rw flag on received request\n");
+		return -EIO;
+	}
+	if (req.command != command) {
+		razer_error("hw_lachesis: Invalid command on received request\n");
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static int lachesis_read_devinfo(struct lachesis_private *priv)
+{
+	uint8_t buf[2];
+	int err;
+	struct lachesis5k6_request_devinfo devinfo;
+
+	priv->fw_version = 0;
+	memset(priv->serial, 0, sizeof(priv->serial));
+
+	switch (priv->type) {
+	case LACHESIS_CLASSIC:
+		err = lachesis_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
+					0x06, 0, buf, sizeof(buf));
+		if (err)
+			return -EIO;
+		priv->fw_version = ((uint16_t)(buf[0]) << 8) | buf[1];
+		break;
+	case LACHESIS_5600:
+		err = lachesis5k6_request_read(priv, 2, 1,
+					       &devinfo, sizeof(devinfo));
+		if (err)
+			return -EIO;
+		priv->fw_version = ((uint16_t)(devinfo.fwver[0]) << 8) |
+				   devinfo.fwver[1];
+		memcpy(priv->serial, devinfo.serial, LACHESIS_SERIAL_MAX_LEN);
+		break;
+	}
+
+	return 0;
+}
+
+static int lachesis_commit_classic(struct lachesis_private *priv)
 {
 	unsigned int i;
 	int err;
@@ -309,7 +479,25 @@ static int lachesis_commit(struct lachesis_private *priv)
 	return 0;
 }
 
-static int lachesis_read_config_from_hw(struct lachesis_private *priv)
+static int lachesis_commit_5600(struct lachesis_private *priv)
+{
+	//TODO
+	return 0;
+}
+
+static int lachesis_commit(struct lachesis_private *priv)
+{
+	switch (priv->type) {
+	case LACHESIS_CLASSIC:
+		return lachesis_commit_classic(priv);
+	case LACHESIS_5600:
+		return lachesis_commit_5600(priv);
+	}
+
+	return -ENODEV;
+}
+
+static int lachesis_read_config_classic(struct lachesis_private *priv)
 {
 	int err;
 	unsigned char value;
@@ -401,6 +589,24 @@ static int lachesis_read_config_from_hw(struct lachesis_private *priv)
 		priv->dpimappings[i].res = (dpimap.mappings[i].dpival0 + 1) * 125;
 
 	return 0;
+}
+
+static int lachesis_read_config_5600(struct lachesis_private *priv)
+{
+	//TODO
+	return 0;
+}
+
+static int lachesis_read_config_from_hw(struct lachesis_private *priv)
+{
+	switch (priv->type) {
+	case LACHESIS_CLASSIC:
+		return lachesis_read_config_classic(priv);
+	case LACHESIS_5600:
+		return lachesis_read_config_5600(priv);
+	}
+
+	return -ENODEV;
 }
 
 static int lachesis_get_fw_version(struct razer_mouse *m)
@@ -549,18 +755,29 @@ static int lachesis_set_freq(struct razer_mouse_profile *p,
 static int lachesis_supported_resolutions(struct razer_mouse *m,
 					  enum razer_mouse_res **res_list)
 {
+	struct lachesis_private *priv = m->drv_data;
 	enum razer_mouse_res *list;
-	const int count = 32;
-	unsigned int i, res;
+	unsigned int i, count = 0, res, step = 0;
+
+	switch (priv->type) {
+	case LACHESIS_CLASSIC:
+		count = 32;
+		step = RAZER_MOUSE_RES_125DPI;
+		break;
+	case LACHESIS_5600:
+		count = 56;
+		step = RAZER_MOUSE_RES_100DPI;
+		break;
+	}
 
 	list = malloc(sizeof(*list) * count);
 	if (!list)
 		return -ENOMEM;
 
-	res = RAZER_MOUSE_RES_125DPI;
+	res = step;
 	for (i = 0; i < count; i++) {
 		list[i] = res;
-		res += RAZER_MOUSE_RES_125DPI;
+		res += step;
 	}
 
 	*res_list = list;
@@ -739,11 +956,22 @@ int razer_lachesis_init(struct razer_mouse *m,
 			struct libusb_device *usbdev)
 {
 	struct lachesis_private *priv;
-	unsigned int i;
-	int err, fwver;
+	struct libusb_device_descriptor desc;
+	unsigned int i, flags;
+	int err;
+	const char *devname = "";
 
 	BUILD_BUG_ON(sizeof(struct lachesis_profcfg_cmd) != 0x18C);
 	BUILD_BUG_ON(sizeof(struct lachesis_dpimap_cmd) != 0x60);
+	BUILD_BUG_ON(sizeof(struct lachesis5k6_request) != 90);
+	BUILD_BUG_ON(sizeof(struct lachesis5k6_request_devinfo) != 34);
+	BUILD_BUG_ON(sizeof(struct lachesis5k6_request_sensor) != 5);
+
+	err = libusb_get_device_descriptor(usbdev, &desc);
+	if (err) {
+		razer_error("hw_lachesis: Failed to get device descriptor\n");
+		return -EIO;
+	}
 
 	priv = zalloc(sizeof(struct lachesis_private));
 	if (!priv)
@@ -751,8 +979,13 @@ int razer_lachesis_init(struct razer_mouse *m,
 	priv->m = m;
 	m->drv_data = priv;
 
+	priv->type = LACHESIS_CLASSIC;
+	if (desc.idVendor == 0x1532 && desc.idProduct == 0x001E)
+		priv->type = LACHESIS_5600;
+
 	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
-	err |= razer_usb_add_used_interface(m->usb_ctx, 1, 0);
+	if (priv->type == LACHESIS_CLASSIC)
+		err |= razer_usb_add_used_interface(m->usb_ctx, 1, 0);
 	if (err) {
 		err = -ENODEV;
 		goto err_free;
@@ -768,10 +1001,15 @@ int razer_lachesis_init(struct razer_mouse *m,
 		priv->profiles[i].set_button_function = lachesis_set_button_function;
 		priv->profiles[i].mouse = m;
 	}
+
+	flags = 0;
+	if (priv->type == LACHESIS_5600)
+		flags = RAZER_AXIS_INDEPENDENT_DPIMAPPING;
 	razer_init_axes(&priv->axes[0],
-			"X", 0,
-			"Y", 0,
+			"X", flags,
+			"Y", flags,
 			"Scroll", 0);
+
 	for (i = 0; i < LACHESIS_NR_DPIMAPPINGS; i++) {
 		priv->dpimappings[i].nr = i;
 		priv->dpimappings[i].res = RAZER_MOUSE_RES_UNKNOWN;
@@ -785,13 +1023,11 @@ int razer_lachesis_init(struct razer_mouse *m,
 			    "Failed to initially claim the device\n");
 		goto err_free;
 	}
-	fwver = lachesis_read_fw_ver(priv);
-	if (fwver < 0) {
+	err = lachesis_read_devinfo(priv);
+	if (err) {
 		razer_error("hw_lachesis: Failed to get firmware version\n");
-		err = fwver;
 		goto err_release;
 	}
-	priv->fw_version = fwver;
 
 	err = lachesis_read_config_from_hw(priv);
 	if (err) {
@@ -799,7 +1035,16 @@ int razer_lachesis_init(struct razer_mouse *m,
 			    "Failed to read the configuration from hardware\n");
 		goto err_release;
 	}
-	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, "Lachesis", 1, m->idstr);
+	switch (priv->type) {
+	case LACHESIS_CLASSIC:
+		devname = "Lachesis Classic";
+		break;
+	case LACHESIS_5600:
+		devname = "Lachesis 5600DPI";
+		break;
+	}
+	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, devname, 1,
+				    priv->serial, m->idstr);
 
 	m->type = RAZER_MOUSETYPE_LACHESIS;
 

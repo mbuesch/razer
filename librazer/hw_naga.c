@@ -515,7 +515,8 @@ int razer_naga_init(struct razer_mouse *m,
 			"Scroll", 0);
 
 	m->type = RAZER_MOUSETYPE_NAGA;
-	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, "Naga", 1, m->idstr);
+	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, "Naga", 1,
+				    NULL, m->idstr);
 
 	m->get_fw_version = naga_get_fw_version;
 	m->reconfigure = naga_reconfigure;

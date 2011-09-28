@@ -776,7 +776,8 @@ int razer_deathadder_init(struct razer_mouse *m,
 		devname = "DeathAdder Black Edition";
 		break;
 	}
-	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, devname, 0, m->idstr);
+	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, devname, 0,
+				    NULL, m->idstr);
 
 	m->get_fw_version = deathadder_get_fw_version;
 	m->reconfigure = deathadder_reconfigure;
