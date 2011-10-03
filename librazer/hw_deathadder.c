@@ -187,7 +187,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 		}
 
 		/* Translate resolution setting. */
-		switch (priv->cur_dpimapping->res) {
+		switch (priv->cur_dpimapping->res[RAZER_DIM_0]) {
 		case RAZER_MOUSE_RES_450DPI:
 			res_value = 3;
 			break;
@@ -267,7 +267,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 
 		/* Translate resolution setting. */
 		if (priv->type == DEATHADDER_CLASSIC) {
-			switch (priv->cur_dpimapping->res) {
+			switch (priv->cur_dpimapping->res[RAZER_DIM_0]) {
 			case RAZER_MOUSE_RES_450DPI:
 				config.res = 3;
 				break;
@@ -283,7 +283,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 				goto out;
 			}
 		} else {
-			switch (priv->cur_dpimapping->res) {
+			switch (priv->cur_dpimapping->res[RAZER_DIM_0]) {
 			case RAZER_MOUSE_RES_450DPI:
 				config.res = 4;
 				break;
@@ -421,10 +421,10 @@ static int deathadder_get_leds(struct razer_mouse *m,
 	if (priv->type == DEATHADDER_BLACK)
 		return 0; /* No LEDs */
 
-	scroll = malloc(sizeof(struct razer_led));
+	scroll = zalloc(sizeof(struct razer_led));
 	if (!scroll)
 		return -ENOMEM;
-	logo = malloc(sizeof(struct razer_led));
+	logo = zalloc(sizeof(struct razer_led));
 	if (!logo) {
 		free(scroll);
 		return -ENOMEM;
@@ -456,7 +456,7 @@ static int deathadder_supported_freqs(struct razer_mouse *m,
 	enum razer_mouse_freq *list;
 	const int count = 3;
 
-	list = malloc(sizeof(*list) * count);
+	list = zalloc(sizeof(*list) * count);
 	if (!list)
 		return -ENOMEM;
 
@@ -507,7 +507,7 @@ static int deathadder_supported_resolutions(struct razer_mouse *m,
 	enum razer_mouse_res *list;
 	const int count = (priv->type == DEATHADDER_CLASSIC) ? 3 : 4;
 
-	list = malloc(sizeof(*list) * count);
+	list = zalloc(sizeof(*list) * count);
 	if (!list)
 		return -ENOMEM;
 
@@ -739,17 +739,20 @@ int razer_deathadder_init(struct razer_mouse *m,
 	priv->profile.mouse = m;
 
 	priv->dpimapping[0].nr = 0;
-	priv->dpimapping[0].res = RAZER_MOUSE_RES_450DPI;
+	priv->dpimapping[0].res[RAZER_DIM_0] = RAZER_MOUSE_RES_450DPI;
+	priv->dpimapping[0].dimension_mask = (1 << RAZER_DIM_0);
 	priv->dpimapping[0].change = NULL;
 	priv->dpimapping[0].mouse = m;
 
 	priv->dpimapping[1].nr = 1;
-	priv->dpimapping[1].res = RAZER_MOUSE_RES_900DPI;
+	priv->dpimapping[1].res[RAZER_DIM_0] = RAZER_MOUSE_RES_900DPI;
+	priv->dpimapping[1].dimension_mask = (1 << RAZER_DIM_0);
 	priv->dpimapping[1].change = NULL;
 	priv->dpimapping[1].mouse = m;
 
 	priv->dpimapping[2].nr = 2;
-	priv->dpimapping[2].res = RAZER_MOUSE_RES_1800DPI;
+	priv->dpimapping[2].res[RAZER_DIM_0] = RAZER_MOUSE_RES_1800DPI;
+	priv->dpimapping[2].dimension_mask = (1 << RAZER_DIM_0);
 	priv->dpimapping[2].change = NULL;
 	priv->dpimapping[2].mouse = m;
 
@@ -757,7 +760,8 @@ int razer_deathadder_init(struct razer_mouse *m,
 		priv->cur_dpimapping = &priv->dpimapping[2];
 	} else {
 		priv->dpimapping[3].nr = 3;
-		priv->dpimapping[3].res = RAZER_MOUSE_RES_3500DPI;
+		priv->dpimapping[3].res[RAZER_DIM_0] = RAZER_MOUSE_RES_3500DPI;
+		priv->dpimapping[3].dimension_mask = (1 << RAZER_DIM_0);
 		priv->dpimapping[3].change = NULL;
 		priv->dpimapping[3].mouse = m;
 
@@ -781,8 +785,8 @@ int razer_deathadder_init(struct razer_mouse *m,
 
 	m->get_fw_version = deathadder_get_fw_version;
 	m->reconfigure = deathadder_reconfigure;
-	m->get_leds = deathadder_get_leds;
 	m->flash_firmware = deathadder_flash_firmware;
+	m->global_get_leds = deathadder_get_leds;
 	m->get_profiles = deathadder_get_profiles;
 	m->supported_resolutions = deathadder_supported_resolutions;
 	m->supported_freqs = deathadder_supported_freqs;

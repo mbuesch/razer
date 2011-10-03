@@ -3,7 +3,7 @@
  *   Applications do NOT want to use this.
  *   Applications should use pyrazer or librazerd instead.
  *
- *   Copyright (C) 2007-2010 Michael Buesch <m@bues.ch>
+ *   Copyright (C) 2007-2011 Michael Buesch <m@bues.ch>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -25,6 +25,8 @@
 #endif
 
 #include <stdlib.h>
+#include <stdint.h>
+#include <stddef.h>
 
 
 #define RAZER_IDSTR_MAX_SIZE	128
@@ -39,6 +41,9 @@ struct razer_mouse_profile_emu;
 struct razer_mouse;
 
 
+/** razer_utf16_t - UTF-16 type */
+typedef uint16_t razer_utf16_t;
+
 /** enum razer_led_state - The LED state value
   * @RAZER_LED_OFF: The LED is turned off
   * @RAZER_LED_ON: The LED is turned on
@@ -50,6 +55,19 @@ enum razer_led_state {
 	RAZER_LED_UNKNOWN,
 };
 
+/** struct razer_rgb_color - An RGB color
+ * @r: Red value.
+ * @g: Green value.
+ * @b: Blue value.
+ * @valid: 1 if this color is valid. 0 otherise.
+ */
+struct razer_rgb_color {
+	uint8_t r;
+	uint8_t g;
+	uint8_t b;
+	uint8_t valid;
+};
+
 /** struct razer_led - A LED on a razer device.
   *
   * @next: The next LED device in the linked list.
@@ -57,9 +75,13 @@ enum razer_led_state {
   * @name: The human readable name string for the LED.
   * @id: A unique ID cookie
   * @state: The state of the LED (on, off, unknown)
+  * @color: The color of the LED.
   *
   * @toggle_state: Toggle the state. Note that a new_state of
-  * 	RAZER_LED_UNKNOWN result in an error.
+  * 	RAZER_LED_UNKNOWN result is an error.
+  *
+  * @change_color: Change the color of the LED.
+  *	May be NULL, if the color cannot be changed.
   *
   * @u: This union contains a pointer to the parent device.
   */
@@ -69,12 +91,17 @@ struct razer_led {
 	const char *name;
 	unsigned int id;
 	enum razer_led_state state;
+	struct razer_rgb_color color;
 
 	int (*toggle_state)(struct razer_led *led,
 			    enum razer_led_state new_state);
 
+	int (*change_color)(struct razer_led *led,
+			    const struct razer_rgb_color *new_color);
+
 	union {
 		struct razer_mouse *mouse;
+		struct razer_mouse_profile *mouse_prof;
 	} u;
 };
 
@@ -107,6 +134,7 @@ enum razer_mouse_res {
 	RAZER_MOUSE_RES_2000DPI		= 2000,
 	RAZER_MOUSE_RES_3500DPI		= 3500,
 	RAZER_MOUSE_RES_4000DPI		= 4000,
+	RAZER_MOUSE_RES_5600DPI		= 5600,
 };
 
 /** enum razer_mouse_type
@@ -169,29 +197,111 @@ struct razer_axis {
 	unsigned int flags;
 };
 
+/** razer_id_mask_t - ID mask type */
+typedef uint64_t razer_id_mask_t;
+
+/** razer_id_mask_set - Set a bit in an ID mask.
+ *
+ * @mask: Pointer to the mask.
+ *
+ * @nr: The ID number.
+ */
+static inline void razer_id_mask_set(razer_id_mask_t *mask, unsigned int id)
+{
+	*mask |= ((razer_id_mask_t)1ull << id);
+}
+
+/** razer_id_mask_clear - Clear a bit in an ID mask.
+ *
+ * @mask: Pointer to the mask.
+ *
+ * @nr: The ID number.
+ */
+static inline void razer_id_mask_clear(razer_id_mask_t *mask, unsigned int id)
+{
+	*mask &= ~((razer_id_mask_t)1ull << id);
+}
+
+/** razer_id_mask_zero - Initialize an ID mask to "all unset".
+ *
+ * @mask: Pointer to the mask.
+ */
+static inline void razer_id_mask_zero(razer_id_mask_t *mask)
+{
+	*mask = (razer_id_mask_t)0ull;
+}
+
+/** enum razer_dimension - Dimension IDs
+ * @RAZER_DIM_X: X dimension
+ * @RAZER_DIM_Y: Y dimension
+ * @RAZER_DIM_Z: Z dimension
+ * @RAZER_NR_DIMS: 3 dimensions ought to be enough in this universe.
+ * @RAZER_DIM_0: First dimension. X alias.
+ * @RAZER_DIM_1: Second dimension. Y alias.
+ * @RAZER_DIM_2: Third dimension. Z alias.
+ */
+enum razer_dimension {
+	RAZER_DIM_X,
+	RAZER_DIM_Y,
+	RAZER_DIM_Z,
+
+	RAZER_NR_DIMS,
+
+	RAZER_DIM_0	= RAZER_DIM_X,
+	RAZER_DIM_1	= RAZER_DIM_Y,
+	RAZER_DIM_2	= RAZER_DIM_Z,
+};
+
 /** struct razer_mouse_dpimapping - Mouse scan resolution mapping.
  *
- * @nr: An ID number. Read only!
+ * @nr: The ID number.
  *
- * @res: The resolution value. Read only!
+ * @res: The resolution values. One per dimension.
+ *
+ * @dimension_mask: Mask of used dimensions.
+ *
+ * @profile_mask: A bitmask of which profile this dpimapping is valid for.
+ *	A value of 0 indicates "any profile".
+ *	If bit0 is set, this means profile 0.
+ *	If bit1 is set, this means profile 1. etc...
  *
  * @change: Change this mapping to another resolution value.
  *	May be NULL, if the mapping cannot be changed.
  */
 struct razer_mouse_dpimapping {
 	unsigned int nr;
-	enum razer_mouse_res res;
+	enum razer_mouse_res res[RAZER_NR_DIMS];
+	unsigned int dimension_mask;
+	razer_id_mask_t profile_mask;
 
-	int (*change)(struct razer_mouse_dpimapping *d, enum razer_mouse_res res);
+	int (*change)(struct razer_mouse_dpimapping *d,
+		      enum razer_dimension dim,
+		      enum razer_mouse_res res);
 
 	struct razer_mouse *mouse;
 };
 
 /** struct razer_mouse_profile - A mouse profile
  *
+ * @nr: The profile ID.
+ *
+ * @get_name: Get the profile name.
+ *	May be NULL.
+ *
+ * @set_name: Set the profile name.
+ *	May be NULL.
+ *
+ * @get_leds: Get a linked list of per-profile LEDs.
+ * 	Returns the number of LEDs or a negative error code.
+ * 	leds_list points to the first LED in the list.
+ * 	The caller is responsible to free every item in leds_list.
+ *	May be NULL.
+ *
  * @get_freq: Get the currently used scan frequency.
+ *	May be NULL, if the scan frequency is not managed per profile.
  *
  * @set_freq: Change the mouse scan frequency.
+ *	May be NULL, if the scan frequency is not managed per profile.
  *
  * @get_dpimapping: Returns the active scan resolution mapping.
  *	If axis is NULL, returns the mapping of the first axis.
@@ -205,6 +315,13 @@ struct razer_mouse_dpimapping {
  */
 struct razer_mouse_profile {
 	unsigned int nr;
+
+	const razer_utf16_t * (*get_name)(struct razer_mouse_profile *p);
+	int (*set_name)(struct razer_mouse_profile *p,
+			const razer_utf16_t *new_name);
+
+	int (*get_leds)(struct razer_mouse_profile *p,
+			struct razer_led **leds_list);
 
 	enum razer_mouse_freq (*get_freq)(struct razer_mouse_profile *p);
 	int (*set_freq)(struct razer_mouse_profile *p, enum razer_mouse_freq freq);
@@ -227,12 +344,12 @@ struct razer_mouse_profile {
 /** enum razer_mouse_flags - Flags for a mouse
  *
  * @RAZER_MOUSEFLG_NEW: The device detection routine of the library
- *                      sets this to flag on detection. So the highlevel code
- *                      using the library can clear this flag to keep track of
- *                      devices it already knows about.
+ *	sets this to flag on detection. So the highlevel code
+ *	using the library can clear this flag to keep track of
+ *	devices it already knows about.
  *
  * @RAZER_MOUSEFLG_PROFEMU: Profiles are emulated in software. The device
- *                          does only support one profile in hardware.
+ *	does only support one profile in hardware.
  */
 enum razer_mouse_flags {
 	RAZER_MOUSEFLG_NEW		= (1 << 0),
@@ -276,14 +393,21 @@ enum {
   * @reconfigure: Reconfigure the hardware.
   *	May be NULL.
   *
-  * @get_leds: Get a linked list of available LEDs.
-  * 	Returns the number of LEDs or a negative error code.
-  * 	leds_list points to the first LED in the list.
-  * 	The caller is responsible to free every item in leds_list.
-  *
   * @flash_firmware: Upload a firmware image to the device and
   *     flash it to the PROM. &magic_number is &RAZER_FW_FLASH_MAGIC.
   *     The magic is used to project against accidental calls.
+  *
+  * @global_get_leds: Get a linked list of globally managed LEDs.
+  * 	Returns the number of LEDs or a negative error code.
+  * 	leds_list points to the first LED in the list.
+  * 	The caller is responsible to free every item in leds_list.
+  *	May be NULL.
+  *
+  * @global_get_freq: Get the current globally used scan frequency.
+  *	May be NULL, if the scan frequency is not managed globally.
+  *
+  * @global_set_freq: Change the global mouse scan frequency.
+  *	May be NULL, if the scan frequency is not managed globally.
   *
   * @nr_profiles: The number of profiles supported by this device.
   *	Defaults to 1.
@@ -340,12 +464,15 @@ struct razer_mouse {
 
 	int (*reconfigure)(struct razer_mouse *m);
 
-	int (*get_leds)(struct razer_mouse *m,
-			struct razer_led **leds_list);
-
 	int (*flash_firmware)(struct razer_mouse *m,
 			      const char *data, size_t len,
 			      unsigned int magic_number);
+
+	int (*global_get_leds)(struct razer_mouse *m,
+			       struct razer_led **leds_list);
+
+	enum razer_mouse_freq (*global_get_freq)(struct razer_mouse *m);
+	int (*global_set_freq)(struct razer_mouse *m, enum razer_mouse_freq freq);
 
 	unsigned int nr_profiles;
 	struct razer_mouse_profile * (*get_profiles)(struct razer_mouse *m);

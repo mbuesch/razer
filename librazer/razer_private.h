@@ -107,7 +107,7 @@ void razer_init_axes(struct razer_axis *axes,
 
 struct razer_mouse_dpimapping * razer_mouse_get_dpimapping_by_res(
 		struct razer_mouse_dpimapping *mappings, size_t nr_mappings,
-		enum razer_mouse_res res);
+		enum razer_dimension dim, enum razer_mouse_res res);
 
 struct razer_event_spacing {
 	unsigned int spacing_msec;

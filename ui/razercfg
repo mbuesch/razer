@@ -31,21 +31,23 @@ def getRazer():
 	return razer
 
 class Operation:
-	def parseProfileValuePair(self, parameter, idstr):
-		# Parse profile:value pair string. Default to active
+	def parseProfileValueStr(self, parameter, idstr, nrValues=1):
+		# Parse profile:value[:value]... string. Default to active
 		# profile, if not given. May raise ValueError.
 		split = parameter.split(":")
-		if len(split) == 1:
-			profile = getRazer().getActiveProfile(idstr) + 1
-			value = int(split[0].strip())
-		elif len(split) == 2:
+		if len(split) == nrValues:
+			profile = None
+			values = split
+		elif len(split) == nrValues + 1:
 			profile = int(split[0].strip())
-			value = int(split[1].strip())
+			values = split[1:]
+			if profile == 0:
+				profile = getRazer().getActiveProfile(idstr) + 1
+			if profile < 0:
+				raise ValueError
 		else:
 			raise ValueError
-		if profile < 1:
-			raise ValueError
-		return (profile, value)
+		return (profile, values)
 
 class OpSleep(Operation):
 	def __init__(self, seconds):
@@ -57,23 +59,29 @@ class OpSleep(Operation):
 class OpGetFwVer(Operation):
 	def run(self, idstr):
 		verTuple = getRazer().getFwVer(idstr)
-		print "%s: Firmware version %d.%d" %\
+		print "%s: Firmware version %d.%02d" %\
 			(idstr, verTuple[0], verTuple[1])
 
 class OpGetFreq(Operation):
 	def run(self, idstr):
 		freqs = getRazer().getSupportedFreqs(idstr)
-		profiles = getRazer().getProfiles(idstr)
-		for profile in profiles:
-			sys.stdout.write("Profile %2u:   " % (profile + 1))
-			curFreq = getRazer().getCurrentFreq(idstr, profile)
-			output = []
-			for freq in freqs:
-				if freq == curFreq:
-					output.append("*%u Hz" % freq)
-				else:
-					output.append(" %u Hz" % freq)
-			print ", ".join(output)
+		minfo = getRazer().getMouseInfo(idstr)
+		if minfo & Razer.MOUSEINFOFLG_GLOBAL_FREQ:
+			curFreq = getRazer().getCurrentFreq(idstr)
+			self.printFreq(freqs, curFreq)
+		if minfo & Razer.MOUSEINFOFLG_PROFILE_FREQ:
+			profiles = getRazer().getProfiles(idstr)
+			for profile in profiles:
+				sys.stdout.write("Profile %2u:   " % (profile + 1))
+				curFreq = getRazer().getCurrentFreq(idstr, profile)
+				self.printFreq(freqs, curFreq)
+
+	def printFreq(self, freqs, curFreq):
+		output = []
+		for freq in freqs:
+			pfx = "*" if freq == curFreq else " "
+			output.append("%s%u Hz" % (pfx, freq))
+		print ", ".join(output)
 
 class OpGetRes(Operation):
 	def run(self, idstr):
@@ -83,49 +91,86 @@ class OpGetRes(Operation):
 			sys.stdout.write("Profile %2u:   " % (profile + 1))
 			curMapping = getRazer().getDpiMapping(idstr, profile)
 			output = []
-			for mapping in mappings:
-				if mapping[0] == curMapping:
-					output.append("*%u (%u DPI)" % (mapping[0] + 1, mapping[1]))
-				else:
-					output.append(" %u (%u DPI)" % (mapping[0] + 1, mapping[1]))
+			pm = filter(lambda m: m.profileMask == 0 or\
+					      m.profileMask & (1 << profile),
+				    mappings)
+			for mapping in pm:
+				pfx = "*" if mapping.id == curMapping else " "
+				r = [ "%u" % r for r in mapping.res if r is not None ]
+				rStr = "/".join(r)
+				output.append("%s%u (%s DPI)" % (pfx, mapping.id + 1, rStr))
 			print ", ".join(output)
 
 class OpPrintLeds(Operation):
 	def run(self, idstr):
-		leds = getRazer().getLeds(idstr)
+		minfo = getRazer().getMouseInfo(idstr)
+		if minfo & Razer.MOUSEINFOFLG_GLOBAL_LEDS:
+			sys.stdout.write("Global LEDs:   ")
+			leds = getRazer().getLeds(idstr)
+			self.printLeds(leds)
+		if minfo & Razer.MOUSEINFOFLG_PROFILE_LEDS:
+			profiles = getRazer().getProfiles(idstr)
+			for profile in profiles:
+				sys.stdout.write("Profile %2u LEDs:   " % (profile + 1))
+				leds = getRazer().getLeds(idstr, profile)
+				self.printLeds(leds)
+
+	def printLeds(self, leds):
 		output = []
 		for led in leds:
-			if led[1] == 0:
-				state = "off"
-			elif led[1] == 1:
-				state = "on"
-			else:
-				state = "unknown"
-			output.append("%s => %s" % (led[0], state))
+			state = "on" if led.state else "off"
+			color = ""
+			if led.color is not None:
+				color = "/color#%02X%02X%02X" %\
+					(led.color.r, led.color.g, led.color.b)
+			output.append("%s => %s%s" % (led.name, state, color))
 		print ",  ".join(output)
 
-class OpSetLed(Operation):
-	def __init__(self, cfgStr):
-		self.cfgStr = cfgStr
+class OpSetLedState(Operation):
+	def __init__(self, param):
+		self.param = param
 
 	def run(self, idstr):
-		cfgStr = self.cfgStr.split(":")
 		try:
-			newState = cfgStr[-1].strip().lower()
-			ledName = ":".join(cfgStr[:-1])
-			if not ledName:
-				raise ValueError()
-			if newState in ["0", "off", "false"]:
-				newState = False
-			elif newState in ["1", "on", "true"]:
-				newState = True
+			(profile, config) = self.parseProfileValueStr(self.param, idstr, 2)
+			ledName = config[0].strip()
+			newState = razer_str2bool(config[1])
+			if profile is None:
+				profile = Razer.PROFILE_INVALID
 			else:
-				raise ValueError()
+				profile -= 1
+			leds = getRazer().getLeds(idstr, profile)
+			led = filter(lambda l: l.name == ledName, leds)[0]
+			led.state = newState
+			error = getRazer().setLed(idstr, led)
+			if error:
+				raise RazerEx("Failed to set LED state (%s)" %\
+					      Razer.strerror(error))
 		except (IndexError, ValueError):
 			raise RazerEx("Invalid parameter to --setled option")
-		error = getRazer().setLed(idstr, ledName, newState)
-		if error:
-			raise RazerEx("Failed to set LED state (%s)" % Razer.strerror(error))
+
+class OpSetLedColor(Operation):
+	def __init__(self, param):
+		self.param = param
+
+	def run(self, idstr):
+		try:
+			(profile, config) = self.parseProfileValueStr(self.param, idstr, 2)
+			ledName = config[0].strip()
+			newColor = RazerRGB.fromString(config[1])
+			if profile is None:
+				profile = Razer.PROFILE_INVALID
+			else:
+				profile -= 1
+			leds = getRazer().getLeds(idstr, profile)
+			led = filter(lambda l: l.name == ledName, leds)[0]
+			led.color = newColor
+			error = getRazer().setLed(idstr, led)
+			if error:
+				raise RazerEx("Failed to set LED color (%s)" %\
+					      Razer.strerror(error))
+		except (IndexError, ValueError):
+			raise RazerEx("Invalid parameter to --setledcolor option")
 
 class OpSetRes(Operation):
 	def __init__(self, param):
@@ -133,14 +178,20 @@ class OpSetRes(Operation):
 
 	def run(self, idstr):
 		try:
-			(profile, mapping) = self.parseProfileValuePair(self.param, idstr)
+			(profile, mapping) = self.parseProfileValueStr(self.param, idstr)
+			mapping = int(mapping[0])
+			if profile is None:
+				raise ValueError
 		except ValueError:
 			raise RazerEx("Invalid parameter to --res option")
 		if mapping >= 100:
 			# Mapping is in DPI. Get the mapping ID.
 			mappings = getRazer().getSupportedDpiMappings(idstr)
+			pm = filter(lambda m: m.profileMask == 0 or\
+					      m.profileMask & (1 << profile),
+				    mappings)
 			try:
-				(mapping, res, mutable) = filter(lambda x: x[1] == mapping, mappings)[0]
+				mapping = filter(lambda m: mapping in m.res, pm)[0].id
 			except IndexError:
 				raise RazerEx("Invalid resolution %d" % mapping)
 		else:
@@ -156,10 +207,15 @@ class OpSetFreq(Operation):
 
 	def run(self, idstr):
 		try:
-			(profile, freq) = self.parseProfileValuePair(self.param, idstr)
+			(profile, freq) = self.parseProfileValueStr(self.param, idstr)
+			freq = int(freq[0])
 		except ValueError:
 			raise RazerEx("Invalid parameter to --freq option")
-		error = getRazer().setFrequency(idstr, profile - 1, freq)
+		if profile is None:
+			profile = Razer.PROFILE_INVALID
+		else:
+			profile -= 1
+		error = getRazer().setFrequency(idstr, profile, freq)
 		if error:
 			raise RazerEx("Failed to set frequency to %d Hz (%s)" %\
 					(freq, Razer.strerror(error)))
@@ -232,13 +288,17 @@ def usage():
 	print ""
 	print "Options for mice:"
 	print "-V|--fwver               Print the firmware version number"
-	print "-r|--res [profile:]DPI   Changes the scan resolution. profile is optional."
+	print "-r|--res profile:DPI     Changes the scan resolution."
 	print "-R|--getres              Prints the resolutions"
-	print "-f|--freq [profile:]FREQ Changes the scan frequency. profile is optional."
+	print "-f|--freq [profile:]FREQ Changes the scan frequency."
 	print "-F|--getfreq             Prints the frequencies"
 	print "-L|--leds                Print the identifiers of the LEDs on the device"
-	print "-l|--setled LED:off      Toggle the LED with the identifier \"LED\" ON or OFF"
+	print "-l|--setled [profile:]LED:off  Toggle the LED with the identifier \"LED\" ON or OFF"
+	print "-c|--setledcolor [profile:]LED:aabbcc  Set LED color to RGB 'aabbcc'"
 	print "-X|--flashfw FILE        Flash a firmware image to the device"
+	print ""
+	print "The 'profile' number may be 0 for the current profile. If 'profile' is"
+	print "omitted, the global settings are changed (not possible for every device)."
 
 def findDevice(deviceType=None):
 	if deviceType is None or deviceType == "mouse":
@@ -256,11 +316,12 @@ def parse_args():
 
 	try:
 		(opts, args) = getopt.getopt(sys.argv[1:],
-			"hvBsKd:r:Rf:FLl:Vc:S:X:",
+			"hvBsKd:r:Rf:FLl:VS:X:c:",
 			[ "help", "version", "background",
 			  "scan", "reconfigure", "device=", "res=",
 			  "getres", "freq=", "getfreq", "leds", "setled=",
-			  "fwver", "config=", "sleep=", "flashfw=", ])
+			  "fwver", "config=", "sleep=", "flashfw=",
+			  "setledcolor=", ])
 	except getopt.GetoptError:
 		usage()
 		exit(1)
@@ -316,7 +377,12 @@ def parse_args():
 		if o in ("-l", "--setled"):
 			if not currentDevOps:
 				currentDevOps = DevOps(findDevice())
-			currentDevOps.add(OpSetLed(v))
+			currentDevOps.add(OpSetLedState(v))
+			continue
+		if o in ("-c", "--setledcolor"):
+			if not currentDevOps:
+				currentDevOps = DevOps(findDevice())
+			currentDevOps.add(OpSetLedColor(v))
 			continue
 		if o in ("-V", "--fwver"):
 			if not currentDevOps:

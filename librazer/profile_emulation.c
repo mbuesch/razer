@@ -272,6 +272,7 @@ int razer_mouse_init_profile_emulation(struct razer_mouse *m)
 		prof->nr = i;
 
 		/* Assign callbacks, if the driver supports the feature. */
+//TODO LEDs
 		if (hw_profile->get_freq)
 			prof->get_freq = mouse_profemu_get_freq;
 		if (hw_profile->set_freq)

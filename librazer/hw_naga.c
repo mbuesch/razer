@@ -175,8 +175,8 @@ static int naga_commit(struct naga_private *priv)
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.command = cpu_to_le16(0x0300);
 	cmd.request = cpu_to_le16(0x0104);
-	xres = (((unsigned int)priv->cur_dpimapping_X->res / 100) - 1) * 4;
-	yres = (((unsigned int)priv->cur_dpimapping_Y->res / 100) - 1) * 4;
+	xres = (((unsigned int)priv->cur_dpimapping_X->res[RAZER_DIM_0] / 100) - 1) * 4;
+	yres = (((unsigned int)priv->cur_dpimapping_Y->res[RAZER_DIM_0] / 100) - 1) * 4;
 	cmd.value0 = cpu_to_le16(xres | (yres << 8));
 	err = naga_send_command(priv, &cmd);
 	if (err)
@@ -247,7 +247,7 @@ static int naga_reconfigure(struct razer_mouse *m)
 }
 
 static int naga_led_toggle(struct razer_led *led,
-				 enum razer_led_state new_state)
+			   enum razer_led_state new_state)
 {
 	struct razer_mouse *m = led->u.mouse;
 	struct naga_private *priv = m->drv_data;
@@ -276,7 +276,7 @@ static int naga_led_toggle(struct razer_led *led,
 }
 
 static int naga_get_leds(struct razer_mouse *m,
-			       struct razer_led **leds_list)
+			 struct razer_led **leds_list)
 {
 	struct naga_private *priv = m->drv_data;
 	struct razer_led *scroll, *logo;
@@ -501,11 +501,12 @@ int razer_naga_init(struct razer_mouse *m,
 
 	for (i = 0; i < NAGA_NR_DPIMAPPINGS; i++) {
 		priv->dpimapping[i].nr = i;
-		priv->dpimapping[i].res = (i + 1) * 100;
-		if (priv->dpimapping[i].res == 1000) {
+		priv->dpimapping[i].res[RAZER_DIM_0] = (i + 1) * 100;
+		if (priv->dpimapping[i].res[RAZER_DIM_0] == 1000) {
 			priv->cur_dpimapping_X = &priv->dpimapping[i];
 			priv->cur_dpimapping_Y = &priv->dpimapping[i];
 		}
+		priv->dpimapping[i].dimension_mask = (1 << RAZER_DIM_0);
 		priv->dpimapping[i].change = NULL;
 		priv->dpimapping[i].mouse = m;
 	}
@@ -520,7 +521,7 @@ int razer_naga_init(struct razer_mouse *m,
 
 	m->get_fw_version = naga_get_fw_version;
 	m->reconfigure = naga_reconfigure;
-	m->get_leds = naga_get_leds;
+	m->global_get_leds = naga_get_leds;
 	m->get_profiles = naga_get_profiles;
 	m->supported_axes = naga_supported_axes;
 	m->supported_resolutions = naga_supported_resolutions;

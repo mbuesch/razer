@@ -299,7 +299,7 @@ static int boomslangce_commit(struct boomslangce_private *priv)
 		u.profcfg.magic = BOOMSLANGCE_PROFCFG_MAGIC;
 		u.profcfg.profilenr = cpu_to_le16(i + 1);
 		u.profcfg.reply_profilenr = u.profcfg.profilenr;
-		switch (priv->cur_dpimapping[i]->res) {
+		switch (priv->cur_dpimapping[i]->res[RAZER_DIM_0]) {
 		default:
 		case RAZER_MOUSE_RES_400DPI:
 			u.profcfg.dpisel = 4;
@@ -432,17 +432,17 @@ static int boomslangce_read_config_from_hw(struct boomslangce_private *priv)
 		case 4:
 			priv->cur_dpimapping[i] = razer_mouse_get_dpimapping_by_res(
 					priv->dpimappings, ARRAY_SIZE(priv->dpimappings),
-					RAZER_MOUSE_RES_400DPI);
+					RAZER_DIM_0, RAZER_MOUSE_RES_400DPI);
 			break;
 		case 3:
 			priv->cur_dpimapping[i] = razer_mouse_get_dpimapping_by_res(
 					priv->dpimappings, ARRAY_SIZE(priv->dpimappings),
-					RAZER_MOUSE_RES_800DPI);
+					RAZER_DIM_0, RAZER_MOUSE_RES_800DPI);
 			break;
 		case 2:
 			priv->cur_dpimapping[i] = razer_mouse_get_dpimapping_by_res(
 					priv->dpimappings, ARRAY_SIZE(priv->dpimappings),
-					RAZER_MOUSE_RES_1800DPI);
+					RAZER_DIM_0, RAZER_MOUSE_RES_1800DPI);
 			break;
 		default:
 			razer_error("hw_boomslangce: Got invalid DPI mapping selection\n");
@@ -538,7 +538,7 @@ static int boomslangce_supported_resolutions(struct razer_mouse *m,
 	enum razer_mouse_res *list;
 	const int count = 3;
 
-	list = malloc(sizeof(*list) * count);
+	list = zalloc(sizeof(*list) * count);
 	if (!list)
 		return -ENOMEM;
 
@@ -557,7 +557,7 @@ static int boomslangce_supported_freqs(struct razer_mouse *m,
 	enum razer_mouse_freq *list;
 	const int count = 3;
 
-	list = malloc(sizeof(*list) * count);
+	list = zalloc(sizeof(*list) * count);
 	if (!list)
 		return -ENOMEM;
 
@@ -685,10 +685,10 @@ static int boomslangce_get_leds(struct razer_mouse *m,
 	struct boomslangce_private *priv = m->drv_data;
 	struct razer_led *scroll, *logo;
 
-	scroll = malloc(sizeof(struct razer_led));
+	scroll = zalloc(sizeof(struct razer_led));
 	if (!scroll)
 		return -ENOMEM;
-	logo = malloc(sizeof(struct razer_led));
+	logo = zalloc(sizeof(struct razer_led));
 	if (!logo) {
 		free(scroll);
 		return -ENOMEM;
@@ -807,15 +807,18 @@ int razer_boomslangce_init(struct razer_mouse *m,
 	}
 
 	priv->dpimappings[0].nr = 0;
-	priv->dpimappings[0].res = RAZER_MOUSE_RES_400DPI;
+	priv->dpimappings[0].res[RAZER_DIM_0] = RAZER_MOUSE_RES_400DPI;
+	priv->dpimappings[0].dimension_mask = (1 << RAZER_DIM_0);
 	priv->dpimappings[0].mouse = m;
 
 	priv->dpimappings[1].nr = 1;
-	priv->dpimappings[1].res = RAZER_MOUSE_RES_800DPI;
+	priv->dpimappings[1].res[RAZER_DIM_0] = RAZER_MOUSE_RES_800DPI;
+	priv->dpimappings[1].dimension_mask = (1 << RAZER_DIM_0);
 	priv->dpimappings[1].mouse = m;
 
 	priv->dpimappings[2].nr = 2;
-	priv->dpimappings[2].res = RAZER_MOUSE_RES_1800DPI;
+	priv->dpimappings[2].res[RAZER_DIM_0] = RAZER_MOUSE_RES_1800DPI;
+	priv->dpimappings[2].dimension_mask = (1 << RAZER_DIM_0);
 	priv->dpimappings[2].mouse = m;
 
 	for (i = 0; i < BOOMSLANGCE_NR_PROFILES; i++) {
@@ -855,7 +858,7 @@ int razer_boomslangce_init(struct razer_mouse *m,
 
 	m->get_fw_version = boomslangce_get_fw_version;
 	m->reconfigure = boomslangce_reconfigure;
-	m->get_leds = boomslangce_get_leds;
+	m->global_get_leds = boomslangce_get_leds;
 	m->nr_profiles = BOOMSLANGCE_NR_PROFILES;
 	m->get_profiles = boomslangce_get_profiles;
 	m->get_active_profile = boomslangce_get_active_profile;

@@ -5,7 +5,7 @@
 #
 #   This library connects to the lowlevel 'razerd' system daemon.
 #
-#   Copyright (C) 2008-2009 Michael Buesch <m@bues.ch>
+#   Copyright (C) 2008-2011 Michael Buesch <m@bues.ch>
 #
 #   This program is free software; you can redistribute it and/or
 #   modify it under the terms of the GNU General Public License
@@ -29,7 +29,6 @@ RAZER_VERSION	= "0.17"
 class RazerEx(Exception):
 	"Exception thrown by pyrazer code."
 
-
 def razer_be32_to_int(be32Str):
 	return ((ord(be32Str[0]) << 24) | \
 	        (ord(be32Str[1]) << 16) | \
@@ -50,7 +49,19 @@ def razer_int_to_be16(integer):
 	return "%c%c" % ((integer >> 8) & 0xFF,\
 			 (integer & 0xFF))
 
-class RazerDevId:
+def razer_str2bool(string):
+	string = string.lower().strip()
+	if string in ["no", "off", "false"]:
+		return False
+	if string in ["yes", "on", "true"]:
+		return True
+	try:
+		return bool(int(string))
+	except (ValueError), e:
+		pass
+	raise ValueError
+
+class RazerDevId(object):
 	"devid parser"
 
 	DEVTYPE_UNKNOWN = "Unknown"
@@ -94,17 +105,65 @@ class RazerDevId:
 		"Returns the device ID string"
 		return self.devid
 
-class Razer:
+class RazerRGB(object):
+	"An RGB color"
+
+	def __init__(self, r, g, b):
+		self.r = r
+		self.g = g
+		self.b = b
+
+	@classmethod
+	def fromU32(cls, u32):
+		return cls(r=(u32 >> 16) & 0xFF,
+			   g=(u32 >> 8) & 0xFF,
+			   b=(u32 >> 0) & 0xFF)
+
+	def toU32(self):
+		return ((self.r & 0xFF) << 16) |\
+		       ((self.g & 0xFF) << 8) |\
+		       ((self.b & 0xFF) << 0)
+
+	@classmethod
+	def fromString(cls, string):
+		string = string.strip().lstrip("#")
+		if len(string) != 6:
+			raise ValueError
+		return cls(r=int(string[0:2], 16),
+			   g=int(string[2:4], 16),
+			   b=int(string[4:6], 16))
+
+class RazerLED(object):
+	"LED representation"
+
+	def __init__(self, profileId, name, state, color, canChangeColor):
+		self.profileId = profileId
+		self.name = name
+		self.state = state
+		self.color = color
+		self.canChangeColor = canChangeColor
+
+class RazerDpiMapping(object):
+	"DPI mapping"
+
+	def __init__(self, id, res, profileMask, mutable):
+		self.id = id
+		self.res = res
+		self.profileMask = profileMask
+		self.mutable = mutable
+
+class Razer(object):
 	SOCKET_PATH	= "/var/run/razerd/socket"
 	PRIVSOCKET_PATH	= "/var/run/razerd/socket.privileged"
 
-	INTERFACE_REVISION = 2
+	INTERFACE_REVISION = 3
 
 	COMMAND_MAX_SIZE = 512
 	COMMAND_HDR_SIZE = 1
 	BULK_CHUNK_SIZE = 128
 	RAZER_IDSTR_MAX_SIZE = 128
 	RAZER_LEDNAME_MAX_SIZE = 64
+	RAZER_NR_DIMS = 3
 
 	COMMAND_ID_GETREV = 0		# Get the revision number of the socket interface.
 	COMMAND_ID_RESCANMICE = 1	# Rescan mice.
@@ -129,6 +188,7 @@ class Razer:
 	COMMAND_ID_SETBUTFUNC = 20	# Set the current function of a button.
 	COMMAND_ID_SUPPAXES = 21	# Get a list of supported axes.
 	COMMAND_ID_RECONFIGMICE = 22	# Reconfigure all mice
+	COMMAND_ID_GETMOUSEINFO = 23	# Get detailed information about a mouse
 
 	COMMAND_PRIV_FLASHFW = 128	# Upload and flash a firmware image
 	COMMAND_PRIV_CLAIM = 129	# Claim the device.
@@ -167,6 +227,19 @@ class Razer:
 	# Axis flags
 	RAZER_AXIS_INDEPENDENT_DPIMAPPING	= (1 << 0)
 
+	# Mouseinfo flags
+	MOUSEINFOFLG_RESULTOK		= (1 << 0)
+	MOUSEINFOFLG_GLOBAL_LEDS	= (1 << 1)
+	MOUSEINFOFLG_PROFILE_LEDS	= (1 << 2)
+	MOUSEINFOFLG_GLOBAL_FREQ	= (1 << 3)
+	MOUSEINFOFLG_PROFILE_FREQ	= (1 << 4)
+
+	# LED flags
+	LED_FLAG_HAVECOLOR		= (1 << 0)
+	LED_FLAG_CHANGECOLOR		= (1 << 1)
+
+	# Special profile ID
+	PROFILE_INVALID			= 0xFFFFFFFF
 
 	@staticmethod
 	def strerror(errno):
@@ -247,7 +320,7 @@ class Razer:
 			payload = razer_be32_to_int(sock.recv(4))
 		elif id == self.REPLY_ID_STR:
 			strlen = razer_be16_to_int(sock.recv(2))
-			payload = sock.recv(strlen)
+			payload = sock.recv(strlen) if strlen else ""
 		elif id == self.NOTIFY_ID_NEWMOUSE:
 			pass
 		elif id == self.NOTIFY_ID_DELMOUSE:
@@ -315,6 +388,14 @@ class Razer:
 			mice.append(self.__recvString())
 		return mice
 
+	def getMouseInfo(self, idstr):
+		"Get detailed information about a mouse"
+		self.__sendCommand(self.COMMAND_ID_GETMOUSEINFO, idstr)
+		flags = self.__recvU32()
+		if (flags & self.MOUSEINFOFLG_RESULTOK) == 0:
+			raise RazerEx("Failed to get mouseinfo for " + idstr)
+		return flags
+
 	def reconfigureMice(self):
 		"Reconfigure all mice."
 		self.__sendCommand(self.COMMAND_ID_RECONFIGMICE)
@@ -338,7 +419,7 @@ class Razer:
 			freqs.append(self.__recvU32())
 		return freqs
 
-	def getCurrentFreq(self, idstr, profileId):
+	def getCurrentFreq(self, idstr, profileId=PROFILE_INVALID):
 		"Returns the currently selected frequency for a mouse."
 		payload = razer_int_to_be32(profileId)
 		self.__sendCommand(self.COMMAND_ID_GETFREQ, idstr, payload)
@@ -353,28 +434,35 @@ class Razer:
 			res.append(self.__recvU32())
 		return res
 
-	def getLeds(self, idstr):
-		"Returns a list of LEDs on the mouse. Each entry is a tuple (name, state)."
-		self.__sendCommand(self.COMMAND_ID_GETLEDS, idstr)
+	def getLeds(self, idstr, profileId=PROFILE_INVALID):
+		"""Returns a list of RazerLED instances for the given profile,
+		or the global LEDs, if no profile given"""
+		payload = razer_int_to_be32(profileId)
+		self.__sendCommand(self.COMMAND_ID_GETLEDS, idstr, payload)
 		count = self.__recvU32()
 		leds = []
 		for i in range(0, count):
+			flags = self.__recvU32()
 			name = self.__recvString()
 			state = self.__recvU32()
-			leds.append( (name, state) )
+			color = self.__recvU32()
+			if (flags & self.LED_FLAG_HAVECOLOR) == 0:
+				color = None
+			else:
+				color = RazerRGB.fromU32(color)
+			canChangeColor = bool(flags & self.LED_FLAG_CHANGECOLOR)
+			leds.append(RazerLED(profileId, name, state, color, canChangeColor))
 		return leds
 
-	def setLed(self, idstr, ledName, newState):
+	def setLed(self, idstr, led):
 		"Set a LED to a new state."
-		ledName = ledName.strip()
-		if len(ledName) > self.RAZER_LEDNAME_MAX_SIZE:
+		if len(led.name) > self.RAZER_LEDNAME_MAX_SIZE:
 			raise RazerEx("LED name string too long")
-		payload = ledName
-		payload += '\0' * (self.RAZER_LEDNAME_MAX_SIZE - len(ledName))
-		if newState:
-			payload += "%c" % 1
-		else:
-			payload += "%c" % 0
+		payload = razer_int_to_be32(led.profileId)
+		payload += led.name
+		payload += '\0' * (self.RAZER_LEDNAME_MAX_SIZE - len(led.name))
+		payload += "%c" % (1 if led.state else 0)
+		payload += razer_int_to_be32(led.color.toU32())
 		self.__sendCommand(self.COMMAND_ID_SETLED, idstr, payload)
 		return self.__recvU32()
 
@@ -385,20 +473,32 @@ class Razer:
 		return self.__recvU32()
 
 	def getSupportedDpiMappings(self, idstr):
-		"Returns a list of supported DPI mappings. Each entry is a tuple (id, resolution, isMutable)"
+		"Returns a list of supported DPI mappings. Each entry is a RazerDpiMapping() instance."
 		self.__sendCommand(self.COMMAND_ID_SUPPDPIMAPPINGS, idstr)
 		count = self.__recvU32()
 		mappings = []
 		for i in range(0, count):
 			id = self.__recvU32()
-			res = self.__recvU32()
+			dimMask = self.__recvU32()
+			res = []
+			for i in range(0, self.RAZER_NR_DIMS):
+				rVal = self.__recvU32()
+				if (dimMask & (1 << i)) == 0:
+					rVal = None
+				res.append(rVal)
+			profileMaskHigh = self.__recvU32()
+			profileMaskLow = self.__recvU32()
+			profileMask = (profileMaskHigh << 32) | profileMaskLow
 			mutable = self.__recvU32()
-			mappings.append( (id, res, mutable) )
+			mappings.append(RazerDpiMapping(
+				id, res, profileMask, mutable))
 		return mappings
 
-	def changeDpiMapping(self, idstr, mappingId, newResolution):
+	def changeDpiMapping(self, idstr, mappingId, dimensionId, newResolution):
 		"Changes the resolution value of a DPI mapping."
-		payload = razer_int_to_be32(mappingId) + razer_int_to_be32(newResolution)
+		payload = razer_int_to_be32(mappingId) +\
+			  razer_int_to_be32(dimensionId) +\
+			  razer_int_to_be32(newResolution)
 		self.__sendCommand(self.COMMAND_ID_CHANGEDPIMAPPING, idstr, payload)
 		return self.__recvU32()
 
@@ -498,7 +598,7 @@ class Razer:
 			axes.append( (id, name, flags) )
 		return axes
 
-class IHEXParser:
+class IHEXParser(object):
 	TYPE_DATA = 0
 	TYPE_EOF  = 1
 	TYPE_ESAR = 2
@@ -557,14 +657,14 @@ class IHEXParser:
 			raise RazerEx("Invalid firmware file format (IHEX digit format)")
 		return "".join(bin)
 
-class SRECParser:
+class SRECParser(object):
 	def __init__(self, srec):
 		self.srec = srec
 
 	def parse(self):
 		return ""#TODO
 
-class RazerFirmwareParser:
+class RazerFirmwareParser(object):
 	class Descriptor:
 		def __init__(self, startOffset, endOffset, parser, binTruncate):
 			# startOffset: The offset where the ihex/srec/etc starts

@@ -71,11 +71,13 @@ int razer_parse_buttonmap(void *rawdata, size_t rawsize,
 				"is invalid\n", (unsigned int)count);
 			return -EINVAL;
 		}
+		/*FIXME triggers for lachesis5k6
 		if (mapping.logical == 0) {
 			razer_error("razer_parse_buttonmap: Logical mapping for 0x%02X "
 				"is invalid\n", mapping.physical);
 			return -EINVAL;
 		}
+		*/
 
 		target->physical = mapping.physical;
 		target->logical = mapping.logical;

@@ -209,18 +209,48 @@ uint8_t razer_xor8_checksum(const void *_buffer, size_t size)
 	return sum;
 }
 
+static char razer_char_to_ascii(char c)
+{
+	if (c >= 32 && c <= 126)
+		return c;
+	return '.';
+}
+
 void razer_dump(const char *prefix, const void *_buf, size_t size)
 {
 	const unsigned char *buf = _buf;
 	size_t i;
+	char ascii[17] = { 0, };
+	unsigned int ascii_idx = 0;
 
 	for (i = 0; i < size; i++) {
 		if (i % 16 == 0) {
-			if (i != 0)
-				printf("\n");
+			if (i != 0) {
+				printf("  |%s|\n", ascii);
+				memset(ascii, 0, sizeof(ascii));
+				ascii_idx = 0;
+			}
 			printf("%s-[%04X]:  ", prefix, (unsigned int)i);
 		}
 		printf("%02X%s", buf[i], (i % 2) ? " " : "");
+		ascii[ascii_idx++] = razer_char_to_ascii(buf[i]);
+	}
+	if (ascii[0]) {
+		for (; i % 16; i++)
+			printf((i % 2) ? "   " : "  ");
+		printf("  |%s|", ascii);
 	}
 	printf("\n\n");
+}
+
+void razer_utf16_cpy(razer_utf16_t *dest, const razer_utf16_t *src,
+		     size_t max_chars)
+{
+	size_t i;
+
+	for (i = 0; i < max_chars; i++, dest++, src++) {
+		*dest = *src;
+		if (!(*src))
+			break;
+	}
 }

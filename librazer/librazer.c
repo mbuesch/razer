@@ -115,7 +115,7 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 //	USB_MOUSE(0x04B4, 0xE006, &razer_deathadder_base_ops), /* cypress bootloader */
 	USB_MOUSE(0x1532, 0x0003, &razer_krait_base_ops),
 	USB_MOUSE(0x1532, 0x000C, &razer_lachesis_base_ops), /* classic */
-//	USB_MOUSE(0x1532, 0x001E, &razer_lachesis_base_ops), /* 5600 DPI */
+	USB_MOUSE(0x1532, 0x001E, &razer_lachesis_base_ops), /* 5600 DPI */
 	USB_MOUSE(0x1532, 0x0015, &razer_naga_base_ops),
 	USB_MOUSE(0x1532, 0x0101, &razer_copperhead_base_ops),
 	USB_MOUSE(0x1532, 0x0005, &razer_boomslangce_base_ops),
@@ -374,6 +374,7 @@ static bool mouse_apply_one_config(struct config_file *f,
 	int err, nr;
 	char a[64] = { 0, }, b[64] = { 0, };
 
+//FIXME fixes for glob/prof configs
 	if (strcasecmp(item, "profile") == 0) {
 		int profile;
 
@@ -406,9 +407,10 @@ static bool mouse_apply_one_config(struct config_file *f,
 		nr = m->supported_dpimappings(m, &mappings);
 		if (nr <= 0)
 			goto error;
+		//FIXME dims
 		for (i = 0; i < nr; i++) {
 			if (resolution >= 100) {
-				if ((int)(mappings[i].res) != resolution)
+				if ((int)(mappings[i].res[RAZER_DIM_0]) != resolution)
 					continue;
 			} else {
 				if (mappings[i].nr != resolution)
@@ -427,6 +429,9 @@ static bool mouse_apply_one_config(struct config_file *f,
 		struct razer_led *leds, *led;
 		const char *ledname;
 
+		/* TODO: Extend led config entry to specify the profile */
+		prof = m->get_active_profile(m);
+
 		err = razer_split_pair(value, ':', a, b, min(sizeof(a), sizeof(b)));
 		if (err)
 			goto error;
@@ -434,9 +439,9 @@ static bool mouse_apply_one_config(struct config_file *f,
 		err = razer_string_to_bool(razer_string_strip(b), &on);
 		if (err)
 			goto error;
-		if (!m->get_leds)
+		if (!prof->get_leds)
 			goto ok; /* No LEDs. Ignore config. */
-		err = m->get_leds(m, &leds);
+		err = prof->get_leds(prof, &leds);
 		if (err < 0)
 			goto error;
 		if (err == 0)
@@ -1260,13 +1265,13 @@ void razer_init_axes(struct razer_axis *axes,
 
 struct razer_mouse_dpimapping * razer_mouse_get_dpimapping_by_res(
 		struct razer_mouse_dpimapping *mappings, size_t nr_mappings,
-		enum razer_mouse_res res)
+		enum razer_dimension dim, enum razer_mouse_res res)
 {
 	struct razer_mouse_dpimapping *mapping = NULL;
 	size_t i;
 
 	for (i = 0; i < nr_mappings; i++) {
-		if (mappings[i].res == res) {
+		if (mappings[i].res[dim] == res) {
 			mapping = &mappings[i];
 			break;
 		}

@@ -2,7 +2,7 @@
  *   Razer daemon
  *   Daemon to keep track of Razer device state.
  *
- *   Copyright (C) 2008-2010 Michael Buesch <m@bues.ch>
+ *   Copyright (C) 2008-2011 Michael Buesch <m@bues.ch>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -82,7 +82,7 @@ struct commandline_args {
 #define SOCKPATH		VAR_RUN_RAZERD "/socket"
 #define PRIV_SOCKPATH		VAR_RUN_RAZERD "/socket.privileged"
 
-#define INTERFACE_REVISION	2
+#define INTERFACE_REVISION	3
 
 #define COMMAND_MAX_SIZE	512
 #define COMMAND_HDR_SIZE	sizeof(struct command_hdr)
@@ -114,6 +114,7 @@ enum {
 	COMMAND_ID_SETBUTFUNC,		/* Set the current function of a button. */
 	COMMAND_ID_SUPPAXES,		/* Get a list of supported axes. */
 	COMMAND_ID_RECONFIGMICE,	/* Reconfigure all mice. */
+	COMMAND_ID_GETMOUSEINFO,	/* Get detailed information about a mouse */
 
 	/* Privileged commands */
 	COMMAND_PRIV_FLASHFW = 128,	/* Upload and flash a firmware image */
@@ -131,6 +132,23 @@ enum {
 	ERR_FAIL,
 	ERR_PAYLOAD,
 	ERR_NOTSUPP,
+};
+
+enum mouseinfo_flags {
+	MOUSEINFOFLG_RESULTOK		= (1 << 0),
+	MOUSEINFOFLG_GLOBAL_LEDS	= (1 << 1),
+	MOUSEINFOFLG_PROFILE_LEDS	= (1 << 2),
+	MOUSEINFOFLG_GLOBAL_FREQ	= (1 << 3),
+	MOUSEINFOFLG_PROFILE_FREQ	= (1 << 4),
+};
+
+enum led_flags {
+	LED_FLAG_HAVECOLOR		= (1 << 0),
+	LED_FLAG_CHANGECOLOR		= (1 << 1),
+};
+
+enum profile_special_values {
+	PROFILE_INVALID			= 0xFFFFFFFF,
 };
 
 struct command_hdr {
@@ -158,6 +176,7 @@ struct command {
 
 		struct {
 			uint32_t id;
+			uint32_t dimension;
 			uint32_t new_resolution;
 		} _packed changedpimapping;
 
@@ -173,11 +192,14 @@ struct command {
 		} _packed setdpimapping;
 
 		struct {
+			uint32_t profile_id;
 		} _packed getleds;
 
 		struct {
+			uint32_t profile_id;
 			char led_name[RAZER_LEDNAME_MAX_SIZE];
 			uint8_t new_state;
+			uint32_t color;
 		} _packed setled;
 
 		struct {
@@ -215,6 +237,9 @@ struct command {
 			uint32_t button_id;
 			uint32_t function_id;
 		} _packed setbutfunc;
+
+		struct {
+		} _packed getmouseinfo;
 
 		struct {
 			uint32_t imagesize;
@@ -873,16 +898,24 @@ static void command_getfreq(struct client *client, const struct command *cmd, un
 	struct razer_mouse *mouse;
 	struct razer_mouse_profile *profile;
 	enum razer_mouse_freq freq;
+	unsigned int profile_id;
 
 	if (len < CMD_SIZE(getfreq))
 		goto error;
 	mouse = find_mouse(cmd->idstr);
 	if (!mouse)
 		goto error;
-	profile = find_mouse_profile(mouse, be32_to_cpu(cmd->getfreq.profile_id));
-	if (!profile || !profile->get_freq)
-		goto error;
-	freq = profile->get_freq(profile);
+	profile_id = be32_to_cpu(cmd->getfreq.profile_id);
+	if (profile_id == PROFILE_INVALID) {
+		if (!mouse->global_get_freq)
+			goto error;
+		freq = mouse->global_get_freq(mouse);
+	} else {
+		profile = find_mouse_profile(mouse, profile_id);
+		if (!profile || !profile->get_freq)
+			goto error;
+		freq = profile->get_freq(profile);
+	}
 
 	send_u32(client, freq);
 
@@ -947,7 +980,7 @@ static void command_suppdpimappings(struct client *client, const struct command 
 {
 	struct razer_mouse *mouse;
 	struct razer_mouse_dpimapping *list;
-	int i, count;
+	int i, j, count;
 
 	if (len < CMD_SIZE(suppdpimappings))
 		goto error;
@@ -961,7 +994,11 @@ static void command_suppdpimappings(struct client *client, const struct command 
 	send_u32(client, count);
 	for (i = 0; i < count; i++) {
 		send_u32(client, list[i].nr);
-		send_u32(client, list[i].res);
+		send_u32(client, list[i].dimension_mask);
+		for (j = 0; j < RAZER_NR_DIMS; j++)
+			send_u32(client, list[i].res[j]);
+		send_u32(client, (list[i].profile_mask >> 32) & 0xFFFFFFFF);
+		send_u32(client, (list[i].profile_mask >> 0) & 0xFFFFFFFF);
 		send_u32(client, list[i].change ? 1 : 0);
 	}
 	/* No need to free list. It's statically allocated. */
@@ -1000,6 +1037,7 @@ static void command_changedpimapping(struct client *client, const struct command
 		goto error;
 	}
 	err = mapping->change(mapping,
+			      be32_to_cpu(cmd->changedpimapping.dimension),
 			      be32_to_cpu(cmd->changedpimapping.new_resolution));
 	if (err)
 		errorcode = ERR_FAIL;
@@ -1092,25 +1130,80 @@ static void command_reconfigmice(struct client *client, const struct command *cm
 	razer_reconfig_mice();
 }
 
+static void command_getmouseinfo(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	struct razer_mouse_profile *profiles;
+	unsigned int flags;
+
+	if (len < CMD_SIZE(getmouseinfo))
+		goto error;
+	mouse = find_mouse(cmd->idstr);
+	if (!mouse)
+		goto error;
+	flags = MOUSEINFOFLG_RESULTOK;
+	if (mouse->global_get_leds)
+		flags |= MOUSEINFOFLG_GLOBAL_LEDS;
+	if (mouse->global_get_freq)
+		flags |= MOUSEINFOFLG_GLOBAL_FREQ;
+	if (mouse->nr_profiles && mouse->get_profiles) {
+		profiles = mouse->get_profiles(mouse);
+		if (profiles) {
+			if (profiles[0].get_leds)
+				flags |= MOUSEINFOFLG_PROFILE_LEDS;
+			if (profiles[0].get_freq)
+				flags |= MOUSEINFOFLG_PROFILE_FREQ;
+		}
+	}
+	send_u32(client, flags);
+
+	return;
+error:
+	send_u32(client, 0);
+}
+
 static void command_getleds(struct client *client, const struct command *cmd, unsigned int len)
 {
 	struct razer_mouse *mouse;
+	struct razer_mouse_profile *profile;
 	struct razer_led *leds_list, *led;
 	int count;
+	unsigned int flags, profile_id;
 
 	if (len < CMD_SIZE(getleds))
 		goto error;
 	mouse = find_mouse(cmd->idstr);
-	if (!mouse || !mouse->get_leds)
+	if (!mouse)
 		goto error;
-	count = mouse->get_leds(mouse, &leds_list);
+	profile_id = be32_to_cpu(cmd->getleds.profile_id);
+	if (profile_id == PROFILE_INVALID) {
+		if (!mouse->global_get_leds)
+			goto error;
+		count = mouse->global_get_leds(mouse, &leds_list);
+	} else {
+		profile = find_mouse_profile(mouse, profile_id);
+		if (!profile)
+			goto error;
+		if (!profile->get_leds)
+			goto error;
+		count = profile->get_leds(profile, &leds_list);
+	}
 	if (count <= 0)
 		goto error;
 
 	send_u32(client, count);
 	for (led = leds_list; led; led = led->next) {
+		flags = 0;
+		if (led->color.valid)
+			flags |= LED_FLAG_HAVECOLOR;
+		if (led->change_color)
+			flags |= LED_FLAG_CHANGECOLOR;
+		send_u32(client, flags);
 		send_string(client, led->name);
 		send_u32(client, led->state);
+		send_u32(client, ((uint32_t)led->color.r << 16) |
+				 ((uint32_t)led->color.g << 8) |
+				 ((uint32_t)led->color.b << 0));
 	}
 	razer_free_leds(leds_list);
 
@@ -1136,9 +1229,13 @@ static struct razer_led * razer_mouse_find_led(struct razer_led *leds_list,
 static void command_setled(struct client *client, const struct command *cmd, unsigned int len)
 {
 	struct razer_mouse *mouse;
+	struct razer_mouse_profile *profile;
 	struct razer_led *leds_list = NULL, *led;
+	enum razer_led_state new_state;
+	struct razer_rgb_color new_color;
 	int err, count;
 	uint32_t errorcode = ERR_NONE;
+	unsigned int profile_id, value;
 
 	if (len < CMD_SIZE(setled)) {
 		errorcode = ERR_CMDSIZE;
@@ -1149,7 +1246,25 @@ static void command_setled(struct client *client, const struct command *cmd, uns
 		errorcode = ERR_NOMOUSE;
 		goto error;
 	}
-	count = mouse->get_leds(mouse, &leds_list);
+	profile_id = be32_to_cpu(cmd->setled.profile_id);
+	if (profile_id == PROFILE_INVALID) {
+		if (!mouse->global_get_leds) {
+			errorcode = ERR_NOLED;
+			goto error;
+		}
+		count = mouse->global_get_leds(mouse, &leds_list);
+	} else {
+		profile = find_mouse_profile(mouse, profile_id);
+		if (!profile) {
+			errorcode = ERR_NOLED;
+			goto error;
+		}
+		if (!profile->get_leds) {
+			errorcode = ERR_NOLED;
+			goto error;
+		}
+		count = profile->get_leds(profile, &leds_list);
+	}
 	if (count <= 0) {
 		errorcode = ERR_NOMEM;
 		goto error;
@@ -1164,12 +1279,35 @@ static void command_setled(struct client *client, const struct command *cmd, uns
 		errorcode = ERR_CLAIM;
 		goto error;
 	}
-	err = led->toggle_state(led, cmd->setled.new_state ? RAZER_LED_ON : RAZER_LED_OFF);
-	mouse->release(mouse);
-	if (err) {
-		errorcode = ERR_FAIL;
-		goto error;
+	new_state = cmd->setled.new_state ? RAZER_LED_ON : RAZER_LED_OFF;
+	if (new_state != led->state) {
+		err = led->toggle_state(led, new_state);
+		if (err) {
+			mouse->release(mouse);
+			errorcode = ERR_FAIL;
+			goto error;
+		}
 	}
+	if (led->change_color) {
+		memset(&new_color, 0, sizeof(new_color));
+		value = be32_to_cpu(cmd->setled.color);
+		new_color.valid = 1;
+		new_color.r = (value >> 16) & 0xFF;
+		new_color.g = (value >> 8) & 0xFF;
+		new_color.b = (value >> 0) & 0xFF;
+		if (!!new_color.valid != !!led->color.valid ||
+		    new_color.r != led->color.r ||
+		    new_color.g != led->color.g ||
+		    new_color.b != led->color.b) {
+			err = led->change_color(led, &new_color);
+			if (err) {
+				mouse->release(mouse);
+				errorcode = ERR_FAIL;
+				goto error;
+			}
+		}
+	}
+	mouse->release(mouse);
 
 error:
 	razer_free_leds(leds_list);
@@ -1179,9 +1317,10 @@ error:
 static void command_setfreq(struct client *client, const struct command *cmd, unsigned int len)
 {
 	struct razer_mouse *mouse;
-	struct razer_mouse_profile *profile;
+	struct razer_mouse_profile *profile = NULL;
 	int err;
 	uint32_t errorcode = ERR_NONE;
+	unsigned int profile_id;
 
 	if (len < CMD_SIZE(setfreq)) {
 		errorcode = ERR_CMDSIZE;
@@ -1192,10 +1331,22 @@ static void command_setfreq(struct client *client, const struct command *cmd, un
 		errorcode = ERR_NOMOUSE;
 		goto error;
 	}
-	profile = find_mouse_profile(mouse, be32_to_cpu(cmd->setfreq.profile_id));
-	if (!profile || !profile->set_freq) {
-		errorcode = ERR_FAIL;
-		goto error;
+	profile_id = be32_to_cpu(cmd->setfreq.profile_id);
+	if (profile_id == PROFILE_INVALID) {
+		if (!mouse->global_set_freq) {
+			errorcode = ERR_NOTSUPP;
+			goto error;
+		}
+	} else {
+		profile = find_mouse_profile(mouse, profile_id);
+		if (!profile) {
+			errorcode = ERR_FAIL;
+			goto error;
+		}
+		if (!profile->set_freq) {
+			errorcode = ERR_NOTSUPP;
+			goto error;
+		}
 	}
 
 	err = mouse->claim(mouse);
@@ -1203,7 +1354,13 @@ static void command_setfreq(struct client *client, const struct command *cmd, un
 		errorcode = ERR_CLAIM;
 		goto error;
 	}
-	err = profile->set_freq(profile, be32_to_cpu(cmd->setfreq.new_frequency));
+	if (profile_id == PROFILE_INVALID) {
+		err = mouse->global_set_freq(mouse,
+			be32_to_cpu(cmd->setfreq.new_frequency));
+	} else {
+		err = profile->set_freq(profile,
+			be32_to_cpu(cmd->setfreq.new_frequency));
+	}
 	mouse->release(mouse);
 	if (err) {
 		errorcode = ERR_FAIL;
@@ -1631,6 +1788,9 @@ static void handle_received_command(struct client *client, const char *_cmd, uns
 		break;
 	case COMMAND_ID_RECONFIGMICE:
 		command_reconfigmice(client, cmd, len);
+		break;
+	case COMMAND_ID_GETMOUSEINFO:
+		command_getmouseinfo(client, cmd, len);
 		break;
 	default:
 		/* Unknown command. */

@@ -80,7 +80,7 @@ static int krait_commit(struct krait_private *priv)
 	uint8_t value;
 	int err;
 
-	switch (priv->cur_dpimapping->res) {
+	switch (priv->cur_dpimapping->res[RAZER_DIM_0]) {
 	case RAZER_MOUSE_RES_400DPI:
 		value = 6;
 		break;
@@ -113,7 +113,7 @@ static int krait_supported_resolutions(struct razer_mouse *m,
 	enum razer_mouse_res *list;
 	const int count = 2;
 
-	list = malloc(sizeof(*list) * count);
+	list = zalloc(sizeof(*list) * count);
 	if (!list)
 		return -ENOMEM;
 
@@ -196,12 +196,14 @@ int razer_krait_init(struct razer_mouse *m,
 	priv->profile.mouse = m;
 
 	priv->dpimapping[0].nr = 0;
-	priv->dpimapping[0].res = RAZER_MOUSE_RES_400DPI;
+	priv->dpimapping[0].res[RAZER_DIM_0] = RAZER_MOUSE_RES_400DPI;
+	priv->dpimapping[0].dimension_mask = (1 << RAZER_DIM_0);
 	priv->dpimapping[0].change = NULL;
 	priv->dpimapping[0].mouse = m;
 
 	priv->dpimapping[1].nr = 1;
-	priv->dpimapping[1].res = RAZER_MOUSE_RES_1600DPI;
+	priv->dpimapping[1].res[RAZER_DIM_0] = RAZER_MOUSE_RES_1600DPI;
+	priv->dpimapping[1].dimension_mask = (1 << RAZER_DIM_0);
 	priv->dpimapping[1].change = NULL;
 	priv->dpimapping[1].mouse = m;
 

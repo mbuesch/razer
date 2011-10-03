@@ -41,10 +41,11 @@ enum { /* LED IDs */
 };
 
 enum { /* Misc constants */
-	LACHESIS_NR_PROFILES	= 5,
-	LACHESIS_NR_DPIMAPPINGS	= 5,
-	LACHESIS_NR_AXES	= 3,
-	LACHESIS_SERIAL_MAX_LEN	= 32,
+	LACHESIS_NR_PROFILES		= 5,
+	LACHESIS_NR_DPIMAPPINGS		= 5,
+	LACHESIS_NR_AXES		= 3,
+	LACHESIS_SERIAL_MAX_LEN		= 32,
+	LACHESIS_PROFNAME_MAX_LEN	= 20,
 };
 
 /* The wire protocol data structures... */
@@ -99,11 +100,11 @@ struct lachesis5k6_request {
 	uint8_t request;
 	uint8_t _padding[3];
 	uint8_t payload[80];
-	be16_t checksum;
+	le16_t checksum;
 } _packed;
 
 #define LACHESIS5K6_REQ_MAGIC		0x01
-#define LACHESIS5K6_REQ_FLG_RXOK	0x02
+#define LACHESIS5K6_REQ_FLG_TRANSOK	0x02
 #define LACHESIS5K6_REQ_READ		0x01
 #define LACHESIS5K6_REQ_WRITE		0x00
 
@@ -112,16 +113,51 @@ struct lachesis5k6_request_devinfo {
 	uint8_t fwver[2];
 } _packed;
 
-struct lachesis5k6_request_sensor {
+struct lachesis5k6_request_globconfig {
 	uint8_t profile;
 	uint8_t freq;
-	uint8_t dpistage; //XXX
+	uint8_t dpisel;
 	uint8_t dpival0;
 	uint8_t dpival1;
 } _packed;
 
+struct lachesis5k6_request_profname {
+	uint8_t profile;
+	uint8_t name[LACHESIS_PROFNAME_MAX_LEN * 2]; /* UTF-16-LE */
+} _packed;
+
+struct lachesis5k6_one_dpimapping {
+	uint8_t dpival0;
+	uint8_t dpival1;
+} _packed;
+
+struct lachesis5k6_led_color {
+	uint8_t r;
+	uint8_t g;
+	uint8_t b;
+	uint8_t padding;
+} _packed;
+
+#define LACHESIS5K6_LED_COLOR_PADDING	0xFF
+
+struct lachesis5k6_request_hwconfig {
+	uint8_t profile;
+	uint8_t leds;
+	uint8_t dpisel;
+	uint8_t nr_dpimappings;
+	struct lachesis5k6_one_dpimapping dpimappings[LACHESIS_NR_DPIMAPPINGS];
+	uint8_t _padding[6];
+	uint8_t buttonmap[4 * NR_LACHESIS_PHYSBUT];
+	struct lachesis5k6_led_color scroll_color;
+	struct lachesis5k6_led_color logo_color;
+} _packed;
+
 struct lachesis_buttons {
 	struct razer_buttonmapping mapping[NR_LACHESIS_PHYSBUT];
+};
+
+struct lachesis_prof_name {
+	razer_utf16_t name[LACHESIS_PROFNAME_MAX_LEN + 1];
 };
 
 /* Context data structure */
@@ -134,23 +170,30 @@ struct lachesis_private {
 	uint16_t fw_version;
 	char serial[LACHESIS_SERIAL_MAX_LEN + 1];
 
-	/* The currently set LED states. */
-	enum razer_led_state led_states[LACHESIS_NR_LEDS];
+	/* The currently set LED states.
+	 * For Classic, only profile 0 is valid. */
+	enum razer_led_state led_states[LACHESIS_NR_PROFILES][LACHESIS_NR_LEDS];
+	/* LED colors (5600 only) */
+	struct razer_rgb_color led_colors[LACHESIS_NR_PROFILES][LACHESIS_NR_LEDS];
 
 	/* The active profile. */
 	struct razer_mouse_profile *cur_profile;
 	/* Profile configuration (one per profile). */
 	struct razer_mouse_profile profiles[LACHESIS_NR_PROFILES];
+	/* Profile names (5600 only) */
+	struct lachesis_prof_name profile_names[LACHESIS_NR_PROFILES];
 
 	/* Supported mouse axes */
 	struct razer_axis axes[LACHESIS_NR_AXES];
 
 	/* The active DPI mapping; per profile. */
 	struct razer_mouse_dpimapping *cur_dpimapping[LACHESIS_NR_PROFILES];
-	/* The possible DPI mappings. */
-	struct razer_mouse_dpimapping dpimappings[LACHESIS_NR_DPIMAPPINGS];
+	/* The possible DPI mappings. For the Lachesis Classic, only
+	 * the first profile is used. */
+	struct razer_mouse_dpimapping dpimappings[LACHESIS_NR_PROFILES][LACHESIS_NR_DPIMAPPINGS];
 
-	/* The active scan frequency; per profile. */
+	/* The active scan frequency. Per profile on Classic.
+	 * On the 5600, only the first entry is used. */
 	enum razer_mouse_freq cur_freq[LACHESIS_NR_PROFILES];
 
 	/* The active button mapping; per profile. */
@@ -212,6 +255,32 @@ static struct razer_button_function lachesis_button_functions[] = {
  * TODO: react to profile/dpi/whatever changes via hw buttons. need to poll?
  */
 
+/*XXX: lachesis-5600 notes
+ *
+ *	get global config:	0x05 / 0x01 (or 0x00)
+ *	set global config:	0x05 / 0x05
+ *	get prof name:		0x22 / 0x01 / payload[0]=profnr
+ *	set prof name:		0x22 / 0x29 / payload = profnr + utf16le
+ *	get hwconfig:		0x06 / 0x01 / payload[0]=profnr
+ *	set hwconfig:		0x06 / 0x48 / payload = profnr + confdata
+ *
+ *	LEDs bit0 -> scroll
+ *	LEDs bit1 -> logo
+ *	LEDs bit2 -> always 1?
+*/
+
+static le16_t lachesis5k6_checksum(const struct lachesis5k6_request *req)
+{
+	uint16_t checksum;
+
+	checksum = razer_xor8_checksum((uint8_t *)req + 2,
+				       sizeof(*req) - 2);
+	if (!(req->flags & LACHESIS5K6_REQ_FLG_TRANSOK))
+		checksum |= 0x100;
+
+	return cpu_to_le16(checksum);
+}
+
 static int lachesis_usb_write(struct lachesis_private *priv,
 			      int request, int command, int index,
 			      void *buf, size_t size)
@@ -234,14 +303,16 @@ static int lachesis_usb_write(struct lachesis_private *priv,
 }
 
 static int lachesis5k6_request_send(struct lachesis_private *priv,
-				    struct lachesis5k6_request *req)
+				    const struct lachesis5k6_request *_req)
 {
-	req->magic = LACHESIS5K6_REQ_MAGIC;
-	req->checksum = razer_xor16_checksum_be(req,
-				sizeof(*req) - sizeof(req->checksum));
+	struct lachesis5k6_request req = *_req;
+
+	req.magic = LACHESIS5K6_REQ_MAGIC;
+	req.checksum = lachesis5k6_checksum(&req);
+//	razer_dump("WR", &req, sizeof(req));
 
 	return lachesis_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
-				  0x300, 0, req, sizeof(*req));
+				  0x300, 0, &req, sizeof(req));
 }
 
 static int lachesis_usb_read(struct lachesis_private *priv,
@@ -266,22 +337,27 @@ static int lachesis_usb_read(struct lachesis_private *priv,
 }
 
 static int lachesis5k6_request_receive(struct lachesis_private *priv,
-				       struct lachesis5k6_request *req)
+				       struct lachesis5k6_request *req,
+				       bool do_checksum)
 {
+	le16_t checksum;
 	int err;
-	be16_t checksum;
 
 	memset(req, 0, sizeof(*req));
 	err = lachesis_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
 				0x300, 0, req, sizeof(*req));
 	if (err)
 		return err;
-	checksum = razer_xor16_checksum_be(req, sizeof(*req) - sizeof(checksum));
-	if (checksum != req->checksum) {
-		razer_error("hw_lachesis: Received request with "
-			    "invalid checksum (expected %04X, got %04X)\n",
-			    be16_to_cpu(checksum), be16_to_cpu(req->checksum));
-//		return -EIO;
+//	razer_dump("RD", req, sizeof(*req));
+	if (do_checksum) {
+		checksum = lachesis5k6_checksum(req);
+		if (req->checksum != checksum) {
+			razer_error("hw_lachesis: Received request with invalid "
+				    "checksum (was 0x%04X, expected 0x%04X)\n",
+				    le16_to_cpu(req->checksum),
+				    le16_to_cpu(checksum));
+			return -EIO;
+		}
 	}
 
 	return 0;
@@ -294,19 +370,19 @@ static int lachesis5k6_request_write(struct lachesis_private *priv,
 	struct lachesis5k6_request req, nullreq;
 	int err;
 
+	if (WARN_ON(payload_len > sizeof(req.payload)))
+		return -EINVAL;
+
 	memset(&req, 0, sizeof(req));
 	req.rw = LACHESIS5K6_REQ_WRITE;
 	req.command = command;
 	req.request = request;
-	if (payload) {
-		if (WARN_ON(payload_len > sizeof(req.payload)))
-			return -EINVAL;
+	if (payload)
 		memcpy(req.payload, payload, payload_len);
-	}
 	err = lachesis5k6_request_send(priv, &req);
 	if (err)
 		return err;
-	err = lachesis5k6_request_receive(priv, &req);
+	err = lachesis5k6_request_receive(priv, &req, 0);
 	if (err)
 		return err;
 	memset(&nullreq, 0, sizeof(nullreq));
@@ -314,7 +390,18 @@ static int lachesis5k6_request_write(struct lachesis_private *priv,
 	if (err)
 		return err;
 
-	//TODO checks
+	if (req.magic != LACHESIS5K6_REQ_MAGIC) {
+		razer_error("hw_lachesis: Invalid magic on sent request\n");
+		return -EIO;
+	}
+	if (req.rw != LACHESIS5K6_REQ_WRITE) {
+		razer_error("hw_lachesis: Invalid rw flag on sent request\n");
+		return -EIO;
+	}
+	if (req.command != command || req.request != request) {
+		razer_error("hw_lachesis: Invalid command on sent request\n");
+		return -EIO;
+	}
 
 	return 0;
 }
@@ -326,35 +413,34 @@ static int lachesis5k6_request_read(struct lachesis_private *priv,
 	struct lachesis5k6_request req, nullreq;
 	int err;
 
+	if (WARN_ON(payload_len > sizeof(req.payload)))
+		return -EINVAL;
+
 	memset(&req, 0, sizeof(req));
 	req.rw = LACHESIS5K6_REQ_READ;
 	req.command = command;
 	req.request = request;
+	if (payload)
+		memcpy(req.payload, payload, payload_len);
 	err = lachesis5k6_request_send(priv, &req);
 	if (err)
 		return err;
-	err = lachesis5k6_request_receive(priv, &req);
+	err = lachesis5k6_request_receive(priv, &req, 0);
 	if (err)
 		return err;
 	memset(&nullreq, 0, sizeof(nullreq));
 	err = lachesis5k6_request_send(priv, &nullreq);
 	if (err)
 		return err;
-
-	if (payload) {
-		if (WARN_ON(payload_len > sizeof(req.payload)))
-			return -EINVAL;
+	if (payload)
 		memcpy(payload, req.payload, payload_len);
-	}
-
-//razer_dump("RD", &req, sizeof(req)); //XXX
 
 	if (req.magic != LACHESIS5K6_REQ_MAGIC) {
 		razer_error("hw_lachesis: Invalid magic on received request\n");
 		return -EIO;
 	}
-	if (!(req.flags & LACHESIS5K6_REQ_FLG_RXOK)) {
-		razer_error("hw_lachesis: Failed to receive request. (RXOK flag)\n");
+	if (!(req.flags & LACHESIS5K6_REQ_FLG_TRANSOK)) {
+		razer_error("hw_lachesis: Failed to receive request. (TRANSOK flag)\n");
 		return -EIO;
 	}
 	if (req.rw != LACHESIS5K6_REQ_READ) {
@@ -387,6 +473,7 @@ static int lachesis_read_devinfo(struct lachesis_private *priv)
 		priv->fw_version = ((uint16_t)(buf[0]) << 8) | buf[1];
 		break;
 	case LACHESIS_5600:
+		memset(&devinfo, 0, sizeof(devinfo));
 		err = lachesis5k6_request_read(priv, 2, 1,
 					       &devinfo, sizeof(devinfo));
 		if (err)
@@ -414,7 +501,7 @@ static int lachesis_commit_classic(struct lachesis_private *priv)
 		profcfg.packetlength = cpu_to_le16(sizeof(profcfg));
 		profcfg.magic = LACHESIS_PROFCFG_MAGIC;
 		profcfg.profile = i + 1;
-		profcfg.dpisel = priv->cur_dpimapping[i]->nr + 1;
+		profcfg.dpisel = (priv->cur_dpimapping[i]->nr % 10) + 1;
 		switch (priv->cur_freq[i]) {
 		default:
 		case RAZER_MOUSE_FREQ_1000HZ:
@@ -448,9 +535,9 @@ static int lachesis_commit_classic(struct lachesis_private *priv)
 
 	/* Commit LED states. */
 	value = 0;
-	if (priv->led_states[LACHESIS_LED_LOGO])
+	if (priv->led_states[0][LACHESIS_LED_LOGO])
 		value |= 0x01;
-	if (priv->led_states[LACHESIS_LED_SCROLL])
+	if (priv->led_states[0][LACHESIS_LED_SCROLL])
 		value |= 0x02;
 	err = lachesis_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
 				 0x04, 0, &value, sizeof(value));
@@ -468,7 +555,7 @@ static int lachesis_commit_classic(struct lachesis_private *priv)
 	memset(&dpimap, 0, sizeof(dpimap));
 	for (i = 0; i < LACHESIS_NR_DPIMAPPINGS; i++) {
 		dpimap.mappings[i].magic = LACHESIS_DPIMAPPING_MAGIC;
-		dpimap.mappings[i].dpival0 = (priv->dpimappings[i].res / 125) - 1;
+		dpimap.mappings[i].dpival0 = (priv->dpimappings[0][i].res[RAZER_DIM_0] / 125) - 1;
 		dpimap.mappings[i].dpival1 = dpimap.mappings[i].dpival0;
 	}
 	err = lachesis_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION,
@@ -481,7 +568,83 @@ static int lachesis_commit_classic(struct lachesis_private *priv)
 
 static int lachesis_commit_5600(struct lachesis_private *priv)
 {
-	//TODO
+	struct lachesis5k6_request_profname profname;
+	struct lachesis5k6_request_globconfig globconfig;
+	struct lachesis5k6_request_hwconfig hwconfig;
+	int err;
+	unsigned int i, j;
+
+	/* Commit profile configs */
+	for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
+		memset(&hwconfig, 0, sizeof(hwconfig));
+		hwconfig.profile = i + 1;
+		hwconfig.leds = 0x04;
+		if (priv->led_states[i][LACHESIS_LED_SCROLL])
+			hwconfig.leds |= 0x01;
+		if (priv->led_states[i][LACHESIS_LED_LOGO])
+			hwconfig.leds |= 0x02;
+		hwconfig.dpisel = (priv->cur_dpimapping[i]->nr % 10) + 1;
+		hwconfig.nr_dpimappings = LACHESIS_NR_DPIMAPPINGS;
+		for (j = 0; j < LACHESIS_NR_DPIMAPPINGS; j++) {
+			hwconfig.dpimappings[j].dpival0 = ((priv->dpimappings[i][j].res[RAZER_DIM_X] / 100) - 1) * 4;
+			hwconfig.dpimappings[j].dpival1 = ((priv->dpimappings[i][j].res[RAZER_DIM_Y] / 100) - 1) * 4;
+		}
+		err = razer_create_buttonmap(hwconfig.buttonmap, sizeof(hwconfig.buttonmap),
+					     priv->buttons[i].mapping,
+					     ARRAY_SIZE(priv->buttons[i].mapping), 2);
+		if (err)
+			return err;
+		hwconfig.scroll_color.padding = LACHESIS5K6_LED_COLOR_PADDING;
+		hwconfig.scroll_color.r = priv->led_colors[i][LACHESIS_LED_SCROLL].r;
+		hwconfig.scroll_color.g = priv->led_colors[i][LACHESIS_LED_SCROLL].g;
+		hwconfig.scroll_color.b = priv->led_colors[i][LACHESIS_LED_SCROLL].b;
+		hwconfig.logo_color.padding = LACHESIS5K6_LED_COLOR_PADDING;
+		hwconfig.logo_color.r = priv->led_colors[i][LACHESIS_LED_LOGO].r;
+		hwconfig.logo_color.g = priv->led_colors[i][LACHESIS_LED_LOGO].g;
+		hwconfig.logo_color.b = priv->led_colors[i][LACHESIS_LED_LOGO].b;
+		err = lachesis5k6_request_write(priv, 6, 0x48,
+						&hwconfig, sizeof(hwconfig));
+		if (err)
+			return err;
+	}
+
+	/* Commit profile names */
+	for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
+		memset(&profname, 0, sizeof(profname));
+		profname.profile = i + 1;
+		for (j = 0; j < LACHESIS_PROFNAME_MAX_LEN; j++) {
+			le16_t c = cpu_to_le16(priv->profile_names[i].name[j]);
+			*((le16_t *)(&profname.name[j * 2])) = c;
+		}
+		err = lachesis5k6_request_write(priv, 0x22, 0x29,
+						&profname, sizeof(profname));
+		if (err)
+			return err;
+	}
+
+	/* Commit global config */
+	memset(&globconfig, 0, sizeof(globconfig));
+	globconfig.profile = priv->cur_profile->nr + 1;
+	switch (priv->cur_freq[0]) {
+	default:
+	case RAZER_MOUSE_FREQ_1000HZ:
+		globconfig.freq = 1;
+		break;
+	case RAZER_MOUSE_FREQ_500HZ:
+		globconfig.freq = 2;
+		break;
+	case RAZER_MOUSE_FREQ_125HZ:
+		globconfig.freq = 8;
+		break;
+	}
+	globconfig.dpisel = (priv->cur_dpimapping[priv->cur_profile->nr]->nr % 10) + 1;
+	globconfig.dpival0 = ((priv->cur_dpimapping[priv->cur_profile->nr]->res[RAZER_DIM_X] / 100) - 1) * 4;
+	globconfig.dpival1 = ((priv->cur_dpimapping[priv->cur_profile->nr]->res[RAZER_DIM_Y] / 100) - 1) * 4;
+	err = lachesis5k6_request_write(priv, 5, 5,
+					&globconfig, sizeof(globconfig));
+	if (err)
+		return err;
+
 	return 0;
 }
 
@@ -542,7 +705,7 @@ static int lachesis_read_config_classic(struct lachesis_private *priv)
 		razer_debug("hw_lachesis: Got profile config %d "
 			"(magic 0x%04X, prof %u, freq %u, dpisel %u)\n",
 			i + 1, profcfg.magic, profcfg.profile, profcfg.freq, profcfg.dpisel);
-		priv->cur_dpimapping[i] = &priv->dpimappings[profcfg.dpisel - 1];
+		priv->cur_dpimapping[i] = &priv->dpimappings[0][profcfg.dpisel - 1];
 		switch (profcfg.freq) {
 		case 1:
 			priv->cur_freq[i] = RAZER_MOUSE_FREQ_1000HZ;
@@ -577,8 +740,8 @@ static int lachesis_read_config_classic(struct lachesis_private *priv)
 				0x05, 0, &value, sizeof(value));
 	if (err)
 		return err;
-	priv->led_states[LACHESIS_LED_LOGO] = !!(value & 0x01);
-	priv->led_states[LACHESIS_LED_SCROLL] = !!(value & 0x02);
+	priv->led_states[0][LACHESIS_LED_LOGO] = !!(value & 0x01);
+	priv->led_states[0][LACHESIS_LED_SCROLL] = !!(value & 0x02);
 
 	/* Get the DPI map */
 	err = lachesis_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
@@ -586,14 +749,117 @@ static int lachesis_read_config_classic(struct lachesis_private *priv)
 	if (err)
 		return err;
 	for (i = 0; i < LACHESIS_NR_DPIMAPPINGS; i++)
-		priv->dpimappings[i].res = (dpimap.mappings[i].dpival0 + 1) * 125;
+		priv->dpimappings[0][i].res[RAZER_DIM_0] = (dpimap.mappings[i].dpival0 + 1) * 125;
 
 	return 0;
 }
 
 static int lachesis_read_config_5600(struct lachesis_private *priv)
 {
-	//TODO
+	unsigned int i, j;
+	int err;
+	struct lachesis5k6_request_profname profname;
+	struct lachesis5k6_request_globconfig globconfig;
+	struct lachesis5k6_request_hwconfig hwconfig;
+	enum razer_mouse_res res_x, res_y;
+
+	/* Get global config */
+	memset(&globconfig, 0, sizeof(globconfig));
+	err = lachesis5k6_request_read(priv, 5, 1,
+				       &globconfig, sizeof(globconfig));
+	if (err)
+		return err;
+	if (globconfig.profile < 1 || globconfig.profile > LACHESIS_NR_PROFILES) {
+		razer_error("hw_lachesis: Got invalid profile number\n");
+		return -EIO;
+	}
+	priv->cur_profile = &priv->profiles[globconfig.profile - 1];
+	switch (globconfig.freq) {
+	case 1:
+		priv->cur_freq[0] = RAZER_MOUSE_FREQ_1000HZ;
+		break;
+	case 2:
+		priv->cur_freq[0] = RAZER_MOUSE_FREQ_500HZ;
+		break;
+	case 8:
+		priv->cur_freq[0] = RAZER_MOUSE_FREQ_125HZ;
+		break;
+	default:
+		razer_error("hw_lachesis: "
+			"Read invalid frequency value from device (%u)\n",
+			globconfig.freq);
+		return -EIO;
+	}
+
+	/* Get the profile names */
+	for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
+		memset(&profname, 0, sizeof(profname));
+		profname.profile = i + 1;
+		err = lachesis5k6_request_read(priv, 0x22, 1,
+					       &profname, sizeof(profname));
+		if (err)
+			return err;
+		memset(&priv->profile_names[i], 0, sizeof(priv->profile_names[i]));
+		for (j = 0; j < LACHESIS_PROFNAME_MAX_LEN; j++) {
+			priv->profile_names[i].name[j] = profname.name[j * 2 + 0];
+			priv->profile_names[i].name[j] |= (uint16_t)profname.name[j * 2 + 1] << 8;
+		}
+	}
+
+	/* Get the profile configs */
+	for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
+		memset(&hwconfig, 0, sizeof(hwconfig));
+		hwconfig.profile = i + 1;
+		err = lachesis5k6_request_read(priv, 6, 1,
+					       &hwconfig, sizeof(hwconfig));
+		if (err)
+			return err;
+		if (hwconfig.profile != i + 1) {
+			razer_error("hw_lachesis: Failed to read hw config\n");
+			return -EIO;
+		}
+		priv->led_states[i][LACHESIS_LED_SCROLL] = !!(hwconfig.leds & 0x01);
+		priv->led_states[i][LACHESIS_LED_LOGO] = !!(hwconfig.leds & 0x02);
+		if (hwconfig.dpisel < 1 || hwconfig.dpisel > LACHESIS_NR_DPIMAPPINGS ||
+		    hwconfig.dpisel > hwconfig.nr_dpimappings) {
+			razer_error("hw_lachesis: Got invalid DPI selection: %u\n",
+				    hwconfig.dpisel);
+			return -EIO;
+		}
+		priv->cur_dpimapping[i] = &priv->dpimappings[i][hwconfig.dpisel - 1];
+
+		if (hwconfig.nr_dpimappings < 1 ||
+		    hwconfig.nr_dpimappings > LACHESIS_NR_DPIMAPPINGS) {
+			razer_error("hw_lachesis: Got invalid nr_dpimappings: %u\n",
+				    hwconfig.nr_dpimappings);
+			return -EIO;
+		}
+		for (j = 0; j < LACHESIS_NR_DPIMAPPINGS; j++) {
+			if (j + 1 > hwconfig.nr_dpimappings) {
+				res_x = RAZER_MOUSE_RES_5600DPI;
+				res_y = res_x;
+			} else {
+				res_x = ((hwconfig.dpimappings[j].dpival0 / 4) + 1) * 100;
+				res_y = ((hwconfig.dpimappings[j].dpival1 / 4) + 1) * 100;
+			}
+			priv->dpimappings[i][j].res[RAZER_DIM_X] = res_x;
+			priv->dpimappings[i][j].res[RAZER_DIM_Y] = res_y;
+		}
+		err = razer_parse_buttonmap(hwconfig.buttonmap, sizeof(hwconfig.buttonmap),
+					    priv->buttons[i].mapping,
+					    ARRAY_SIZE(priv->buttons[i].mapping), 2);
+		if (err)
+			return err;
+		priv->led_colors[i][LACHESIS_LED_SCROLL].r = hwconfig.scroll_color.r;
+		priv->led_colors[i][LACHESIS_LED_SCROLL].g = hwconfig.scroll_color.g;
+		priv->led_colors[i][LACHESIS_LED_SCROLL].b = hwconfig.scroll_color.b;
+		priv->led_colors[i][LACHESIS_LED_SCROLL].valid = 1;
+		priv->led_colors[i][LACHESIS_LED_LOGO].r = hwconfig.logo_color.r;
+		priv->led_colors[i][LACHESIS_LED_LOGO].g = hwconfig.logo_color.g;
+		priv->led_colors[i][LACHESIS_LED_LOGO].b = hwconfig.logo_color.b;
+		priv->led_colors[i][LACHESIS_LED_LOGO].valid = 1;
+	}
+
 	return 0;
 }
 
@@ -625,10 +891,45 @@ static int lachesis_reconfigure(struct razer_mouse *m)
 	return lachesis_commit(priv);
 }
 
+static const razer_utf16_t * lachesis_profile_get_name(struct razer_mouse_profile *p)
+{
+	struct razer_mouse *m = p->mouse;
+	struct lachesis_private *priv = m->drv_data;
+
+	if (p->nr >= LACHESIS_NR_PROFILES)
+		return NULL;
+
+	return priv->profile_names[p->nr].name;
+}
+
+static int lachesis_profile_set_name(struct razer_mouse_profile *p,
+				     const razer_utf16_t *new_name)
+{
+	struct razer_mouse *m = p->mouse;
+	struct lachesis_private *priv = m->drv_data;
+	int err;
+
+	if (p->nr >= LACHESIS_NR_PROFILES)
+		return -EINVAL;
+
+	if (!m->claim_count)
+		return -EBUSY;
+
+	razer_utf16_cpy(priv->profile_names[p->nr].name,
+			new_name, LACHESIS_PROFNAME_MAX_LEN);
+
+	err = lachesis_commit(priv);
+	if (err)
+		return err;
+
+	return 0;
+}
+
 static int lachesis_led_toggle(struct razer_led *led,
 			       enum razer_led_state new_state)
 {
-	struct razer_mouse *m = led->u.mouse;
+	struct razer_mouse_profile *p = led->u.mouse_prof;
+	struct razer_mouse *m = p->mouse;
 	struct lachesis_private *priv = m->drv_data;
 	int err;
 	enum razer_led_state old_state;
@@ -638,32 +939,75 @@ static int lachesis_led_toggle(struct razer_led *led,
 	if ((new_state != RAZER_LED_OFF) &&
 	    (new_state != RAZER_LED_ON))
 		return -EINVAL;
+	if (priv->type == LACHESIS_CLASSIC &&
+	    p->nr != 0)
+		return -EINVAL;
+	if (p->nr >= LACHESIS_NR_PROFILES)
+		return -EINVAL;
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
 
-	old_state = priv->led_states[led->id];
-	priv->led_states[led->id] = new_state;
+	old_state = priv->led_states[p->nr][led->id];
+	priv->led_states[p->nr][led->id] = new_state;
 
 	err = lachesis_commit(priv);
 	if (err) {
-		priv->led_states[led->id] = old_state;
+		priv->led_states[p->nr][led->id] = old_state;
 		return err;
 	}
 
-	return err;
+	return 0;
+}
+
+static int lachesis_led_change_color(struct razer_led *led,
+				     const struct razer_rgb_color *new_color)
+{
+	struct razer_mouse_profile *p = led->u.mouse_prof;
+	struct razer_mouse *m = p->mouse;
+	struct lachesis_private *priv = m->drv_data;
+	struct razer_rgb_color old_color;
+	int err;
+
+	if (WARN_ON(priv->type == LACHESIS_CLASSIC))
+		return -ENODEV;
+	if (led->id >= LACHESIS_NR_LEDS)
+		return -EINVAL;
+	if (p->nr >= LACHESIS_NR_PROFILES)
+		return -EINVAL;
+
+	if (!priv->m->claim_count)
+		return -EBUSY;
+
+	old_color = priv->led_colors[p->nr][led->id];
+	priv->led_colors[p->nr][led->id] = *new_color;
+
+	err = lachesis_commit(priv);
+	if (err) {
+		priv->led_colors[p->nr][led->id] = old_color;
+		return err;
+	}
+
+	return 0;
 }
 
 static int lachesis_get_leds(struct razer_mouse *m,
+			     unsigned int profile_nr,
 			     struct razer_led **leds_list)
 {
 	struct lachesis_private *priv = m->drv_data;
 	struct razer_led *scroll, *logo;
 
-	scroll = malloc(sizeof(struct razer_led));
+	if (WARN_ON(priv->type == LACHESIS_CLASSIC &&
+		    profile_nr != 0))
+		return -EINVAL;
+	if (profile_nr >= LACHESIS_NR_PROFILES)
+		return -EINVAL;
+
+	scroll = zalloc(sizeof(struct razer_led));
 	if (!scroll)
 		return -ENOMEM;
-	logo = malloc(sizeof(struct razer_led));
+	logo = zalloc(sizeof(struct razer_led));
 	if (!logo) {
 		free(scroll);
 		return -ENOMEM;
@@ -671,15 +1015,23 @@ static int lachesis_get_leds(struct razer_mouse *m,
 
 	scroll->name = "Scrollwheel";
 	scroll->id = LACHESIS_LED_SCROLL;
-	scroll->state = priv->led_states[LACHESIS_LED_SCROLL];
+	scroll->state = priv->led_states[profile_nr][LACHESIS_LED_SCROLL];
 	scroll->toggle_state = lachesis_led_toggle;
-	scroll->u.mouse = m;
+	if (priv->type != LACHESIS_CLASSIC) {
+		scroll->color = priv->led_colors[profile_nr][LACHESIS_LED_SCROLL];
+		scroll->change_color = lachesis_led_change_color;
+	}
+	scroll->u.mouse_prof = &priv->profiles[profile_nr];
 
 	logo->name = "GlowingLogo";
 	logo->id = LACHESIS_LED_LOGO;
-	logo->state = priv->led_states[LACHESIS_LED_LOGO];
+	logo->state = priv->led_states[profile_nr][LACHESIS_LED_LOGO];
 	logo->toggle_state = lachesis_led_toggle;
-	logo->u.mouse = m;
+	if (priv->type != LACHESIS_CLASSIC) {
+		logo->color = priv->led_colors[profile_nr][LACHESIS_LED_LOGO];
+		logo->change_color = lachesis_led_change_color;
+	}
+	logo->u.mouse_prof = &priv->profiles[profile_nr];
 
 	/* Link the list */
 	*leds_list = scroll;
@@ -687,6 +1039,18 @@ static int lachesis_get_leds(struct razer_mouse *m,
 	logo->next = NULL;
 
 	return LACHESIS_NR_LEDS;
+}
+
+static int lachesis_profile_get_leds(struct razer_mouse_profile *p,
+				     struct razer_led **leds_list)
+{
+	return lachesis_get_leds(p->mouse, p->nr, leds_list);
+}
+
+static int lachesis_global_get_leds(struct razer_mouse *m,
+				    struct razer_led **leds_list)
+{
+	return lachesis_get_leds(m, 0, leds_list);
 }
 
 static int lachesis_supported_axes(struct razer_mouse *m,
@@ -718,38 +1082,68 @@ static int lachesis_supported_freqs(struct razer_mouse *m,
 	return count;
 }
 
-static enum razer_mouse_freq lachesis_get_freq(struct razer_mouse_profile *p)
+static enum razer_mouse_freq lachesis_get_freq(struct razer_mouse *m,
+					       unsigned int profile_nr)
 {
-	struct lachesis_private *priv = p->mouse->drv_data;
+	struct lachesis_private *priv = m->drv_data;
 
-	if (p->nr >= ARRAY_SIZE(priv->cur_freq))
+	if (WARN_ON(priv->type != LACHESIS_CLASSIC &&
+		    profile_nr != 0))
+		return -EINVAL;
+	if (profile_nr >= ARRAY_SIZE(priv->cur_freq))
 		return -EINVAL;
 
-	return priv->cur_freq[p->nr];
+	return priv->cur_freq[profile_nr];
 }
 
-static int lachesis_set_freq(struct razer_mouse_profile *p,
+static enum razer_mouse_freq lachesis_profile_get_freq(struct razer_mouse_profile *p)
+{
+	return lachesis_get_freq(p->mouse, p->nr);
+}
+
+static enum razer_mouse_freq lachesis_global_get_freq(struct razer_mouse *m)
+{
+	return lachesis_get_freq(m, 0);
+}
+
+static int lachesis_set_freq(struct razer_mouse *m,
+			     unsigned int profile_nr,
 			     enum razer_mouse_freq freq)
 {
-	struct lachesis_private *priv = p->mouse->drv_data;
+	struct lachesis_private *priv = m->drv_data;
 	enum razer_mouse_freq oldfreq;
 	int err;
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
-	if (p->nr >= ARRAY_SIZE(priv->cur_freq))
+	if (WARN_ON(priv->type != LACHESIS_CLASSIC &&
+		    profile_nr != 0))
+		return -EINVAL;
+	if (profile_nr >= ARRAY_SIZE(priv->cur_freq))
 		return -EINVAL;
 
-	oldfreq = priv->cur_freq[p->nr];
-	priv->cur_freq[p->nr] = freq;
+	oldfreq = priv->cur_freq[profile_nr];
+	priv->cur_freq[profile_nr] = freq;
 
 	err = lachesis_commit(priv);
 	if (err) {
-		priv->cur_freq[p->nr] = oldfreq;
+		priv->cur_freq[profile_nr] = oldfreq;
 		return err;
 	}
 
 	return 0;
+}
+
+static int lachesis_profile_set_freq(struct razer_mouse_profile *p,
+				     enum razer_mouse_freq freq)
+{
+	return lachesis_set_freq(p->mouse, p->nr, freq);
+}
+
+static int lachesis_global_set_freq(struct razer_mouse *m,
+				    enum razer_mouse_freq freq)
+{
+	return lachesis_set_freq(m, 0, freq);
 }
 
 static int lachesis_supported_resolutions(struct razer_mouse *m,
@@ -826,9 +1220,16 @@ static int lachesis_supported_dpimappings(struct razer_mouse *m,
 {
 	struct lachesis_private *priv = m->drv_data;
 
-	*res_ptr = &priv->dpimappings[0];
+	switch (priv->type) {
+	case LACHESIS_CLASSIC:
+		*res_ptr = &priv->dpimappings[0][0];
+		return LACHESIS_NR_DPIMAPPINGS;
+	case LACHESIS_5600:
+		*res_ptr = &priv->dpimappings[0][0];
+		return LACHESIS_NR_PROFILES * LACHESIS_NR_DPIMAPPINGS;
+	}
 
-	return ARRAY_SIZE(priv->dpimappings);
+	return -ENODEV;
 }
 
 static struct razer_mouse_dpimapping * lachesis_get_dpimapping(struct razer_mouse_profile *p,
@@ -849,10 +1250,17 @@ static int lachesis_set_dpimapping(struct razer_mouse_profile *p,
 	struct lachesis_private *priv = p->mouse->drv_data;
 	struct razer_mouse_dpimapping *oldmapping;
 	int err;
+	razer_id_mask_t idmask;
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
 	if (p->nr >= ARRAY_SIZE(priv->cur_dpimapping))
+		return -EINVAL;
+
+	razer_id_mask_zero(&idmask);
+	if (priv->type != LACHESIS_CLASSIC)
+		razer_id_mask_set(&idmask, p->nr);
+	if (d->profile_mask != idmask)
 		return -EINVAL;
 
 	oldmapping = priv->cur_dpimapping[p->nr];
@@ -868,21 +1276,25 @@ static int lachesis_set_dpimapping(struct razer_mouse_profile *p,
 }
 
 static int lachesis_dpimapping_modify(struct razer_mouse_dpimapping *d,
+				      enum razer_dimension dim,
 				      enum razer_mouse_res res)
 {
 	struct lachesis_private *priv = d->mouse->drv_data;
 	enum razer_mouse_res oldres;
 	int err;
 
+	if ((int)dim < 0 || (int)dim >= ARRAY_SIZE(d->res))
+		return -EINVAL;
+
 	if (!priv->m->claim_count)
 		return -EBUSY;
 
-	oldres = d->res;
-	d->res = res;
+	oldres = d->res[dim];
+	d->res[dim] = res;
 
 	err = lachesis_commit(priv);
 	if (err) {
-		d->res = oldres;
+		d->res[dim] = oldres;
 		return err;
 	}
 
@@ -957,7 +1369,7 @@ int razer_lachesis_init(struct razer_mouse *m,
 {
 	struct lachesis_private *priv;
 	struct libusb_device_descriptor desc;
-	unsigned int i, flags;
+	unsigned int i, j, k;
 	int err;
 	const char *devname = "";
 
@@ -965,7 +1377,9 @@ int razer_lachesis_init(struct razer_mouse *m,
 	BUILD_BUG_ON(sizeof(struct lachesis_dpimap_cmd) != 0x60);
 	BUILD_BUG_ON(sizeof(struct lachesis5k6_request) != 90);
 	BUILD_BUG_ON(sizeof(struct lachesis5k6_request_devinfo) != 34);
-	BUILD_BUG_ON(sizeof(struct lachesis5k6_request_sensor) != 5);
+	BUILD_BUG_ON(sizeof(struct lachesis5k6_request_globconfig) != 5);
+	BUILD_BUG_ON(sizeof(struct lachesis5k6_request_profname) != 41);
+	BUILD_BUG_ON(sizeof(struct lachesis5k6_request_hwconfig) != 72);
 
 	err = libusb_get_device_descriptor(usbdev, &desc);
 	if (err) {
@@ -993,8 +1407,14 @@ int razer_lachesis_init(struct razer_mouse *m,
 
 	for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
 		priv->profiles[i].nr = i;
-		priv->profiles[i].get_freq = lachesis_get_freq;
-		priv->profiles[i].set_freq = lachesis_set_freq;
+		if (priv->type == LACHESIS_CLASSIC) {
+			priv->profiles[i].get_freq = lachesis_profile_get_freq;
+			priv->profiles[i].set_freq = lachesis_profile_set_freq;
+		} else {
+			priv->profiles[i].get_leds = lachesis_profile_get_leds;
+			priv->profiles[i].get_name = lachesis_profile_get_name;
+			priv->profiles[i].set_name = lachesis_profile_set_name;
+		}
 		priv->profiles[i].get_dpimapping = lachesis_get_dpimapping;
 		priv->profiles[i].set_dpimapping = lachesis_set_dpimapping;
 		priv->profiles[i].get_button_function = lachesis_get_button_function;
@@ -1002,19 +1422,28 @@ int razer_lachesis_init(struct razer_mouse *m,
 		priv->profiles[i].mouse = m;
 	}
 
-	flags = 0;
-	if (priv->type == LACHESIS_5600)
-		flags = RAZER_AXIS_INDEPENDENT_DPIMAPPING;
 	razer_init_axes(&priv->axes[0],
-			"X", flags,
-			"Y", flags,
+			"X", 0,
+			"Y", 0,
 			"Scroll", 0);
 
-	for (i = 0; i < LACHESIS_NR_DPIMAPPINGS; i++) {
-		priv->dpimappings[i].nr = i;
-		priv->dpimappings[i].res = RAZER_MOUSE_RES_UNKNOWN;
-		priv->dpimappings[i].change = lachesis_dpimapping_modify;
-		priv->dpimappings[i].mouse = m;
+	for (i = 0; i < LACHESIS_NR_PROFILES; i++) {
+		for (j = 0; j < LACHESIS_NR_DPIMAPPINGS; j++) {
+			priv->dpimappings[i][j].nr = i * 10 + j;
+			for (k = 0; k < RAZER_NR_DIMS; k++)
+				priv->dpimappings[i][j].res[k] = RAZER_MOUSE_RES_UNKNOWN;
+			if (priv->type == LACHESIS_CLASSIC) {
+				priv->dpimappings[i][j].dimension_mask = (1 << RAZER_DIM_0);
+			} else {
+				priv->dpimappings[i][j].dimension_mask = (1 << RAZER_DIM_X) |
+									 (1 << RAZER_DIM_Y);
+			}
+			razer_id_mask_zero(&priv->dpimappings[i][j].profile_mask);
+			if (priv->type != LACHESIS_CLASSIC)
+				razer_id_mask_set(&priv->dpimappings[i][j].profile_mask, i);
+			priv->dpimappings[i][j].change = lachesis_dpimapping_modify;
+			priv->dpimappings[i][j].mouse = m;
+		}
 	}
 
 	err = m->claim(m);
@@ -1050,7 +1479,12 @@ int razer_lachesis_init(struct razer_mouse *m,
 
 	m->get_fw_version = lachesis_get_fw_version;
 	m->reconfigure = lachesis_reconfigure;
-	m->get_leds = lachesis_get_leds;
+	if (priv->type == LACHESIS_CLASSIC) {
+		m->global_get_leds = lachesis_global_get_leds;
+	} else {
+		m->global_get_freq = lachesis_global_get_freq;
+		m->global_set_freq = lachesis_global_set_freq;
+	}
 	m->nr_profiles = ARRAY_SIZE(priv->profiles);
 	m->get_profiles = lachesis_get_profiles;
 	m->get_active_profile = lachesis_get_active_profile;
