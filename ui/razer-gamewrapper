@@ -1,0 +1,60 @@
+#!/bin/sh
+
+[ -n "$RAZER_MOUSE_DEV" ] || RAZER_MOUSE_DEV=mouse
+[ -n "$RAZER_MOUSE_GAMINGPROF" ] || RAZER_MOUSE_GAMINGPROF=5
+
+usage()
+{
+	echo "Usage razer-gamewrapper GAME [GAME-OPTIONS]"
+	echo
+	echo "Arguments:"
+	echo "  GAME is the game binary to execute"
+	echo "  GAME-OPTIONS are optional options to the game"
+	echo
+	echo "Environment variables:"
+	echo "  RAZER_MOUSE_DEV           The id-string of the mouse."
+	echo "                            Defaults to the first razer mouse."
+	echo "  RAZER_MOUSE_GAMINGPROF    The profile ID of the gaming profile."
+	echo "                            Defaults to '5'."
+}
+
+message()
+{
+	echo "razer-gamewrapper: $*"
+}
+
+die()
+{
+	message "$*"
+	cleanup
+	exit 1
+}
+
+cleanup()
+{
+	[ -n "$oldprof" ] && {
+		razercfg -d "$RAZER_MOUSE_DEV" -p "$oldprof" || die "Failed to reset mouse profile"
+	}
+}
+
+terminate()
+{
+	cleanup
+	exit 1
+}
+
+oldprof=
+
+[ "$#" -eq 0 -o "$1" = "-h" -o "$1" = "--help" ] && { usage; terminate; }
+oldprof="$(razercfg -d "$RAZER_MOUSE_DEV" -P | awk '{print $3;}')"
+[ -n "$oldprof" ] || die "Failed to get current mouse profile"
+trap terminate INT TERM
+message "Old mouse profile: $oldprof"
+message "Switching to gaming profile: $RAZER_MOUSE_GAMINGPROF"
+razercfg -d "$RAZER_MOUSE_DEV" -p "$RAZER_MOUSE_GAMINGPROF" || die "Failed to set mouse gaming profile"
+message "Starting game: $*"
+$@ || die "Failed to start the game"
+message "Switching to old profile: $oldprof"
+cleanup
+
+exit 0
