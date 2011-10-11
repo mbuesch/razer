@@ -62,6 +62,11 @@ class OpGetFwVer(Operation):
 		print "%s: Firmware version %d.%02d" %\
 			(idstr, verTuple[0], verTuple[1])
 
+class OpGetProfile(Operation):
+	def run(self, idstr):
+		profileId = getRazer().getActiveProfile(idstr)
+		print("Active profile: %u" % (profileId + 1))
+
 class OpGetFreq(Operation):
 	def run(self, idstr):
 		freqs = getRazer().getSupportedFreqs(idstr)
@@ -125,6 +130,20 @@ class OpPrintLeds(Operation):
 					(led.color.r, led.color.g, led.color.b)
 			output.append("%s => %s%s" % (led.name, state, color))
 		print ",  ".join(output)
+
+class OpSetProfile(Operation):
+	def __init__(self, param):
+		self.param = param
+
+	def run(self, idstr):
+		try:
+			profileId = int(self.param) - 1
+			error = getRazer().setActiveProfile(idstr, profileId)
+			if error:
+				raise RazerEx("Failed to set active profile (%s)" %\
+					      Razer.strerror(error))
+		except (ValueError), e:
+			raise RazerEx("Invalid parameter to --profile option")
 
 class OpSetLedState(Operation):
 	def __init__(self, param):
@@ -288,6 +307,8 @@ def usage():
 	print ""
 	print "Options for mice:"
 	print "-V|--fwver               Print the firmware version number"
+	print "-p|--profile profile     Changes the active profile"
+	print "-P|--getprofile          Prints the active profile"
 	print "-r|--res profile:DPI     Changes the scan resolution."
 	print "-R|--getres              Prints the resolutions"
 	print "-f|--freq [profile:]FREQ Changes the scan frequency."
@@ -316,12 +337,13 @@ def parse_args():
 
 	try:
 		(opts, args) = getopt.getopt(sys.argv[1:],
-			"hvBsKd:r:Rf:FLl:VS:X:c:",
+			"hvBsKd:r:Rf:FLl:VS:X:c:p:P",
 			[ "help", "version", "background",
 			  "scan", "reconfigure", "device=", "res=",
 			  "getres", "freq=", "getfreq", "leds", "setled=",
 			  "fwver", "config=", "sleep=", "flashfw=",
-			  "setledcolor=", ])
+			  "setledcolor=",
+			  "profile=", "getprofile", ])
 	except getopt.GetoptError:
 		usage()
 		exit(1)
@@ -348,6 +370,16 @@ def parse_args():
 			if currentDevOps and currentDevOps.ops:
 				devOpsList.append(currentDevOps)
 			currentDevOps = DevOps(v)
+			continue
+		if o in ("-p", "--profile"):
+			if not currentDevOps:
+				currentDevOps = DevOps(findDevice())
+			currentDevOps.add(OpSetProfile(v))
+			continue
+		if o in ("-P", "--getprofile"):
+			if not currentDevOps:
+				currentDevOps = DevOps(findDevice())
+			currentDevOps.add(OpGetProfile())
 			continue
 		if o in ("-r", "--res"):
 			if not currentDevOps:
