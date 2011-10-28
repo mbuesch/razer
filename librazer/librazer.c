@@ -345,7 +345,8 @@ static int parse_int_int_pair(const char *str, int *val0, int *val1)
 	int err;
 
 	*val0 = *val1 = -1;
-	err = razer_split_pair(str, ':', a, b, min(sizeof(a), sizeof(b)));
+	err = razer_split_tuple(str, ':', min(sizeof(a), sizeof(b)),
+				a, b, NULL);
 	if (err) {
 		/* It's not a pair. Interpret it as one value. */
 		strncpy(a, str, sizeof(a) - 1);
@@ -372,7 +373,8 @@ static bool mouse_apply_one_config(struct config_file *f,
 	struct razer_mouse_profile *prof;
 	bool *error = data;
 	int err, nr;
-	char a[64] = { 0, }, b[64] = { 0, };
+	static const size_t tmplen = 128;
+	char a[tmplen], b[tmplen], c[tmplen];
 
 //FIXME fixes for glob/prof configs
 	if (strcasecmp(item, "profile") == 0) {
@@ -427,21 +429,42 @@ static bool mouse_apply_one_config(struct config_file *f,
 	} else if (strcasecmp(item, "led") == 0) {
 		bool on;
 		struct razer_led *leds, *led;
-		const char *ledname;
+		const char *ledname, *ledstate;
+		int profile;
 
-		/* TODO: Extend led config entry to specify the profile */
-		prof = m->get_active_profile(m);
-
-		err = razer_split_pair(value, ':', a, b, min(sizeof(a), sizeof(b)));
+		err = razer_split_tuple(value, ':', tmplen, a, b, c, NULL);
+		if (err && err != -ENODATA)
+			goto error;
+		if (!strlen(a) || !strlen(b))
+			goto error;
+		if (strlen(c)) {
+			/* A profile was specified */
+			err = razer_string_to_int(razer_string_strip(a), &profile);
+			if (err || profile < 1)
+				goto error;
+			prof = find_prof(m, profile - 1);
+			if (!prof)
+				goto error;
+			ledname = razer_string_strip(b);
+			ledstate = razer_string_strip(c);
+		} else {
+			/* Modify global LEDs */
+			prof = NULL;
+			ledname = razer_string_strip(a);
+			ledstate = razer_string_strip(b);
+		}
+		err = razer_string_to_bool(ledstate, &on);
 		if (err)
 			goto error;
-		ledname = razer_string_strip(a);
-		err = razer_string_to_bool(razer_string_strip(b), &on);
-		if (err)
-			goto error;
-		if (!prof->get_leds)
-			goto ok; /* No LEDs. Ignore config. */
-		err = prof->get_leds(prof, &leds);
+		if (prof) {
+			if (!prof->get_leds)
+				goto ok; /* No LEDs. Ignore config. */
+			err = prof->get_leds(prof, &leds);
+		} else {
+			if (!m->global_get_leds)
+				goto ok; /* No LEDs. Ignore config. */
+			err = m->global_get_leds(m, &leds);
+		}
 		if (err < 0)
 			goto error;
 		if (err == 0)

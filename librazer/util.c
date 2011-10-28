@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <ctype.h>
+#include <stdarg.h>
 
 
 void razer_free(void *ptr, size_t size)
@@ -44,19 +45,34 @@ char * razer_strsplit(char *str, char sep)
 	return NULL;
 }
 
-int razer_split_pair(const char *str, char sep, char *a, char *b, size_t len)
+int razer_split_tuple(const char *str, char sep,
+		      size_t elems_max_len, ...)
 {
-	char *tmp;
+	char *elem;
+	va_list ap;
+	int err = 0;
 
-	if (strlen(str) >= len)
+	if (!elems_max_len)
 		return -EINVAL;
-	strcpy(a, str);
-	tmp = razer_strsplit(a, sep);
-	if (!tmp)
+	if (strlen(str) >= elems_max_len)
 		return -EINVAL;
-	strcpy(b, tmp);
 
-	return 0;
+	va_start(ap, elems_max_len);
+	while (1) {
+		elem = va_arg(ap, char *);
+		if (!elem)
+			break;
+		elem[0] = '\0';
+		if (!str) {
+			err = -ENODATA;
+			continue;
+		}
+		strncpy(elem, str, elems_max_len - 1);
+		str = razer_strsplit(elem, sep);
+	}
+	va_end(ap);
+
+	return err;
 }
 
 int razer_string_to_int(const char *string, int *i)
