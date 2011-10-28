@@ -457,9 +457,14 @@ static bool mouse_apply_one_config(struct config_file *f,
 		if (err)
 			goto error;
 		if (prof) {
-			if (!prof->get_leds)
-				goto ok; /* No LEDs. Ignore config. */
-			err = prof->get_leds(prof, &leds);
+			if (prof->get_leds) {
+				err = prof->get_leds(prof, &leds);
+			} else {
+				/* Try to fall back to global */
+				if (!m->global_get_leds)
+					goto ok; /* No LEDs. Ignore config. */
+				err = m->global_get_leds(m, &leds);
+			}
 		} else {
 			if (!m->global_get_leds)
 				goto ok; /* No LEDs. Ignore config. */
