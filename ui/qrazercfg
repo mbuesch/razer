@@ -562,7 +562,8 @@ class MainWindow(QMainWindow):
 
 		mb = QMenuBar(self)
 		rzrmen = QMenu(self.tr("Razer"), mb)
-		rzrmen.addAction(self.tr("Rescan devices"), self.scan)
+		rzrmen.addAction(self.tr("Scan system for devices"), self.scan)
+		rzrmen.addAction(self.tr("Re-apply all hardware settings"), self.reconfig)
 		rzrmen.addSeparator()
 		rzrmen.addAction(self.tr("Exit"), self.close)
 		mb.addMenu(rzrmen)
@@ -602,6 +603,10 @@ class MainWindow(QMainWindow):
 				self.statusBar().showMessage(self.tr("Found %d Razer mice" % len(mice)))
 		self.mice = mice
 		self.mousewidget.update(mice)
+
+	def reconfig(self):
+		razer.rescanDevices()
+		razer.reconfigureDevices()
 
 	def about(self):
 		QMessageBox.information(self, self.tr("About"),
