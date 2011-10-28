@@ -68,6 +68,8 @@ struct naga_private {
 	struct razer_mouse_profile profile;
 	struct razer_mouse_dpimapping dpimapping[NAGA_NR_DPIMAPPINGS];
 	struct razer_axis axes[NAGA_NR_AXES];
+
+	bool commit_pending;
 };
 
 
@@ -165,7 +167,7 @@ static int naga_read_fw_ver(struct naga_private *priv)
 	return -ENODEV;
 }
 
-static int naga_commit(struct naga_private *priv)
+static int naga_do_commit(struct naga_private *priv)
 {
 	struct naga_command cmd;
 	unsigned int xres, yres, freq;
@@ -237,13 +239,20 @@ static int naga_get_fw_version(struct razer_mouse *m)
 	return priv->fw_version;
 }
 
-static int naga_reconfigure(struct razer_mouse *m)
+static int naga_commit(struct razer_mouse *m, int force)
 {
 	struct naga_private *priv = m->drv_data;
+	int err = 0;
 
 	if (!m->claim_count)
 		return -EBUSY;
-	return naga_commit(priv);
+	if (priv->commit_pending || force) {
+		err = naga_do_commit(priv);
+		if (!err)
+			priv->commit_pending = 0;
+	}
+
+	return err;
 }
 
 static int naga_led_toggle(struct razer_led *led,
@@ -251,8 +260,6 @@ static int naga_led_toggle(struct razer_led *led,
 {
 	struct razer_mouse *m = led->u.mouse;
 	struct naga_private *priv = m->drv_data;
-	int err;
-	enum razer_led_state old_state;
 
 	if (led->id >= NAGA_NR_LEDS)
 		return -EINVAL;
@@ -263,16 +270,10 @@ static int naga_led_toggle(struct razer_led *led,
 	if (!priv->m->claim_count)
 		return -EBUSY;
 
-	old_state = priv->led_states[led->id];
 	priv->led_states[led->id] = new_state;
+	priv->commit_pending = 1;
 
-	err = naga_commit(priv);
-	if (err) {
-		priv->led_states[led->id] = old_state;
-		return err;
-	}
-
-	return err;
+	return 0;
 }
 
 static int naga_get_leds(struct razer_mouse *m,
@@ -340,22 +341,14 @@ static int naga_set_freq(struct razer_mouse_profile *p,
 			       enum razer_mouse_freq freq)
 {
 	struct naga_private *priv = p->mouse->drv_data;
-	enum razer_mouse_freq old_freq;
-	int err;
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
 
-	old_freq = priv->frequency;
 	priv->frequency = freq;
+	priv->commit_pending = 1;
 
-	err = naga_commit(priv);
-	if (err) {
-		priv->frequency = old_freq;
-		return err;
-	}
-
-	return err;
+	return 0;
 }
 
 static int naga_supported_axes(struct razer_mouse *m,
@@ -422,16 +415,11 @@ static int naga_set_dpimapping(struct razer_mouse_profile *p,
 			       struct razer_mouse_dpimapping *d)
 {
 	struct naga_private *priv = p->mouse->drv_data;
-	struct razer_mouse_dpimapping *oldmapping_X, *oldmapping_Y;
-	int err;
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
 	if (axis && axis->id >= ARRAY_SIZE(priv->axes))
 		return -EINVAL;
-
-	oldmapping_X = priv->cur_dpimapping_X;
-	oldmapping_Y = priv->cur_dpimapping_Y;
 
 	if (axis) {
 		if (axis->id == 0)
@@ -444,15 +432,9 @@ static int naga_set_dpimapping(struct razer_mouse_profile *p,
 		priv->cur_dpimapping_X = d;
 		priv->cur_dpimapping_Y = d;
 	}
+	priv->commit_pending = 1;
 
-	err = naga_commit(priv);
-	if (err) {
-		priv->cur_dpimapping_X = oldmapping_X;
-		priv->cur_dpimapping_Y = oldmapping_Y;
-		return err;
-	}
-
-	return err;
+	return 0;
 }
 
 int razer_naga_init(struct razer_mouse *m,
@@ -520,7 +502,7 @@ int razer_naga_init(struct razer_mouse *m,
 				    NULL, m->idstr);
 
 	m->get_fw_version = naga_get_fw_version;
-	m->reconfigure = naga_reconfigure;
+	m->commit = naga_commit;
 	m->global_get_leds = naga_get_leds;
 	m->get_profiles = naga_get_profiles;
 	m->supported_axes = naga_supported_axes;
@@ -528,7 +510,7 @@ int razer_naga_init(struct razer_mouse *m,
 	m->supported_freqs = naga_supported_freqs;
 	m->supported_dpimappings = naga_supported_dpimappings;
 
-	err = naga_commit(priv);
+	err = naga_do_commit(priv);
 	if (err) {
 		razer_error("hw_naga: Failed to commit initial settings\n");
 		goto err_release;

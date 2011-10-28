@@ -529,9 +529,17 @@ static int mouse_default_claim(struct razer_mouse *m)
 	return razer_generic_usb_claim_refcount(m->usb_ctx, &m->claim_count);
 }
 
-static void mouse_default_release(struct razer_mouse *m)
+static int mouse_default_release(struct razer_mouse *m)
 {
+	int err = 0;
+
+	if (m->claim_count == 1) {
+		if (m->commit)
+			err = m->commit(m, 0);
+	}
 	razer_generic_usb_release_refcount(m->usb_ctx, &m->claim_count);
+
+	return err;
 }
 
 static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
@@ -693,15 +701,14 @@ int razer_reconfig_mice(void)
 	int err;
 
 	razer_for_each_mouse(m, next, mice_list) {
-		if (m->reconfigure) {
-			err = m->claim(m);
-			if (err)
-				return err;
-			err = m->reconfigure(m);
-			m->release(m);
-			if (err)
-				return err;
-		}
+		err = m->claim(m);
+		if (err)
+			return err;
+		if (m->commit)
+			err = m->commit(m, 1);
+		m->release(m);
+		if (err)
+			return err;
 	}
 
 	return 0;

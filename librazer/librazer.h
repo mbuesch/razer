@@ -386,12 +386,16 @@ enum {
   *	pair up with the corresponding number of release calls.
   *
   * @release: Release a claimed backend device.
+  *	Implicitely commits the config, if the last claim is released.
+  *	Returns 0 on success or an error code.
+  *	An error is a commit error. The mouse is always released properly.
+  *
+  * @commit: Commit the current settings.
+  *	This usually doesn't have to be called explicitely.
+  *	May be NULL.
   *
   * @get_fw_version: Read the firmware version from the device.
   *     Returns the firmware version or a negative error code.
-  *
-  * @reconfigure: Reconfigure the hardware.
-  *	May be NULL.
   *
   * @flash_firmware: Upload a firmware image to the device and
   *     flash it to the PROM. &magic_number is &RAZER_FW_FLASH_MAGIC.
@@ -458,11 +462,11 @@ struct razer_mouse {
 	unsigned int flags;
 
 	int (*claim)(struct razer_mouse *m);
-	void (*release)(struct razer_mouse *m);
+	int (*release)(struct razer_mouse *m);
+
+	int (*commit)(struct razer_mouse *m, int force);
 
 	int (*get_fw_version)(struct razer_mouse *m);
-
-	int (*reconfigure)(struct razer_mouse *m);
 
 	int (*flash_firmware)(struct razer_mouse *m,
 			      const char *data, size_t len,

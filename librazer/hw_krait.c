@@ -5,7 +5,7 @@
  *   Important notice:
  *   This hardware driver is based on reverse engineering, only.
  *
- *   Copyright (C) 2007-2009 Michael Buesch <m@bues.ch>
+ *   Copyright (C) 2007-2011 Michael Buesch <m@bues.ch>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -34,6 +34,8 @@ struct krait_private {
 	struct razer_mouse_dpimapping *cur_dpimapping;
 	struct razer_mouse_profile profile;
 	struct razer_mouse_dpimapping dpimapping[2];
+
+	bool commit_pending;
 };
 
 
@@ -75,7 +77,7 @@ static int krait_usb_read(struct krait_private *priv,
 }
 #endif
 
-static int krait_commit(struct krait_private *priv)
+static int krait_do_commit(struct krait_private *priv)
 {
 	uint8_t value;
 	int err;
@@ -98,13 +100,20 @@ static int krait_commit(struct krait_private *priv)
 	return 0;
 }
 
-static int krait_reconfigure(struct razer_mouse *m)
+static int krait_commit(struct razer_mouse *m, int force)
 {
 	struct krait_private *priv = m->drv_data;
+	int err = 0;
 
 	if (!m->claim_count)
 		return -EBUSY;
-	return krait_commit(priv);
+	if (priv->commit_pending || force) {
+		err = krait_do_commit(priv);
+		if (!err)
+			priv->commit_pending = 0;
+	}
+
+	return err;
 }
 
 static int krait_supported_resolutions(struct razer_mouse *m,
@@ -155,19 +164,12 @@ static int krait_set_dpimapping(struct razer_mouse_profile *p,
 				struct razer_mouse_dpimapping *d)
 {
 	struct krait_private *priv = p->mouse->drv_data;
-	struct razer_mouse_dpimapping *old_d;
-	int err;
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
 
-	old_d = priv->cur_dpimapping;
 	priv->cur_dpimapping = d;
-	err = krait_commit(priv);
-	if (err) {
-		priv->cur_dpimapping = old_d;
-		return err;
-	}
+	priv->commit_pending = 1;
 
 	return 0;
 }
@@ -213,7 +215,7 @@ int razer_krait_init(struct razer_mouse *m,
 	razer_generic_usb_gen_idstr(usbdev, NULL, "Krait", 1,
 				    NULL, m->idstr);
 
-	m->reconfigure = krait_reconfigure;
+	m->commit = krait_commit;
 	m->get_profiles = krait_get_profiles;
 	m->supported_resolutions = krait_supported_resolutions;
 	m->supported_dpimappings = krait_supported_dpimappings;

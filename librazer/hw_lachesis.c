@@ -198,6 +198,8 @@ struct lachesis_private {
 
 	/* The active button mapping; per profile. */
 	struct lachesis_buttons buttons[LACHESIS_NR_PROFILES];
+
+	bool commit_pending;
 };
 
 
@@ -648,7 +650,7 @@ static int lachesis_commit_5600(struct lachesis_private *priv)
 	return 0;
 }
 
-static int lachesis_commit(struct lachesis_private *priv)
+static int lachesis_do_commit(struct lachesis_private *priv)
 {
 	switch (priv->type) {
 	case LACHESIS_CLASSIC:
@@ -882,13 +884,20 @@ static int lachesis_get_fw_version(struct razer_mouse *m)
 	return priv->fw_version;
 }
 
-static int lachesis_reconfigure(struct razer_mouse *m)
+static int lachesis_commit(struct razer_mouse *m, int force)
 {
 	struct lachesis_private *priv = m->drv_data;
+	int err = 0;
 
 	if (!m->claim_count)
 		return -EBUSY;
-	return lachesis_commit(priv);
+	if (priv->commit_pending || force) {
+		err = lachesis_do_commit(priv);
+		if (!err)
+			priv->commit_pending = 0;
+	}
+
+	return err;
 }
 
 static const razer_utf16_t * lachesis_profile_get_name(struct razer_mouse_profile *p)
@@ -907,7 +916,6 @@ static int lachesis_profile_set_name(struct razer_mouse_profile *p,
 {
 	struct razer_mouse *m = p->mouse;
 	struct lachesis_private *priv = m->drv_data;
-	int err;
 
 	if (p->nr >= LACHESIS_NR_PROFILES)
 		return -EINVAL;
@@ -917,10 +925,7 @@ static int lachesis_profile_set_name(struct razer_mouse_profile *p,
 
 	razer_utf16_cpy(priv->profile_names[p->nr].name,
 			new_name, LACHESIS_PROFNAME_MAX_LEN);
-
-	err = lachesis_commit(priv);
-	if (err)
-		return err;
+	priv->commit_pending = 1;
 
 	return 0;
 }
@@ -931,8 +936,6 @@ static int lachesis_led_toggle(struct razer_led *led,
 	struct razer_mouse_profile *p = led->u.mouse_prof;
 	struct razer_mouse *m = p->mouse;
 	struct lachesis_private *priv = m->drv_data;
-	int err;
-	enum razer_led_state old_state;
 
 	if (led->id >= LACHESIS_NR_LEDS)
 		return -EINVAL;
@@ -948,14 +951,8 @@ static int lachesis_led_toggle(struct razer_led *led,
 	if (!priv->m->claim_count)
 		return -EBUSY;
 
-	old_state = priv->led_states[p->nr][led->id];
 	priv->led_states[p->nr][led->id] = new_state;
-
-	err = lachesis_commit(priv);
-	if (err) {
-		priv->led_states[p->nr][led->id] = old_state;
-		return err;
-	}
+	priv->commit_pending = 1;
 
 	return 0;
 }
@@ -966,8 +963,6 @@ static int lachesis_led_change_color(struct razer_led *led,
 	struct razer_mouse_profile *p = led->u.mouse_prof;
 	struct razer_mouse *m = p->mouse;
 	struct lachesis_private *priv = m->drv_data;
-	struct razer_rgb_color old_color;
-	int err;
 
 	if (WARN_ON(priv->type == LACHESIS_CLASSIC))
 		return -ENODEV;
@@ -979,14 +974,8 @@ static int lachesis_led_change_color(struct razer_led *led,
 	if (!priv->m->claim_count)
 		return -EBUSY;
 
-	old_color = priv->led_colors[p->nr][led->id];
 	priv->led_colors[p->nr][led->id] = *new_color;
-
-	err = lachesis_commit(priv);
-	if (err) {
-		priv->led_colors[p->nr][led->id] = old_color;
-		return err;
-	}
+	priv->commit_pending = 1;
 
 	return 0;
 }
@@ -1111,8 +1100,6 @@ static int lachesis_set_freq(struct razer_mouse *m,
 			     enum razer_mouse_freq freq)
 {
 	struct lachesis_private *priv = m->drv_data;
-	enum razer_mouse_freq oldfreq;
-	int err;
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
@@ -1122,14 +1109,8 @@ static int lachesis_set_freq(struct razer_mouse *m,
 	if (profile_nr >= ARRAY_SIZE(priv->cur_freq))
 		return -EINVAL;
 
-	oldfreq = priv->cur_freq[profile_nr];
 	priv->cur_freq[profile_nr] = freq;
-
-	err = lachesis_commit(priv);
-	if (err) {
-		priv->cur_freq[profile_nr] = oldfreq;
-		return err;
-	}
+	priv->commit_pending = 1;
 
 	return 0;
 }
@@ -1197,22 +1178,14 @@ static int lachesis_set_active_profile(struct razer_mouse *m,
 				       struct razer_mouse_profile *p)
 {
 	struct lachesis_private *priv = m->drv_data;
-	struct razer_mouse_profile *oldprof;
-	int err;
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
 
-	oldprof = priv->cur_profile;
 	priv->cur_profile = p;
+	priv->commit_pending = 1;
 
-	err = lachesis_commit(priv);
-	if (err) {
-		priv->cur_profile = oldprof;
-		return err;
-	}
-
-	return err;
+	return 0;
 }
 
 static int lachesis_supported_dpimappings(struct razer_mouse *m,
@@ -1248,8 +1221,6 @@ static int lachesis_set_dpimapping(struct razer_mouse_profile *p,
 				   struct razer_mouse_dpimapping *d)
 {
 	struct lachesis_private *priv = p->mouse->drv_data;
-	struct razer_mouse_dpimapping *oldmapping;
-	int err;
 	razer_id_mask_t idmask;
 
 	if (!priv->m->claim_count)
@@ -1263,14 +1234,8 @@ static int lachesis_set_dpimapping(struct razer_mouse_profile *p,
 	if (d->profile_mask != idmask)
 		return -EINVAL;
 
-	oldmapping = priv->cur_dpimapping[p->nr];
 	priv->cur_dpimapping[p->nr] = d;
-
-	err = lachesis_commit(priv);
-	if (err) {
-		priv->cur_dpimapping[p->nr] = oldmapping;
-		return err;
-	}
+	priv->commit_pending = 1;
 
 	return 0;
 }
@@ -1280,8 +1245,6 @@ static int lachesis_dpimapping_modify(struct razer_mouse_dpimapping *d,
 				      enum razer_mouse_res res)
 {
 	struct lachesis_private *priv = d->mouse->drv_data;
-	enum razer_mouse_res oldres;
-	int err;
 
 	if ((int)dim < 0 || (int)dim >= ARRAY_SIZE(d->res))
 		return -EINVAL;
@@ -1289,14 +1252,8 @@ static int lachesis_dpimapping_modify(struct razer_mouse_dpimapping *d,
 	if (!priv->m->claim_count)
 		return -EBUSY;
 
-	oldres = d->res[dim];
 	d->res[dim] = res;
-
-	err = lachesis_commit(priv);
-	if (err) {
-		d->res[dim] = oldres;
-		return err;
-	}
+	priv->commit_pending = 1;
 
 	return 0;
 }
@@ -1338,8 +1295,6 @@ static int lachesis_set_button_function(struct razer_mouse_profile *p,
 	struct lachesis_private *priv = p->mouse->drv_data;
 	struct lachesis_buttons *buttons;
 	struct razer_buttonmapping *mapping;
-	uint8_t oldlogical;
-	int err;
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
@@ -1353,13 +1308,8 @@ static int lachesis_set_button_function(struct razer_mouse_profile *p,
 	if (!mapping)
 		return -ENODEV;
 
-	oldlogical = mapping->logical;
 	mapping->logical = f->id;
-	err = lachesis_commit(priv);
-	if (err) {
-		mapping->logical = oldlogical;
-		return err;
-	}
+	priv->commit_pending = 1;
 
 	return 0;
 }
@@ -1478,7 +1428,7 @@ int razer_lachesis_init(struct razer_mouse *m,
 	m->type = RAZER_MOUSETYPE_LACHESIS;
 
 	m->get_fw_version = lachesis_get_fw_version;
-	m->reconfigure = lachesis_reconfigure;
+	m->commit = lachesis_commit;
 	if (priv->type == LACHESIS_CLASSIC) {
 		m->global_get_leds = lachesis_global_get_leds;
 	} else {
@@ -1496,7 +1446,7 @@ int razer_lachesis_init(struct razer_mouse *m,
 	m->supported_buttons = lachesis_supported_buttons;
 	m->supported_button_functions = lachesis_supported_button_functions;
 
-	err = lachesis_commit(priv);
+	err = lachesis_do_commit(priv);
 	if (err) {
 		razer_error("hw_lachesis: Failed to commit initial settings\n");
 		goto err_release;

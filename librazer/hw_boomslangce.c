@@ -128,6 +128,7 @@ struct boomslangce_private {
 	/* The active button mapping; per profile. */
 	struct boomslangce_buttonmappings buttons[BOOMSLANGCE_NR_PROFILES];
 
+	bool commit_pending;
 	struct razer_event_spacing commit_spacing;
 };
 
@@ -277,7 +278,7 @@ static int boomslangce_read_fw_ver(struct boomslangce_private *priv)
 	return ver;
 }
 
-static int boomslangce_commit(struct boomslangce_private *priv)
+static int boomslangce_do_commit(struct boomslangce_private *priv)
 {
 	union {
 		struct boomslangce_profcfg_cmd profcfg;
@@ -487,13 +488,20 @@ static int boomslangce_get_fw_version(struct razer_mouse *m)
 	return priv->fw_version;
 }
 
-static int boomslangce_reconfigure(struct razer_mouse *m)
+static int boomslangce_commit(struct razer_mouse *m, int force)
 {
 	struct boomslangce_private *priv = m->drv_data;
+	int err = 0;
 
 	if (!m->claim_count)
 		return -EBUSY;
-	return boomslangce_commit(priv);
+	if (priv->commit_pending || force) {
+		err = boomslangce_do_commit(priv);
+		if (!err)
+			priv->commit_pending = 0;
+	}
+
+	return err;
 }
 
 static struct razer_mouse_profile * boomslangce_get_profiles(struct razer_mouse *m)
@@ -514,22 +522,14 @@ static int boomslangce_set_active_profile(struct razer_mouse *m,
 					 struct razer_mouse_profile *p)
 {
 	struct boomslangce_private *priv = m->drv_data;
-	struct razer_mouse_profile *oldprof;
-	int err;
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
 
-	oldprof = priv->cur_profile;
 	priv->cur_profile = p;
+	priv->commit_pending = 1;
 
-	err = boomslangce_commit(priv);
-	if (err) {
-		priv->cur_profile = oldprof;
-		return err;
-	}
-
-	return err;
+	return 0;
 }
 
 static int boomslangce_supported_resolutions(struct razer_mouse *m,
@@ -584,22 +584,14 @@ static int boomslangce_set_freq(struct razer_mouse_profile *p,
 			       enum razer_mouse_freq freq)
 {
 	struct boomslangce_private *priv = p->mouse->drv_data;
-	enum razer_mouse_freq oldfreq;
-	int err;
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
 	if (p->nr >= ARRAY_SIZE(priv->cur_freq))
 		return -EINVAL;
 
-	oldfreq = priv->cur_freq[p->nr];
 	priv->cur_freq[p->nr] = freq;
-
-	err = boomslangce_commit(priv);
-	if (err) {
-		priv->cur_freq[p->nr] = oldfreq;
-		return err;
-	}
+	priv->commit_pending = 1;
 
 	return 0;
 }
@@ -630,24 +622,16 @@ static int boomslangce_set_dpimapping(struct razer_mouse_profile *p,
 				     struct razer_mouse_dpimapping *d)
 {
 	struct boomslangce_private *priv = p->mouse->drv_data;
-	struct razer_mouse_dpimapping *oldmapping;
-	int err;
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
 	if (p->nr >= ARRAY_SIZE(priv->cur_dpimapping))
 		return -EINVAL;
 
-	oldmapping = priv->cur_dpimapping[p->nr];
 	priv->cur_dpimapping[p->nr] = d;
+	priv->commit_pending = 1;
 
-	err = boomslangce_commit(priv);
-	if (err) {
-		priv->cur_dpimapping[p->nr] = oldmapping;
-		return err;
-	}
-
-	return err;
+	return 0;
 }
 
 static int boomslangce_led_toggle(struct razer_led *led,
@@ -655,8 +639,6 @@ static int boomslangce_led_toggle(struct razer_led *led,
 {
 	struct razer_mouse *m = led->u.mouse;
 	struct boomslangce_private *priv = m->drv_data;
-	int err;
-	enum razer_led_state old_state;
 
 	if (led->id >= BOOMSLANGCE_NR_LEDS)
 		return -EINVAL;
@@ -667,16 +649,10 @@ static int boomslangce_led_toggle(struct razer_led *led,
 	if (!m->claim_count)
 		return -EBUSY;
 
-	old_state = priv->led_states[led->id];
 	priv->led_states[led->id] = new_state;
+	priv->commit_pending = 1;
 
-	err = boomslangce_commit(priv);
-	if (err) {
-		priv->led_states[led->id] = old_state;
-		return err;
-	}
-
-	return err;
+	return 0;
 }
 
 static int boomslangce_get_leds(struct razer_mouse *m,
@@ -758,8 +734,6 @@ static int boomslangce_set_button_function(struct razer_mouse_profile *p,
 	struct boomslangce_private *priv = p->mouse->drv_data;
 	struct boomslangce_buttonmappings *m;
 	struct boomslangce_one_buttonmapping *one;
-	uint8_t oldlogical;
-	int err;
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
@@ -770,13 +744,8 @@ static int boomslangce_set_button_function(struct razer_mouse_profile *p,
 	one = boomslangce_buttonid_to_mapping(m, b->id);
 	if (!one)
 		return -ENODEV;
-	oldlogical = one->logical;
 	one->logical = f->id;
-	err = boomslangce_commit(priv);
-	if (err) {
-		one->logical = oldlogical;
-		return err;
-	}
+	priv->commit_pending = 1;
 
 	return 0;
 }
@@ -857,7 +826,7 @@ int razer_boomslangce_init(struct razer_mouse *m,
 				    NULL, m->idstr);
 
 	m->get_fw_version = boomslangce_get_fw_version;
-	m->reconfigure = boomslangce_reconfigure;
+	m->commit = boomslangce_commit;
 	m->global_get_leds = boomslangce_get_leds;
 	m->nr_profiles = BOOMSLANGCE_NR_PROFILES;
 	m->get_profiles = boomslangce_get_profiles;
@@ -869,7 +838,7 @@ int razer_boomslangce_init(struct razer_mouse *m,
 	m->supported_buttons = boomslangce_supported_buttons;
 	m->supported_button_functions = boomslangce_supported_button_functions;
 
-	err = boomslangce_commit(priv);
+	err = boomslangce_do_commit(priv);
 	if (err) {
 		razer_error("hw_boomslangce: Failed to commit initial config\n");
 		goto err_release;

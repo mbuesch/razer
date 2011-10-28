@@ -73,6 +73,7 @@ struct deathadder_private {
 	struct razer_mouse_profile profile;
 	struct razer_mouse_dpimapping dpimapping[4];
 
+	bool commit_pending;
 	struct razer_event_spacing commit_spacing;
 };
 
@@ -151,7 +152,7 @@ static int deathadder_read_fw_ver(struct deathadder_private *priv)
 	return ver;
 }
 
-static int deathadder_commit(struct deathadder_private *priv)
+static int deathadder_do_commit(struct deathadder_private *priv)
 {
 	struct razer_usb_reconnect_guard guard;
 	int i, err;
@@ -358,6 +359,7 @@ static int deathadder_commit(struct deathadder_private *priv)
 			}
 		}
 	}
+	priv->old_frequency = priv->frequency;
 	err = 0;
 out:
 	razer_event_spacing_leave(&priv->commit_spacing);
@@ -372,13 +374,20 @@ static int deathadder_get_fw_version(struct razer_mouse *m)
 	return priv->fw_version;
 }
 
-static int deathadder_reconfigure(struct razer_mouse *m)
+static int deathadder_commit(struct razer_mouse *m, int force)
 {
 	struct deathadder_private *priv = m->drv_data;
+	int err = 0;
 
 	if (!m->claim_count)
 		return -EBUSY;
-	return deathadder_commit(priv);
+	if (priv->commit_pending || force) {
+		err = deathadder_do_commit(priv);
+		if (!err)
+			priv->commit_pending = 0;
+	}
+
+	return err;
 }
 
 static int deathadder_led_toggle(struct razer_led *led,
@@ -386,8 +395,6 @@ static int deathadder_led_toggle(struct razer_led *led,
 {
 	struct razer_mouse *m = led->u.mouse;
 	struct deathadder_private *priv = m->drv_data;
-	int err;
-	enum razer_led_state old_state;
 
 	if (led->id >= DEATHADDER_NR_LEDS)
 		return -EINVAL;
@@ -400,16 +407,10 @@ static int deathadder_led_toggle(struct razer_led *led,
 	if (!m->claim_count)
 		return -EBUSY;
 
-	old_state = priv->led_states[led->id];
 	priv->led_states[led->id] = new_state;
+	priv->commit_pending = 1;
 
-	err = deathadder_commit(priv);
-	if (err) {
-		priv->led_states[led->id] = old_state;
-		return err;
-	}
-
-	return err;
+	return 0;
 }
 
 static int deathadder_get_leds(struct razer_mouse *m,
@@ -480,24 +481,14 @@ static int deathadder_set_freq(struct razer_mouse_profile *p,
 			       enum razer_mouse_freq freq)
 {
 	struct deathadder_private *priv = p->mouse->drv_data;
-	enum razer_mouse_freq old_freq;
-	int err;
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
 
-	old_freq = priv->frequency;
-	priv->old_frequency = old_freq;
 	priv->frequency = freq;
+	priv->commit_pending = 1;
 
-	err = deathadder_commit(priv);
-	if (err) {
-		priv->frequency = old_freq;
-		return err;
-	}
-	priv->old_frequency = freq;
-
-	return err;
+	return 0;
 }
 
 static int deathadder_supported_resolutions(struct razer_mouse *m,
@@ -645,22 +636,14 @@ static int deathadder_set_dpimapping(struct razer_mouse_profile *p,
 				     struct razer_mouse_dpimapping *d)
 {
 	struct deathadder_private *priv = p->mouse->drv_data;
-	struct razer_mouse_dpimapping *oldmapping;
-	int err;
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
 
-	oldmapping = priv->cur_dpimapping;
 	priv->cur_dpimapping = d;
+	priv->commit_pending = 1;
 
-	err = deathadder_commit(priv);
-	if (err) {
-		priv->cur_dpimapping = oldmapping;
-		return err;
-	}
-
-	return err;
+	return 0;
 }
 
 int razer_deathadder_init(struct razer_mouse *m,
@@ -784,7 +767,7 @@ int razer_deathadder_init(struct razer_mouse *m,
 				    NULL, m->idstr);
 
 	m->get_fw_version = deathadder_get_fw_version;
-	m->reconfigure = deathadder_reconfigure;
+	m->commit = deathadder_commit;
 	m->flash_firmware = deathadder_flash_firmware;
 	m->global_get_leds = deathadder_get_leds;
 	m->get_profiles = deathadder_get_profiles;
@@ -792,7 +775,7 @@ int razer_deathadder_init(struct razer_mouse *m,
 	m->supported_freqs = deathadder_supported_freqs;
 	m->supported_dpimappings = deathadder_supported_dpimappings;
 
-	err = deathadder_commit(priv);
+	err = deathadder_do_commit(priv);
 	if (err) {
 		razer_error("hw_deathadder: Failed to commit initial settings\n");
 		goto err_release;
