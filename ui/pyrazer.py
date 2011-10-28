@@ -462,7 +462,10 @@ class Razer(object):
 		payload += led.name
 		payload += '\0' * (self.RAZER_LEDNAME_MAX_SIZE - len(led.name))
 		payload += "%c" % (1 if led.state else 0)
-		payload += razer_int_to_be32(led.color.toU32())
+		if led.color:
+			payload += razer_int_to_be32(led.color.toU32())
+		else:
+			payload += razer_int_to_be32(0)
 		self.__sendCommand(self.COMMAND_ID_SETLED, idstr, payload)
 		return self.__recvU32()
 
