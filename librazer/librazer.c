@@ -425,7 +425,34 @@ static bool mouse_apply_one_config(struct config_file *f,
 		}
 		goto error;
 	} else if (strcasecmp(item, "freq") == 0) {
-		//TODO
+		int profile, freq, i;
+		enum razer_mouse_freq *freqs;
+
+		err = parse_int_int_pair(value, &profile, &freq);
+		if (err == 1) {
+			prof = m->get_active_profile(m);
+			profile = prof->nr + 1;
+		} else if (err)
+			goto error;
+		if (profile < 1 || freq < 1)
+			goto error;
+		prof = find_prof(m, profile - 1);
+		if (!prof)
+			goto error;
+		nr = m->supported_freqs(m, &freqs);
+		if (nr <= 0)
+			goto error;
+		for (i = 0; i < nr; i++) {
+			if (freqs[i] != freq)
+				continue;
+			err = prof->set_freq(prof, freqs[i]);
+			razer_free_freq_list(freqs, nr);
+			if (err)
+				goto error;
+			goto ok;
+		}
+		razer_free_freq_list(freqs, nr);
+		goto error;
 	} else if (strcasecmp(item, "led") == 0) {
 		bool on;
 		struct razer_led *leds, *led;
