@@ -98,7 +98,4 @@ static inline bool razer_buffer_is_all_zero(const void *_buf, size_t size)
 	return value == 0;
 }
 
-void razer_utf16_cpy(razer_utf16_t *dest, const razer_utf16_t *src,
-		     size_t max_chars);
-
 #endif /* RAZER_UTIL_H_ */

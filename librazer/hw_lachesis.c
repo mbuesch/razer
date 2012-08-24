@@ -916,6 +916,7 @@ static int lachesis_profile_set_name(struct razer_mouse_profile *p,
 {
 	struct razer_mouse *m = p->mouse;
 	struct lachesis_private *priv = m->drv_data;
+	int err;
 
 	if (p->nr >= LACHESIS_NR_PROFILES)
 		return -EINVAL;
@@ -923,11 +924,11 @@ static int lachesis_profile_set_name(struct razer_mouse_profile *p,
 	if (!m->claim_count)
 		return -EBUSY;
 
-	razer_utf16_cpy(priv->profile_names[p->nr].name,
-			new_name, LACHESIS_PROFNAME_MAX_LEN);
+	err = razer_utf16_cpy(priv->profile_names[p->nr].name,
+			      new_name, LACHESIS_PROFNAME_MAX_LEN);
 	priv->commit_pending = 1;
 
-	return 0;
+	return err;
 }
 
 static int lachesis_led_toggle(struct razer_led *led,

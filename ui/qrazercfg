@@ -20,6 +20,12 @@ from PyQt4.QtGui import *
 from pyrazer import *
 
 
+def unicode2QString(uni):
+	return QString.fromUtf8(unicode(uni).decode("UTF-8"))
+
+def QString2unicode(qstr):
+	return unicode(qstr.toUtf8(), "UTF-8").encode("UTF-16")
+
 class OneButtonConfig(QWidget):
 	def __init__(self, id, name, supportedFunctions, buttonConfWidget):
 		QWidget.__init__(self, buttonConfWidget)
@@ -217,6 +223,12 @@ class MouseProfileWidget(QWidget):
 			self.layout().addWidget(self.buttonConf, yoff, 0, 1, 2)
 			yoff += 1
 
+		if minfo & Razer.MOUSEINFOFLG_PROFNAMEMUTABLE:
+			self.buttonName = QPushButton(self.tr("Change profile name"), self)
+			self.connect(self.buttonName, SIGNAL("clicked(bool)"), self.nameChange)
+			self.layout().addWidget(self.buttonName, yoff, 0, 1, 2)
+			yoff += 1
+
 		self.dpimappings = MouseDpiMappingsWidget(self, mouseWidget)
 		self.layout().addWidget(self.dpimappings, yoff, 0, 1, 2)
 		yoff += 1
@@ -330,6 +342,18 @@ class MouseProfileWidget(QWidget):
 	def showButtonConf(self, checked):
 		bconf = ButtonConfDialog(self)
 		bconf.exec_()
+
+	def nameChange(self, unused):
+		name = razer.getProfileName(self.mouseWidget.mouse, self.profileId)
+		(newName, ok) = QInputDialog.getText(self, self.tr("New profile name"),
+						     self.tr("New profile name:"),
+						     QLineEdit.Normal,
+						     unicode2QString(name))
+		if not ok:
+			return
+		newName = QString2unicode(newName)
+		razer.setProfileName(self.mouseWidget.mouse, self.profileId, newName)
+		self.mouseWidget.reloadProfiles()
 
 class OneDpiMapping(QWidget):
 	def __init__(self, dpiMappingsWidget, dpimapping):
@@ -545,10 +569,10 @@ class MouseWidget(QWidget):
 			prof.reload()
 		activeProf = razer.getActiveProfile(self.mouse)
 		for i in range(0, self.profiletab.count()):
-			id = self.profiletab.widget(i).profileId
-			name = "Profile " + str(id + 1)
-			if activeProf == id:
-				name = ">" + name + "<"
+			profileId = self.profiletab.widget(i).profileId
+			name = razer.getProfileName(self.mouse, profileId)
+			if activeProf == profileId:
+				name = u">" + name + u"<"
 			self.profiletab.setTabText(i, name)
 
 class StatusBar(QStatusBar):

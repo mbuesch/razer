@@ -95,6 +95,29 @@ error:
 	return err;
 }
 
+static const razer_utf16_t * mouse_profemu_get_name(struct razer_mouse_profile *p)
+{
+	struct razer_mouse *mouse = p->mouse;
+	struct razer_mouse_profile_emu *emu = mouse->profemu;
+
+	if (WARN_ON(p->nr >= ARRAY_SIZE(emu->profiles)))
+		return NULL;
+	return emu->data[p->nr].name;
+}
+
+static int mouse_profemu_set_name(struct razer_mouse_profile *p,
+				  const razer_utf16_t *new_name)
+{
+	struct razer_mouse *mouse = p->mouse;
+	struct razer_mouse_profile_emu *emu = mouse->profemu;
+
+	if (WARN_ON(p->nr >= ARRAY_SIZE(emu->profiles)))
+		return -EINVAL;
+	razer_utf16_cpy(emu->data[p->nr].name, new_name, PROFEMU_NAME_MAX);
+
+	return 0;
+}
+
 static enum razer_mouse_freq mouse_profemu_get_freq(struct razer_mouse_profile *p)
 {
 	struct razer_mouse *mouse = p->mouse;
@@ -230,6 +253,32 @@ static int mouse_profemu_set_active(struct razer_mouse *m,
 	return mouse_profemu_commit(emu);
 }
 
+static void mouse_profemu_initial_name(razer_utf16_t *namebuf, unsigned int profnr)
+{
+	char name[PROFEMU_NAME_MAX + 1];
+
+	switch (profnr) {
+	case 0:
+		snprintf(name, sizeof(name), "Desktop");
+		break;
+	case 1:
+		snprintf(name, sizeof(name), "FPS gaming");
+		break;
+	case 2:
+		snprintf(name, sizeof(name), "RPG gaming");
+		break;
+	case 3:
+		snprintf(name, sizeof(name), "Generic gaming");
+		break;
+	case 4:
+		snprintf(name, sizeof(name), "CAD");
+		break;
+	default:
+		snprintf(name, sizeof(name), "Profile %u", profnr + 1);
+	}
+	razer_ascii_to_utf16(namebuf, PROFEMU_NAME_MAX, name);
+}
+
 int razer_mouse_init_profile_emulation(struct razer_mouse *m)
 {
 	struct razer_mouse_profile_emu *emu;
@@ -271,6 +320,9 @@ int razer_mouse_init_profile_emulation(struct razer_mouse *m)
 		prof->mouse = m;
 		prof->nr = i;
 
+		prof->get_name = mouse_profemu_get_name;
+		prof->set_name = mouse_profemu_set_name;
+
 		/* Assign callbacks, if the driver supports the feature. */
 //TODO LEDs
 		if (hw_profile->get_freq)
@@ -287,6 +339,7 @@ int razer_mouse_init_profile_emulation(struct razer_mouse *m)
 			prof->set_button_function = mouse_profemu_set_button_function;
 
 		/* Load initial settings */
+		mouse_profemu_initial_name(data->name, i);
 		if (hw_profile->get_freq)
 			data->freq = hw_profile->get_freq(hw_profile);
 		if (hw_profile->get_dpimapping) {

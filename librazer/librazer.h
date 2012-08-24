@@ -44,6 +44,27 @@ struct razer_mouse;
 /** razer_utf16_t - UTF-16 type */
 typedef uint16_t razer_utf16_t;
 
+/** razer_ascii_to_utf16 - Convert ASCII to UTF16.
+ * @dest: Destination buffer.
+ * @dest_max_chars: Maximum number of characters in dest.
+ * @src: NUL terminated ASCII source buffer.
+ */
+void razer_ascii_to_utf16(razer_utf16_t *dest, size_t dest_max_chars,
+			  const char *src);
+
+/** razer_utf16_cpy - Copy an UTF16 string.
+ * @dest: Destination buffer.
+ * @src: Source buffer.
+ * @max_chars: Maximum number of characters to copy.
+ */
+int razer_utf16_cpy(razer_utf16_t *dest, const razer_utf16_t *src,
+		    size_t max_chars);
+
+/** razer_utf16_strlen - Return the length of an UTF16 string.
+ * @str: An UTF16 string.
+ */
+size_t razer_utf16_strlen(const razer_utf16_t *str);
+
 /** enum razer_led_state - The LED state value
   * @RAZER_LED_OFF: The LED is turned off
   * @RAZER_LED_ON: The LED is turned on

@@ -4,7 +4,11 @@
 #include "razer_private.h"
 
 
+#define PROFEMU_NAME_MAX	32
+
 struct razer_mouse_profile_emu_data {
+	/* Profile name string */
+	razer_utf16_t name[PROFEMU_NAME_MAX + 1];
 	/* Frequency selection for this emulated profile */
 	enum razer_mouse_freq freq;
 	/* DPI mappings (per axis) for this emulated profile */

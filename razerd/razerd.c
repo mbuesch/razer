@@ -51,6 +51,7 @@ typedef _Bool bool;
 #define max(x, y)		({ __typeof__(x) __x = (x); \
 				   __typeof__(y) __y = (y); \
 				   __x > __y ? __x : __y; })
+#define ARRAY_SIZE(x)		(sizeof(x) / sizeof((x)[0]))
 
 #define _packed			__attribute__((__packed__))
 
@@ -82,7 +83,7 @@ struct commandline_args {
 #define SOCKPATH		VAR_RUN_RAZERD "/socket"
 #define PRIV_SOCKPATH		VAR_RUN_RAZERD "/socket.privileged"
 
-#define INTERFACE_REVISION	3
+#define INTERFACE_REVISION	4
 
 #define COMMAND_MAX_SIZE	512
 #define COMMAND_HDR_SIZE	sizeof(struct command_hdr)
@@ -115,6 +116,8 @@ enum {
 	COMMAND_ID_SUPPAXES,		/* Get a list of supported axes. */
 	COMMAND_ID_RECONFIGMICE,	/* Reconfigure all mice. */
 	COMMAND_ID_GETMOUSEINFO,	/* Get detailed information about a mouse */
+	COMMAND_ID_GETPROFNAME,		/* Get a profile name. */
+	COMMAND_ID_SETPROFNAME,		/* Set a profile name. */
 
 	/* Privileged commands */
 	COMMAND_PRIV_FLASHFW = 128,	/* Upload and flash a firmware image */
@@ -140,6 +143,7 @@ enum mouseinfo_flags {
 	MOUSEINFOFLG_PROFILE_LEDS	= (1 << 2),
 	MOUSEINFOFLG_GLOBAL_FREQ	= (1 << 3),
 	MOUSEINFOFLG_PROFILE_FREQ	= (1 << 4),
+	MOUSEINFOFLG_PROFNAMEMUTABLE	= (1 << 5),
 };
 
 enum led_flags {
@@ -242,6 +246,15 @@ struct command {
 		} _packed getmouseinfo;
 
 		struct {
+			uint32_t profile_id;
+		} _packed getprofname;
+
+		struct {
+			uint32_t profile_id;
+			uint8_t utf16be_name[64 * 2];
+		} _packed setprofname;
+
+		struct {
 			uint32_t imagesize;
 		} _packed flashfw;
 
@@ -266,6 +279,12 @@ enum {
 	NOTIFY_ID_DELMOUSE,		/* A mouse was removed. */
 };
 
+enum string_encoding {
+	STRING_ENC_ASCII,
+	STRING_ENC_UTF8,
+	STRING_ENC_UTF16BE,
+};
+
 struct reply_hdr {
 	uint8_t id;
 } _packed;
@@ -277,8 +296,9 @@ struct reply {
 			uint32_t val;
 		} _packed u32;
 		struct {
-			uint16_t len;
-			char str[0];
+			uint8_t encoding;
+			uint16_t len; /* in characters */
+			uint8_t str[0]; /* Payload buffer */
 		} _packed string;
 
 		struct {
@@ -307,6 +327,34 @@ static struct client *privileged_clients;
 /* Linked list of detected mice. */
 static struct razer_mouse *mice;
 
+
+static inline uint32_t cpu_to_be32(uint32_t v)
+{
+#ifdef BIG_ENDIAN_HOST
+	return v;
+#else
+	return bswap_32(v);
+#endif
+}
+
+static inline uint16_t cpu_to_be16(uint16_t v)
+{
+#ifdef BIG_ENDIAN_HOST
+	return v;
+#else
+	return bswap_16(v);
+#endif
+}
+
+static inline uint32_t be32_to_cpu(uint32_t v)
+{
+	return cpu_to_be32(v);
+}
+
+static inline uint16_t be16_to_cpu(uint16_t v)
+{
+	return cpu_to_be16(v);
+}
 
 static void loginfo(const char *fmt, ...)
 {
@@ -655,35 +703,6 @@ static void disconnect_client(struct client **client_list, struct client *client
 	free_client(client);
 }
 
-static inline uint32_t cpu_to_be32(uint32_t v)
-{
-#ifdef BIG_ENDIAN_HOST
-	return v;
-#else
-	return bswap_32(v);
-#endif
-}
-
-
-static inline uint16_t cpu_to_be16(uint16_t v)
-{
-#ifdef BIG_ENDIAN_HOST
-	return v;
-#else
-	return bswap_16(v);
-#endif
-}
-
-static inline uint32_t be32_to_cpu(uint32_t v)
-{
-	return cpu_to_be32(v);
-}
-
-static inline uint16_t be16_to_cpu(uint16_t v)
-{
-	return cpu_to_be16(v);
-}
-
 static int send_reply(struct client *client, struct reply *r, size_t len)
 {
 	return send(client->fd, r, len, 0);
@@ -712,9 +731,34 @@ static int send_string(struct client *client, const char *str)
 	}
 
 	r->hdr.id = REPLY_ID_STR;
+	r->string.encoding = STRING_ENC_ASCII;
 	r->string.len = cpu_to_be16(len);
 	memcpy(r->string.str, str, len);
 	err = send_reply(client, r, REPLY_SIZE(string) + len);
+
+	free(r);
+
+	return err;
+}
+
+static int send_utf16_string(struct client *client, const razer_utf16_t *str)
+{
+	struct reply *r;
+	size_t i, len = razer_utf16_strlen(str);
+	int err;
+
+	r = malloc(len * 2 + REPLY_SIZE(string));
+	if (!r) {
+		logerr("Out of memory\n");
+		return -ENOMEM;
+	}
+
+	r->hdr.id = REPLY_ID_STR;
+	r->string.encoding = STRING_ENC_UTF16BE;
+	r->string.len = cpu_to_be16(len);
+	for (i = 0; i < len; i++)
+		((uint16_t *)r->string.str)[i] = cpu_to_be16(str[i]);
+	err = send_reply(client, r, REPLY_SIZE(string) + len * 2);
 
 	free(r);
 
@@ -1153,6 +1197,8 @@ static void command_getmouseinfo(struct client *client, const struct command *cm
 				flags |= MOUSEINFOFLG_PROFILE_LEDS;
 			if (profiles[0].get_freq)
 				flags |= MOUSEINFOFLG_PROFILE_FREQ;
+			if (profiles[0].set_name)
+				flags |= MOUSEINFOFLG_PROFNAMEMUTABLE;
 		}
 	}
 	send_u32(client, flags);
@@ -1393,6 +1439,76 @@ static void command_getprofiles(struct client *client, const struct command *cmd
 	return;
 error:
 	send_u32(client, 0);
+}
+
+static void command_getprofname(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	struct razer_mouse_profile *profile;
+	const razer_utf16_t *name;
+	razer_utf16_t namebuf[64] = { };
+	char asciibuf[64] = { };
+
+	if (len < CMD_SIZE(getprofname))
+		goto error;
+	mouse = find_mouse(cmd->idstr);
+	if (!mouse)
+		goto error;
+	profile = find_mouse_profile(mouse, be32_to_cpu(cmd->getprofname.profile_id));
+	if (!profile)
+		goto error;
+	if (profile->get_name) {
+		name = profile->get_name(profile);
+	} else {
+		snprintf(asciibuf, sizeof(asciibuf),
+			 "Profile %u", profile->nr + 1);
+		razer_ascii_to_utf16(namebuf, ARRAY_SIZE(namebuf), asciibuf);
+		name = namebuf;
+	}
+	if (!name)
+		goto error;
+
+	send_utf16_string(client, name);
+	return;
+error:
+	send_string(client, "");
+}
+
+static void command_setprofname(struct client *client, const struct command *cmd, unsigned int len)
+{
+	struct razer_mouse *mouse;
+	struct razer_mouse_profile *profile;
+	razer_utf16_t namebuf[sizeof(cmd->setprofname.utf16be_name) / 2 + 1] = { };
+	unsigned int i;
+	uint32_t errorcode = ERR_NONE;
+
+	if (len < CMD_SIZE(setprofname)) {
+		errorcode = ERR_CMDSIZE;
+		goto error;
+	}
+	mouse = find_mouse(cmd->idstr);
+	if (!mouse) {
+		errorcode = ERR_NOMOUSE;
+		goto error;
+	}
+	profile = find_mouse_profile(mouse, be32_to_cpu(cmd->setprofname.profile_id));
+	if (!profile) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+	if (!profile->set_name) {
+		errorcode = ERR_NOTSUPP;
+		goto error;
+	}
+	for (i = 0; i < ARRAY_SIZE(namebuf) - 1; i++)
+		namebuf[i] = be16_to_cpu(((uint16_t *)cmd->setprofname.utf16be_name)[i]);
+	if (profile->set_name(profile, namebuf)) {
+		errorcode = ERR_FAIL;
+		goto error;
+	}
+
+error:
+	send_u32(client, errorcode);
 }
 
 static void command_getactiveprof(struct client *client, const struct command *cmd, unsigned int len)
@@ -1791,6 +1907,12 @@ static void handle_received_command(struct client *client, const char *_cmd, uns
 		break;
 	case COMMAND_ID_GETMOUSEINFO:
 		command_getmouseinfo(client, cmd, len);
+		break;
+	case COMMAND_ID_GETPROFNAME:
+		command_getprofname(client, cmd, len);
+		break;
+	case COMMAND_ID_SETPROFNAME:
+		command_setprofname(client, cmd, len);
 		break;
 	default:
 		/* Unknown command. */

@@ -156,7 +156,7 @@ class Razer(object):
 	SOCKET_PATH	= "/var/run/razerd/socket"
 	PRIVSOCKET_PATH	= "/var/run/razerd/socket.privileged"
 
-	INTERFACE_REVISION = 3
+	INTERFACE_REVISION = 4
 
 	COMMAND_MAX_SIZE = 512
 	COMMAND_HDR_SIZE = 1
@@ -189,6 +189,8 @@ class Razer(object):
 	COMMAND_ID_SUPPAXES = 21	# Get a list of supported axes.
 	COMMAND_ID_RECONFIGMICE = 22	# Reconfigure all mice
 	COMMAND_ID_GETMOUSEINFO = 23	# Get detailed information about a mouse
+	COMMAND_ID_GETPROFNAME = 24	# Get a profile name.
+	COMMAND_ID_SETPROFNAME = 25	# Set a profile name.
 
 	COMMAND_PRIV_FLASHFW = 128	# Upload and flash a firmware image
 	COMMAND_PRIV_CLAIM = 129	# Claim the device.
@@ -201,6 +203,11 @@ class Razer(object):
 	__NOTIFY_ID_FIRST = 128
 	NOTIFY_ID_NEWMOUSE = 128	# New mouse was connected.
 	NOTIFY_ID_DELMOUSE = 129	# A mouse was removed.
+
+	# String encodings
+	STRING_ENC_ASCII = 0
+	STRING_ENC_UTF8 = 1
+	STRING_ENC_UTF16BE = 2
 
 	ERR_NONE = 0
 	ERR_CMDSIZE = 1
@@ -233,6 +240,7 @@ class Razer(object):
 	MOUSEINFOFLG_PROFILE_LEDS	= (1 << 2)
 	MOUSEINFOFLG_GLOBAL_FREQ	= (1 << 3)
 	MOUSEINFOFLG_PROFILE_FREQ	= (1 << 4)
+	MOUSEINFOFLG_PROFNAMEMUTABLE	= (1 << 5)
 
 	# LED flags
 	LED_FLAG_HAVECOLOR		= (1 << 0)
@@ -319,8 +327,22 @@ class Razer(object):
 		if id == self.REPLY_ID_U32:
 			payload = razer_be32_to_int(sock.recv(4))
 		elif id == self.REPLY_ID_STR:
+			encoding = ord(sock.recv(1))
 			strlen = razer_be16_to_int(sock.recv(2))
-			payload = sock.recv(strlen) if strlen else ""
+			if encoding == self.STRING_ENC_ASCII:
+				nrbytes = strlen
+				encode = lambda pl: str(pl)
+			elif encoding == self.STRING_ENC_UTF8:
+				nrbytes = strlen
+				encode = lambda pl: unicode(pl, "UTF-8")
+			elif encoding == self.STRING_ENC_UTF16BE:
+				nrbytes = strlen * 2
+				encode = lambda pl: unicode(pl, "UTF-16-BE")
+			else:
+				raise RazerEx("Received invalid string encoding %d" %\
+					      encoding)
+			payload = sock.recv(nrbytes) if nrbytes else ""
+			payload = encode(payload)
 		elif id == self.NOTIFY_ID_NEWMOUSE:
 			pass
 		elif id == self.NOTIFY_ID_DELMOUSE:
@@ -542,6 +564,23 @@ class Razer(object):
 		"Selects the active profile."
 		payload = razer_int_to_be32(profileId)
 		self.__sendCommand(self.COMMAND_ID_SETACTIVEPROF, idstr, payload)
+		return self.__recvU32()
+
+	def getProfileName(self, idstr, profileId):
+		"Get a profile name."
+		payload = razer_int_to_be32(profileId)
+		self.__sendCommand(self.COMMAND_ID_GETPROFNAME, idstr, payload)
+		return self.__recvString()
+
+	def setProfileName(self, idstr, profileId, newName):
+		"Set a profile name. newName is expected to be unicode."
+		payload = razer_int_to_be32(profileId)
+		rawstr = unicode(newName)
+		rawstr = str(newName.decode("UTF-16-BE"))[2:]
+		rawstr = rawstr[:min(len(rawstr), 64 * 2)]
+		rawstr += '\0' * (64 * 2 - len(rawstr))
+		payload += rawstr
+		self.__sendCommand(self.COMMAND_ID_SETPROFNAME, idstr, payload)
 		return self.__recvU32()
 
 	def flashFirmware(self, idstr, image):

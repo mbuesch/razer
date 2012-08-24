@@ -259,14 +259,44 @@ void razer_dump(const char *prefix, const void *_buf, size_t size)
 	printf("\n\n");
 }
 
-void razer_utf16_cpy(razer_utf16_t *dest, const razer_utf16_t *src,
-		     size_t max_chars)
+void razer_ascii_to_utf16(razer_utf16_t *dest, size_t dest_max_chars,
+			  const char *src)
+{
+	size_t count = 0;
+
+	if (!dest_max_chars)
+		return;
+	while (count < dest_max_chars - 1) {
+		if (!*src)
+			break;
+		*dest++ = *src++;
+		count++;
+	}
+	*dest = 0;
+}
+
+int razer_utf16_cpy(razer_utf16_t *dest, const razer_utf16_t *src,
+		    size_t max_chars)
 {
 	size_t i;
 
 	for (i = 0; i < max_chars; i++, dest++, src++) {
 		*dest = *src;
 		if (!(*src))
-			break;
+			return 0;
 	}
+
+	return -ENOSPC;
+}
+
+size_t razer_utf16_strlen(const razer_utf16_t *str)
+{
+	size_t count = 0;
+
+	while (*str) {
+		str++;
+		count++;
+	}
+
+	return count;
 }
