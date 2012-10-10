@@ -711,7 +711,8 @@ static int send_reply(struct client *client, struct reply *r, size_t len)
 	while (len) {
 		ret = send(client->fd, buf, len, 0);
 		if (ret < 0) {
-			if (errno == EAGAIN)
+			if (errno == EAGAIN ||
+			    errno == EINTR)
 				continue;
 			logerr("send() failed: %s", strerror(errno));
 			return -errno;
