@@ -123,7 +123,10 @@ struct lachesis5k6_request_globconfig {
 
 struct lachesis5k6_request_profname {
 	uint8_t profile;
-	uint8_t name[LACHESIS_PROFNAME_MAX_LEN * 2]; /* UTF-16-LE */
+	union {
+		uint8_t name[LACHESIS_PROFNAME_MAX_LEN * 2]; /* UTF-16-LE */
+		le16_t name_le16[LACHESIS_PROFNAME_MAX_LEN];
+	} _packed;
 } _packed;
 
 struct lachesis5k6_one_dpimapping {
@@ -616,7 +619,7 @@ static int lachesis_commit_5600(struct lachesis_private *priv)
 		profname.profile = i + 1;
 		for (j = 0; j < LACHESIS_PROFNAME_MAX_LEN; j++) {
 			le16_t c = cpu_to_le16(priv->profile_names[i].name[j]);
-			*((le16_t *)(&profname.name[j * 2])) = c;
+			profname.name_le16[j] = c;
 		}
 		err = lachesis5k6_request_write(priv, 0x22, 0x29,
 						&profname, sizeof(profname));
