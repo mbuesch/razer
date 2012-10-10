@@ -712,8 +712,10 @@ static int send_reply(struct client *client, struct reply *r, size_t len)
 		ret = send(client->fd, buf, len, 0);
 		if (ret < 0) {
 			if (errno == EAGAIN ||
-			    errno == EINTR)
+			    errno == EINTR) {
+				razer_msleep(1);
 				continue;
+			}
 			logerr("send() failed: %s", strerror(errno));
 			return -errno;
 		}
@@ -794,8 +796,11 @@ static int recv_bulk(struct client *client, char *buf, unsigned int len)
 		while (1) {
 			nr = recv(client->fd, buf + i, next_len, 0);
 			if (nr < 0) {
-				if (errno == EAGAIN)
+				if (errno == EAGAIN ||
+				    errno == EINTR) {
+					razer_msleep(1);
 					continue;
+				}
 			}
 			if (nr > 0)
 				break;

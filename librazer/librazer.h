@@ -526,6 +526,11 @@ struct razer_mouse {
 	void *drv_data; /* For use by the hardware driver */
 };
 
+/** razer_msleep - Delay.
+ * msecs: Number of milliseconds to delay.
+ */
+void razer_msleep(unsigned int msecs);
+
 /** razer_free_freq_list - Free an array of frequencies.
   * This function frees a whole array of frequencies as returned
   * by the device methods.

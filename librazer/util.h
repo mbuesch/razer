@@ -80,7 +80,6 @@ char * razer_string_strip(char *str);
 void razer_timeval_add_msec(struct timeval *tv, unsigned int msec);
 bool razer_timeval_after(const struct timeval *a, const struct timeval *b);
 int razer_timeval_msec_diff(const struct timeval *a, const struct timeval *b);
-void razer_msleep(unsigned int msecs);
 
 le16_t razer_xor16_checksum(const void *_buffer, size_t size);
 be16_t razer_xor16_checksum_be(const void *_buffer, size_t size);
