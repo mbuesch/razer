@@ -705,7 +705,22 @@ static void disconnect_client(struct client **client_list, struct client *client
 
 static int send_reply(struct client *client, struct reply *r, size_t len)
 {
-	return send(client->fd, r, len, 0);
+	const uint8_t *buf = (const uint8_t *)r;
+	int ret;
+
+	while (len) {
+		ret = send(client->fd, buf, len, 0);
+		if (ret < 0) {
+			if (errno == EAGAIN)
+				continue;
+			logerr("send() failed: %s", strerror(errno));
+			return -errno;
+		}
+		len -= ret;
+		buf += ret;
+	}
+
+	return 0;
 }
 
 static int send_u32(struct client *client, uint32_t v)
