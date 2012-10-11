@@ -8,6 +8,8 @@
  *   Copyright (C) 2007-2010 Michael Buesch <m@bues.ch>
  *   Copyright (C) 2010 Bernd Michael Helm <naga@rw23.de>
  *
+ *   Naga-2012 fixes by Tibor Peluch <messani@gmail.com>
+ *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
  *   as published by the Free Software Foundation; either version 2
@@ -41,8 +43,8 @@ enum { /* Misc constants */
 };
 
 struct naga_command {
-	le16_t status;
-	uint8_t padding0[2];
+	uint8_t status;
+	uint8_t padding0[3];
 	le16_t command;
 	le16_t request;
 	le16_t value0;
@@ -72,6 +74,11 @@ struct naga_private {
 	bool commit_pending;
 };
 
+
+static void naga_command_init(struct naga_command *cmd)
+{
+	memset(cmd, 0, sizeof(*cmd));
+}
 
 static int naga_usb_write(struct naga_private *priv,
 			  int request, int command,
@@ -122,7 +129,7 @@ static int naga_send_command(struct naga_private *priv,
 {
 	int err;
 
-	cmd->checksum = razer_xor8_checksum(cmd, sizeof(*cmd) - 2);
+	cmd->checksum = razer_xor8_checksum((uint8_t *)cmd + 2, sizeof(*cmd) - 4);
 	err = naga_usb_write(priv, LIBUSB_REQUEST_SET_CONFIGURATION, 0x300,
 			     cmd, sizeof(*cmd));
 	if (err)
@@ -131,13 +138,13 @@ static int naga_send_command(struct naga_private *priv,
 			    cmd, sizeof(*cmd));
 	if (err)
 		return err;
-	if (cmd->status != cpu_to_le16(2) &&
-	    cmd->status != cpu_to_le16(1)) {
-		razer_error("razer-naga: Command %04X/%04X failed with %04X\n",
+	if (cmd->status != 2 &&
+	    cmd->status != 1 &&
+	    cmd->status != 0) {
+		razer_error("razer-naga: Command %04X/%04X failed with %02X\n",
 			    le16_to_cpu(cmd->command),
 			    le16_to_cpu(cmd->request),
-			    le16_to_cpu(cmd->status));
-//		return -EBUSY;
+			    cmd->status);
 	}
 
 	return 0;
@@ -153,7 +160,7 @@ static int naga_read_fw_ver(struct naga_private *priv)
 	/* Poke the device several times until it responds with a
 	 * valid version number */
 	for (i = 0; i < 5; i++) {
-		memset(&cmd, 0, sizeof(cmd));
+		naga_command_init(&cmd);
 		cmd.command = cpu_to_le16(0x0200);
 		cmd.request = cpu_to_le16(0x8100);
 		err = naga_send_command(priv, &cmd);
@@ -174,7 +181,7 @@ static int naga_do_commit(struct naga_private *priv)
 	int err;
 
 	/* Set the resolution. */
-	memset(&cmd, 0, sizeof(cmd));
+	naga_command_init(&cmd);
 	cmd.command = cpu_to_le16(0x0300);
 	cmd.request = cpu_to_le16(0x0104);
 	xres = (((unsigned int)priv->cur_dpimapping_X->res[RAZER_DIM_0] / 100) - 1) * 4;
@@ -185,7 +192,7 @@ static int naga_do_commit(struct naga_private *priv)
 		return err;
 
 	/* Set the scroll wheel and buttons LEDs. */
-	memset(&cmd, 0, sizeof(cmd));
+	naga_command_init(&cmd);
 	cmd.command = cpu_to_le16(0x0300);
 	cmd.request = cpu_to_le16(0x0003);
 	cmd.value0 = cpu_to_le16(0x0101);
@@ -196,7 +203,7 @@ static int naga_do_commit(struct naga_private *priv)
 		return err;
 
 	/* Set the logo LED. */
-	memset(&cmd, 0, sizeof(cmd));
+	naga_command_init(&cmd);
 	cmd.command = cpu_to_le16(0x0300);
 	cmd.request = cpu_to_le16(0x0003);
 	cmd.value0 = cpu_to_le16(0x0401);
@@ -221,7 +228,7 @@ static int naga_do_commit(struct naga_private *priv)
 	default:
 		return -EINVAL;
 	}
-	memset(&cmd, 0, sizeof(cmd));
+	naga_command_init(&cmd);
 	cmd.command = cpu_to_le16(0x0100);
 	cmd.request = cpu_to_le16(0x0500);
 	cmd.value0 = cpu_to_le16(freq);
