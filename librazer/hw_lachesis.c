@@ -303,6 +303,7 @@ static int lachesis_usb_write(struct lachesis_private *priv,
 		razer_error("hw_lachesis: usb_write failed\n");
 		return -EIO;
 	}
+	razer_msleep(5);
 
 	return 0;
 }
@@ -337,6 +338,7 @@ static int lachesis_usb_read(struct lachesis_private *priv,
 		razer_error("hw_lachesis: usb_read failed\n");
 		return -EIO;
 	}
+	razer_msleep(5);
 
 	return 0;
 }
@@ -820,7 +822,8 @@ static int lachesis_read_config_5600(struct lachesis_private *priv)
 		if (err)
 			return err;
 		if (hwconfig.profile != i + 1) {
-			razer_error("hw_lachesis: Failed to read hw config\n");
+			razer_error("hw_lachesis: Failed to read hw config (%u vs %u)\n",
+				    hwconfig.profile, i + 1);
 			return -EIO;
 		}
 		priv->led_states[i][LACHESIS_LED_SCROLL] = !!(hwconfig.leds & 0x01);
