@@ -279,7 +279,7 @@ static le16_t lachesis5k6_checksum(const struct lachesis5k6_request *req)
 	uint16_t checksum;
 
 	checksum = razer_xor8_checksum((uint8_t *)req + 2,
-				       sizeof(*req) - 2);
+				       sizeof(*req) - 4);
 	if (!(req->flags & LACHESIS5K6_REQ_FLG_TRANSOK))
 		checksum |= 0x100;
 
