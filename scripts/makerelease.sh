@@ -1,54 +1,33 @@
-#!/bin/bash
-set -e
+#!/bin/sh
 
-project="razercfg"
+srcdir="$(dirname "$0")"
+[ "$(echo "$srcdir" | cut -c1)" = '/' ] || srcdir="$PWD/$srcdir"
 
-basedir="$(dirname "$0")"
-[ "${basedir:0:1}" = "/" ] || basedir="$PWD/$basedir"
+srcdir="$srcdir/.."
 
-origin="$basedir/.."
+die() { echo "$*"; exit 1; }
 
-version="$(cat $origin/ui/pyrazer.py | grep -e RAZER_VERSION | head -n1 | cut -d'"' -f2)"
-if [ -z "$version" ]; then
-	echo "Could not determine version!"
-	exit 1
-fi
-release_name="$project-$version"
-tarball="$release_name.tar.bz2"
-tagname="release-$version"
-tagmsg="$project-$version release"
+# Import the makerelease.lib
+# http://bues.ch/gitweb?p=misc.git;a=blob_plain;f=makerelease.lib;hb=HEAD
+for path in $(echo "$PATH" | tr ':' ' '); do
+	[ -f "$MAKERELEASE_LIB" ] && break
+	MAKERELEASE_LIB="$path/makerelease.lib"
+done
+[ -f "$MAKERELEASE_LIB" ] && . "$MAKERELEASE_LIB" || die "makerelease.lib not found."
 
-export GIT_DIR="$origin/.git"
+hook_get_version()
+{
+	local file="$1/ui/pyrazer.py"
+	version="$(cat "$file" | grep -e RAZER_VERSION | head -n1 | cut -d'"' -f2)"
+}
 
-cd /tmp/
-rm -Rf "$release_name" "$tarball"
-echo "Creating target directory"
-mkdir "$release_name"
-cd "$release_name"
-echo "git checkout"
-git checkout -f
+hook_post_checkout()
+{
+	default_hook_post_checkout "$@"
 
-rm scripts/makerelease.sh .gitignore
-rm -R firmware #XXX Remove it for now...
+	# Remove firmware directory from release.
+	rm -r "$1/firmware"
+}
 
-echo "creating tarball"
-cd ..
-tar cjf "$tarball" "$release_name"
-mv "$tarball" "$origin"
-
-echo "running testbuild"
-cd "$release_name"
-cmake .
-make
-
-echo "removing testbuild"
-cd ..
-rm -R "$release_name"
-
-
-echo "Tagging GIT"
-cd "$origin"
-git tag -m "$tagmsg" -a "$tagname"
-
-echo
-echo "built release $version"
+project=razercfg
+makerelease "$@"
