@@ -1120,9 +1120,8 @@ int razer_synapse_set_led_name(struct razer_mouse *m,
 	if (index >= ARRAY_SIZE(s->led_names))
 		return -EINVAL;
 
-	memset(&s->led_names[index], 0, sizeof(s->led_names[index]));
-	strncpy(s->led_names[index].name, name,
-		sizeof(s->led_names[index].name) - 1);
+	razer_strlcpy(s->led_names[index].name, name,
+		      sizeof(s->led_names[index].name));
 
 	return 0;
 }

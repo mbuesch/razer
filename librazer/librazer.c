@@ -365,7 +365,7 @@ static int parse_int_int_pair(const char *str, int *val0, int *val1)
 				a, b, NULL);
 	if (err) {
 		/* It's not a pair. Interpret it as one value. */
-		strncpy(a, str, sizeof(a) - 1);
+		razer_strlcpy(a, str, sizeof(a));
 		err = razer_string_to_int(razer_string_strip(a), val1);
 		if (err)
 			return -EINVAL;

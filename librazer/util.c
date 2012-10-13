@@ -67,7 +67,7 @@ int razer_split_tuple(const char *str, char sep,
 			err = -ENODATA;
 			continue;
 		}
-		strncpy(elem, str, elems_max_len - 1);
+		razer_strlcpy(elem, str, elems_max_len);
 		str = razer_strsplit(elem, sep);
 	}
 	va_end(ap);
@@ -128,6 +128,20 @@ char * razer_string_strip(char *str)
 	}
 
 	return start;
+}
+
+void razer_strlcpy(char *dst, const char *src, size_t dst_size)
+{
+	size_t len;
+
+	if (!dst_size)
+		return;
+
+	len = strlen(src);
+	if (len >= dst_size)
+		len = dst_size - 1;
+	memcpy(dst, src, len);
+	dst[len] = 0;
 }
 
 void razer_timeval_add_msec(struct timeval *tv, unsigned int msec)

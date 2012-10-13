@@ -534,6 +534,13 @@ struct razer_mouse {
  */
 void razer_msleep(unsigned int msecs);
 
+/** razer_strlcpy - Copy a string into a sized buffer.
+ * @dst: Destination buffer.
+ * @src: Source string.
+ * @dst_size: Destination buffer size.
+ */
+void razer_strlcpy(char *dst, const char *src, size_t dst_size);
+
 /** razer_free_freq_list - Free an array of frequencies.
   * This function frees a whole array of frequencies as returned
   * by the device methods.

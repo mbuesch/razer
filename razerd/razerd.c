@@ -474,7 +474,7 @@ static int create_socket(const char *path, unsigned int perm,
 		goto error_close_sock;
 	}
 	sockaddr.sun_family = AF_UNIX;
-	strncpy(sockaddr.sun_path, path, sizeof(sockaddr.sun_path) - 1);
+	razer_strlcpy(sockaddr.sun_path, path, sizeof(sockaddr.sun_path));
 	err = bind(fd, (struct sockaddr *)&sockaddr, SUN_LEN(&sockaddr));
 	if (err) {
 		logerr("Failed to bind socket to %s: %s\n",
