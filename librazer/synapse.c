@@ -654,6 +654,27 @@ static int synapse_commit(struct razer_mouse *m, int force)
 	return err;
 }
 
+static enum razer_mouse_freq synapse_global_get_freq(struct razer_mouse *m)
+{
+	struct razer_synapse *s = m->synapse_data;
+
+	return s->cur_freq;
+}
+
+static int synapse_global_set_freq(struct razer_mouse *m,
+				   enum razer_mouse_freq freq)
+{
+	struct razer_synapse *s = m->synapse_data;
+
+	if (!s->m->claim_count)
+		return -EBUSY;
+
+	s->cur_freq = freq;
+	s->commit_pending = 1;
+
+	return 0;
+}
+
 static const razer_utf16_t * synapse_profile_get_name(struct razer_mouse_profile *p)
 {
 	struct razer_mouse *m = p->mouse;
@@ -1052,8 +1073,8 @@ int razer_synapse_init(struct razer_mouse *m,
 
 	m->get_fw_version = synapse_get_fw_version;
 	m->commit = synapse_commit;
-//TODO	m->global_get_freq = synapse_global_get_freq;
-//TODO	m->global_set_freq = synapse_global_set_freq;
+	m->global_get_freq = synapse_global_get_freq;
+	m->global_set_freq = synapse_global_set_freq;
 	m->nr_profiles = SYNAPSE_NR_PROFILES;
 	m->get_profiles = synapse_get_profiles;
 	m->get_active_profile = synapse_get_active_profile;
