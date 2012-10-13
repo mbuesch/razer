@@ -822,8 +822,8 @@ static int synapse_profile_get_leds(struct razer_mouse_profile *p,
 		if (s->features & RAZER_SYNFEAT_RGBLEDS) {
 			leds[i]->color = s->led_colors[p->nr][i];
 			leds[i]->change_color = synapse_led_change_color;
-			leds[i]->u.mouse_prof = &s->profiles[p->nr];
 		}
+		leds[i]->u.mouse_prof = &s->profiles[p->nr];
 	}
 
 	/* Link the list */
