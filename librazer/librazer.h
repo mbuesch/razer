@@ -165,6 +165,7 @@ enum razer_mouse_res {
   * @RAZER_MOUSETYPE_LACHESIS: A "Copperhead" mouse
   * @RAZER_MOUSETYPE_NAGA: A "Naga" mouse
   * @RAZER_MOUSETYPE_BOOMSLANGCE: A "Boomslang Collector's Edition" mouse
+  * @RAZER_MOUSETYPE_IMPERATOR: An "Imperator" mouse
   */
 enum razer_mouse_type {
 	RAZER_MOUSETYPE_DEATHADDER,
@@ -173,6 +174,7 @@ enum razer_mouse_type {
 	RAZER_MOUSETYPE_COPPERHEAD,
 	RAZER_MOUSETYPE_NAGA,
 	RAZER_MOUSETYPE_BOOMSLANGCE,
+	RAZER_MOUSETYPE_IMPERATOR,
 };
 
 /** struct razer_button_function - A logical button function
@@ -524,6 +526,7 @@ struct razer_mouse {
 	unsigned int claim_count;
 	struct razer_mouse_profile_emu *profemu;
 	void *drv_data; /* For use by the hardware driver */
+	void *synapse_data; /* For use by synapse driver */
 };
 
 /** razer_msleep - Delay.

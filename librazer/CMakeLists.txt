@@ -6,13 +6,15 @@ add_library(razer SHARED
 	    librazer.c
 	    config.c
 	    util.c
+	    synapse.c
 	    cypress_bootloader.c
 	    hw_boomslangce.c
 	    hw_copperhead.c
 	    hw_deathadder.c
 	    hw_krait.c
 	    hw_lachesis.c
-	    hw_naga.c)
+	    hw_naga.c
+	    hw_imperator.c)
 
 set_target_properties(razer PROPERTIES COMPILE_FLAGS ${GENERIC_COMPILE_FLAGS})
 

@@ -66,11 +66,13 @@ int razer_parse_buttonmap(void *rawdata, size_t rawsize,
 		}
 		mapping.physical = raw[rawptr + 0];
 		mapping.logical = raw[rawptr + 1];
+		/*FIXME
 		if (mapping.physical == 0) {
 			razer_error("razer_parse_buttonmap: Physical mapping for %u "
 				"is invalid\n", (unsigned int)count);
 			return -EINVAL;
 		}
+		*/
 		/*FIXME triggers for lachesis5k6
 		if (mapping.logical == 0) {
 			razer_error("razer_parse_buttonmap: Logical mapping for 0x%02X "
