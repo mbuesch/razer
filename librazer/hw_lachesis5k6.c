@@ -28,7 +28,7 @@ int razer_lachesis5k6_init(struct razer_mouse *m,
 {
 	int err;
 
-	err = razer_synapse_init(m, 0);
+	err = razer_synapse_init(m, RAZER_SYNFEAT_RGBLEDS);
 	if (err)
 		return err;
 

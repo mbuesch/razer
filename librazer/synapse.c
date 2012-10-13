@@ -29,14 +29,9 @@ enum synapse_constants {
 	SYNAPSE_NR_PROFILES		= 5,
 	SYNAPSE_NR_DPIMAPPINGS		= 5,
 	SYNAPSE_NR_AXES			= 3,
+	SYNAPSE_NR_LEDS			= 2,
 	SYNAPSE_SERIAL_MAX_LEN		= 32,
 	SYNAPSE_PROFNAME_MAX_LEN	= 20,
-};
-
-enum { /* LED IDs */
-	SYNAPSE_LED_SCROLL = 0,
-	SYNAPSE_LED_LOGO,
-	SYNAPSE_NR_LEDS,
 };
 
 enum synapse_phys_button {
@@ -115,8 +110,7 @@ struct synapse_request_hwconfig {
 	struct synapse_one_dpimapping dpimappings[SYNAPSE_NR_DPIMAPPINGS];
 	uint8_t _padding[6];
 	uint8_t buttonmap[4 * NR_SYNAPSE_PHYSBUT];
-	struct synapse_led_color scroll_color;
-	struct synapse_led_color logo_color;
+	struct synapse_led_color led_colors[SYNAPSE_NR_LEDS];
 } _packed;
 
 
@@ -126,6 +120,10 @@ struct synapse_buttons {
 
 struct synapse_prof_name {
 	razer_utf16_t name[SYNAPSE_PROFNAME_MAX_LEN + 1];
+};
+
+struct synapse_led_name {
+	char name[32];
 };
 
 struct razer_synapse {
@@ -139,6 +137,8 @@ struct razer_synapse {
 	/* Device serial number */
 	char serial[SYNAPSE_SERIAL_MAX_LEN + 1];
 
+	/* LED names */
+	struct synapse_led_name led_names[SYNAPSE_NR_LEDS];
 	/* The currently set LED states. */
 	enum razer_led_state led_states[SYNAPSE_NR_PROFILES][SYNAPSE_NR_LEDS];
 	/* LED colors */
@@ -458,8 +458,8 @@ static int synapse_read_config_from_hw(struct razer_synapse *s)
 				    hwconfig.profile, i + 1);
 			return -EIO;
 		}
-		s->led_states[i][SYNAPSE_LED_SCROLL] = !!(hwconfig.leds & 0x01);
-		s->led_states[i][SYNAPSE_LED_LOGO] = !!(hwconfig.leds & 0x02);
+		for (j = 0; j < SYNAPSE_NR_LEDS; j++)
+			s->led_states[i][j] = !!(hwconfig.leds & (1 << j));
 		if (hwconfig.dpisel < 1 || hwconfig.dpisel > SYNAPSE_NR_DPIMAPPINGS ||
 		    hwconfig.dpisel > hwconfig.nr_dpimappings) {
 			razer_error("synapse: Got invalid DPI selection: %u\n",
@@ -490,14 +490,13 @@ static int synapse_read_config_from_hw(struct razer_synapse *s)
 					    ARRAY_SIZE(s->buttons[i].mapping), 2);
 		if (err)
 			return err;
-		s->led_colors[i][SYNAPSE_LED_SCROLL].r = hwconfig.scroll_color.r;
-		s->led_colors[i][SYNAPSE_LED_SCROLL].g = hwconfig.scroll_color.g;
-		s->led_colors[i][SYNAPSE_LED_SCROLL].b = hwconfig.scroll_color.b;
-		s->led_colors[i][SYNAPSE_LED_SCROLL].valid = 1;
-		s->led_colors[i][SYNAPSE_LED_LOGO].r = hwconfig.logo_color.r;
-		s->led_colors[i][SYNAPSE_LED_LOGO].g = hwconfig.logo_color.g;
-		s->led_colors[i][SYNAPSE_LED_LOGO].b = hwconfig.logo_color.b;
-		s->led_colors[i][SYNAPSE_LED_LOGO].valid = 1;
+		for (j = 0; j < SYNAPSE_NR_LEDS; j++) {
+			s->led_colors[i][j].r = hwconfig.led_colors[j].r;
+			s->led_colors[i][j].g = hwconfig.led_colors[j].g;
+			s->led_colors[i][j].b = hwconfig.led_colors[j].b;
+			s->led_colors[i][j].valid = !!(s->features & RAZER_SYNFEAT_RGBLEDS);
+
+		}
 	}
 
 	return 0;
@@ -543,10 +542,10 @@ static int synapse_do_commit(struct razer_synapse *s)
 		memset(&hwconfig, 0, sizeof(hwconfig));
 		hwconfig.profile = i + 1;
 		hwconfig.leds = 0x04;
-		if (s->led_states[i][SYNAPSE_LED_SCROLL])
-			hwconfig.leds |= 0x01;
-		if (s->led_states[i][SYNAPSE_LED_LOGO])
-			hwconfig.leds |= 0x02;
+		for (j = 0; j < SYNAPSE_NR_LEDS; j++) {
+			if (s->led_states[i][j])
+				hwconfig.leds |= (1 << j);
+		}
 		hwconfig.dpisel = (s->cur_dpimapping[i]->nr % 10) + 1;
 		hwconfig.nr_dpimappings = SYNAPSE_NR_DPIMAPPINGS;
 		for (j = 0; j < SYNAPSE_NR_DPIMAPPINGS; j++) {
@@ -558,14 +557,14 @@ static int synapse_do_commit(struct razer_synapse *s)
 					     ARRAY_SIZE(s->buttons[i].mapping), 2);
 		if (err)
 			return err;
-		hwconfig.scroll_color.padding = SYNAPSE_LED_COLOR_PADDING;
-		hwconfig.scroll_color.r = s->led_colors[i][SYNAPSE_LED_SCROLL].r;
-		hwconfig.scroll_color.g = s->led_colors[i][SYNAPSE_LED_SCROLL].g;
-		hwconfig.scroll_color.b = s->led_colors[i][SYNAPSE_LED_SCROLL].b;
-		hwconfig.logo_color.padding = SYNAPSE_LED_COLOR_PADDING;
-		hwconfig.logo_color.r = s->led_colors[i][SYNAPSE_LED_LOGO].r;
-		hwconfig.logo_color.g = s->led_colors[i][SYNAPSE_LED_LOGO].g;
-		hwconfig.logo_color.b = s->led_colors[i][SYNAPSE_LED_LOGO].b;
+		if (s->features & RAZER_SYNFEAT_RGBLEDS) {
+			for (j = 0; j < SYNAPSE_NR_LEDS; j++) {
+				hwconfig.led_colors[j].padding = SYNAPSE_LED_COLOR_PADDING;
+				hwconfig.led_colors[j].r = s->led_colors[i][j].r;
+				hwconfig.led_colors[j].g = s->led_colors[i][j].g;
+				hwconfig.led_colors[j].b = s->led_colors[i][j].b;
+			}
+		}
 		err = synapse_request_write(s, 6, 0x48,
 					    &hwconfig, sizeof(hwconfig));
 		if (err)
@@ -800,40 +799,37 @@ static int synapse_profile_get_leds(struct razer_mouse_profile *p,
 				    struct razer_led **leds_list)
 {
 	struct razer_synapse *s = p->mouse->synapse_data;
-	struct razer_led *scroll, *logo;
+	struct razer_led *leds[SYNAPSE_NR_LEDS];
+	int i;
 
 	if (p->nr >= SYNAPSE_NR_PROFILES)
 		return -EINVAL;
 
-	scroll = zalloc(sizeof(struct razer_led));
-	if (!scroll)
-		return -ENOMEM;
-	logo = zalloc(sizeof(struct razer_led));
-	if (!logo) {
-		free(scroll);
-		return -ENOMEM;
+	for (i = 0; i < SYNAPSE_NR_LEDS; i++) {
+		leds[i] = zalloc(sizeof(struct razer_led));
+		if (!leds[i]) {
+			for (i--; i >= 0; i--)
+				razer_free(leds[i], sizeof(struct razer_led));
+			return -ENOMEM;
+		}
 	}
 
-	scroll->name = "Scrollwheel";
-	scroll->id = SYNAPSE_LED_SCROLL;
-	scroll->state = s->led_states[p->nr][SYNAPSE_LED_SCROLL];
-	scroll->toggle_state = synapse_led_toggle;
-	scroll->color = s->led_colors[p->nr][SYNAPSE_LED_SCROLL];
-	scroll->change_color = synapse_led_change_color;
-	scroll->u.mouse_prof = &s->profiles[p->nr];
-
-	logo->name = "GlowingLogo";
-	logo->id = SYNAPSE_LED_LOGO;
-	logo->state = s->led_states[p->nr][SYNAPSE_LED_LOGO];
-	logo->toggle_state = synapse_led_toggle;
-	logo->color = s->led_colors[p->nr][SYNAPSE_LED_LOGO];
-	logo->change_color = synapse_led_change_color;
-	logo->u.mouse_prof = &s->profiles[p->nr];
+	for (i = 0; i < SYNAPSE_NR_LEDS; i++) {
+		leds[i]->name = s->led_names[i].name;
+		leds[i]->id = i;
+		leds[i]->state = s->led_states[p->nr][i];
+		leds[i]->toggle_state = synapse_led_toggle;
+		if (s->features & RAZER_SYNFEAT_RGBLEDS) {
+			leds[i]->color = s->led_colors[p->nr][i];
+			leds[i]->change_color = synapse_led_change_color;
+			leds[i]->u.mouse_prof = &s->profiles[p->nr];
+		}
+	}
 
 	/* Link the list */
-	*leds_list = scroll;
-	scroll->next = logo;
-	logo->next = NULL;
+	*leds_list = leds[0];
+	for (i = 0; i < SYNAPSE_NR_LEDS; i++)
+		leds[i]->next = (i < SYNAPSE_NR_LEDS - 1) ? leds[i + 1] : NULL;
 
 	return SYNAPSE_NR_LEDS;
 }
@@ -1004,6 +1000,10 @@ int razer_synapse_init(struct razer_mouse *m,
 		}
 	}
 
+	/* Default LED names */
+	razer_synapse_set_led_name(m, 0, "ScrollWheel");
+	razer_synapse_set_led_name(m, 1, "GlowingLogo");
+
 	err = m->claim(m);
 	if (err) {
 		razer_error("synapse: "
@@ -1061,6 +1061,22 @@ void razer_synapse_exit(struct razer_mouse *m)
 
 	razer_free(s, sizeof(*s));
 	m->synapse_data = NULL;
+}
+
+int razer_synapse_set_led_name(struct razer_mouse *m,
+			       unsigned int index,
+			       const char *name)
+{
+	struct razer_synapse *s = m->synapse_data;
+
+	if (index >= ARRAY_SIZE(s->led_names))
+		return -EINVAL;
+
+	memset(&s->led_names[index], 0, sizeof(s->led_names[index]));
+	strncpy(s->led_names[index].name, name,
+		sizeof(s->led_names[index].name) - 1);
+
+	return 0;
 }
 
 const char * razer_synapse_get_serial(struct razer_mouse *m)
