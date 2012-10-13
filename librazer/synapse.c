@@ -128,6 +128,7 @@ struct synapse_led_name {
 
 struct razer_synapse {
 	struct razer_mouse *m;
+	void *drv_data;
 
 	/* Feature selection bits */
 	unsigned int features;
@@ -551,7 +552,7 @@ static int synapse_read_devinfo(struct razer_synapse *s)
 
 static int synapse_get_fw_version(struct razer_mouse *m)
 {
-	struct razer_synapse *s = m->synapse_data;
+	struct razer_synapse *s = m->drv_data;
 
 	return s->fw_version;
 }
@@ -640,7 +641,7 @@ static int synapse_do_commit(struct razer_synapse *s)
 
 static int synapse_commit(struct razer_mouse *m, int force)
 {
-	struct razer_synapse *s = m->synapse_data;
+	struct razer_synapse *s = m->drv_data;
 	int err = 0;
 
 	if (!m->claim_count)
@@ -656,7 +657,7 @@ static int synapse_commit(struct razer_mouse *m, int force)
 
 static enum razer_mouse_freq synapse_global_get_freq(struct razer_mouse *m)
 {
-	struct razer_synapse *s = m->synapse_data;
+	struct razer_synapse *s = m->drv_data;
 
 	return s->cur_freq;
 }
@@ -664,7 +665,7 @@ static enum razer_mouse_freq synapse_global_get_freq(struct razer_mouse *m)
 static int synapse_global_set_freq(struct razer_mouse *m,
 				   enum razer_mouse_freq freq)
 {
-	struct razer_synapse *s = m->synapse_data;
+	struct razer_synapse *s = m->drv_data;
 
 	if (!s->m->claim_count)
 		return -EBUSY;
@@ -678,7 +679,7 @@ static int synapse_global_set_freq(struct razer_mouse *m,
 static const razer_utf16_t * synapse_profile_get_name(struct razer_mouse_profile *p)
 {
 	struct razer_mouse *m = p->mouse;
-	struct razer_synapse *s = m->synapse_data;
+	struct razer_synapse *s = m->drv_data;
 
 	if (p->nr >= SYNAPSE_NR_PROFILES)
 		return NULL;
@@ -690,7 +691,7 @@ static int synapse_profile_set_name(struct razer_mouse_profile *p,
 				    const razer_utf16_t *new_name)
 {
 	struct razer_mouse *m = p->mouse;
-	struct razer_synapse *s = m->synapse_data;
+	struct razer_synapse *s = m->drv_data;
 	int err;
 
 	if (p->nr >= SYNAPSE_NR_PROFILES)
@@ -711,7 +712,7 @@ static int synapse_led_toggle(struct razer_led *led,
 {
 	struct razer_mouse_profile *p = led->u.mouse_prof;
 	struct razer_mouse *m = p->mouse;
-	struct razer_synapse *s = m->synapse_data;
+	struct razer_synapse *s = m->drv_data;
 
 	if (led->id >= SYNAPSE_NR_LEDS)
 		return -EINVAL;
@@ -735,7 +736,7 @@ static int synapse_led_change_color(struct razer_led *led,
 {
 	struct razer_mouse_profile *p = led->u.mouse_prof;
 	struct razer_mouse *m = p->mouse;
-	struct razer_synapse *s = m->synapse_data;
+	struct razer_synapse *s = m->drv_data;
 
 	if (led->id >= SYNAPSE_NR_LEDS)
 		return -EINVAL;
@@ -755,14 +756,14 @@ static int synapse_led_change_color(struct razer_led *led,
 
 static struct razer_mouse_profile * synapse_get_profiles(struct razer_mouse *m)
 {
-	struct razer_synapse *s = m->synapse_data;
+	struct razer_synapse *s = m->drv_data;
 
 	return &s->profiles[0];
 }
 
 static struct razer_mouse_profile * synapse_get_active_profile(struct razer_mouse *m)
 {
-	struct razer_synapse *s = m->synapse_data;
+	struct razer_synapse *s = m->drv_data;
 
 	return s->cur_profile;
 }
@@ -770,7 +771,7 @@ static struct razer_mouse_profile * synapse_get_active_profile(struct razer_mous
 static int synapse_set_active_profile(struct razer_mouse *m,
 				      struct razer_mouse_profile *p)
 {
-	struct razer_synapse *s = m->synapse_data;
+	struct razer_synapse *s = m->drv_data;
 
 	if (!s->m->claim_count)
 		return -EBUSY;
@@ -784,7 +785,7 @@ static int synapse_set_active_profile(struct razer_mouse *m,
 static int synapse_supported_dpimappings(struct razer_mouse *m,
 					 struct razer_mouse_dpimapping **res_ptr)
 {
-	struct razer_synapse *s = m->synapse_data;
+	struct razer_synapse *s = m->drv_data;
 
 	*res_ptr = &s->dpimappings[0][0];
 
@@ -794,7 +795,7 @@ static int synapse_supported_dpimappings(struct razer_mouse *m,
 static struct razer_mouse_dpimapping * synapse_get_dpimapping(struct razer_mouse_profile *p,
 							      struct razer_axis *axis)
 {
-	struct razer_synapse *s = p->mouse->synapse_data;
+	struct razer_synapse *s = p->mouse->drv_data;
 
 	if (p->nr >= ARRAY_SIZE(s->cur_dpimapping))
 		return NULL;
@@ -806,7 +807,7 @@ static int synapse_set_dpimapping(struct razer_mouse_profile *p,
 				  struct razer_axis *axis,
 				  struct razer_mouse_dpimapping *d)
 {
-	struct razer_synapse *s = p->mouse->synapse_data;
+	struct razer_synapse *s = p->mouse->drv_data;
 	razer_id_mask_t idmask;
 
 	if (!s->m->claim_count)
@@ -829,7 +830,7 @@ static int synapse_dpimapping_modify(struct razer_mouse_dpimapping *d,
 				     enum razer_dimension dim,
 				     enum razer_mouse_res res)
 {
-	struct razer_synapse *s = d->mouse->synapse_data;
+	struct razer_synapse *s = d->mouse->drv_data;
 
 	if ((int)dim < 0 || (int)dim >= ARRAY_SIZE(d->res))
 		return -EINVAL;
@@ -846,7 +847,7 @@ static int synapse_dpimapping_modify(struct razer_mouse_dpimapping *d,
 static int synapse_profile_get_leds(struct razer_mouse_profile *p,
 				    struct razer_led **leds_list)
 {
-	struct razer_synapse *s = p->mouse->synapse_data;
+	struct razer_synapse *s = p->mouse->drv_data;
 	struct razer_led *leds[SYNAPSE_NR_LEDS];
 	int i;
 
@@ -885,7 +886,7 @@ static int synapse_profile_get_leds(struct razer_mouse_profile *p,
 static int synapse_supported_axes(struct razer_mouse *m,
 				  struct razer_axis **axes_list)
 {
-	struct razer_synapse *s = m->synapse_data;
+	struct razer_synapse *s = m->drv_data;
 
 	*axes_list = s->axes;
 
@@ -952,7 +953,7 @@ static int synapse_supported_button_functions(struct razer_mouse *m,
 static struct razer_button_function * synapse_get_button_function(struct razer_mouse_profile *p,
 								  struct razer_button *b)
 {
-	struct razer_synapse *s = p->mouse->synapse_data;
+	struct razer_synapse *s = p->mouse->drv_data;
 	struct synapse_buttons *buttons;
 
 	if (p->nr > ARRAY_SIZE(s->buttons))
@@ -969,7 +970,7 @@ static int synapse_set_button_function(struct razer_mouse_profile *p,
 				       struct razer_button *b,
 				       struct razer_button_function *f)
 {
-	struct razer_synapse *s = p->mouse->synapse_data;
+	struct razer_synapse *s = p->mouse->drv_data;
 	struct synapse_buttons *buttons;
 	struct razer_buttonmapping *mapping;
 
@@ -992,6 +993,7 @@ static int synapse_set_button_function(struct razer_mouse_profile *p,
 }
 
 int razer_synapse_init(struct razer_mouse *m,
+		       void *drv_data,
 		       unsigned int features)
 {
 	struct razer_synapse *s;
@@ -1006,9 +1008,10 @@ int razer_synapse_init(struct razer_mouse *m,
 	s = zalloc(sizeof(*s));
 	if (!s)
 		return -ENOMEM;
-	m->synapse_data = s;
+	m->drv_data = s;
 	s->m = m;
 
+	s->drv_data = drv_data;
 	s->features = features;
 
 	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
@@ -1105,17 +1108,24 @@ err_free:
 
 void razer_synapse_exit(struct razer_mouse *m)
 {
-	struct razer_synapse *s = m->synapse_data;
+	struct razer_synapse *s = m->drv_data;
 
 	razer_free(s, sizeof(*s));
-	m->synapse_data = NULL;
+	m->drv_data = NULL;
+}
+
+void * razer_synapse_get_drv_data(struct razer_mouse *m)
+{
+	struct razer_synapse *s = m->drv_data;
+
+	return s->drv_data;
 }
 
 int razer_synapse_set_led_name(struct razer_mouse *m,
 			       unsigned int index,
 			       const char *name)
 {
-	struct razer_synapse *s = m->synapse_data;
+	struct razer_synapse *s = m->drv_data;
 
 	if (index >= ARRAY_SIZE(s->led_names))
 		return -EINVAL;
@@ -1128,7 +1138,7 @@ int razer_synapse_set_led_name(struct razer_mouse *m,
 
 const char * razer_synapse_get_serial(struct razer_mouse *m)
 {
-	struct razer_synapse *s = m->synapse_data;
+	struct razer_synapse *s = m->drv_data;
 
 	return s->serial;
 }

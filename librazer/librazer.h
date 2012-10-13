@@ -526,7 +526,6 @@ struct razer_mouse {
 	unsigned int claim_count;
 	struct razer_mouse_profile_emu *profemu;
 	void *drv_data; /* For use by the hardware driver */
-	void *synapse_data; /* For use by synapse driver */
 };
 
 /** razer_msleep - Delay.

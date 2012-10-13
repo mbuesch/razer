@@ -11,8 +11,11 @@ enum razer_synapse_features {
 };
 
 int razer_synapse_init(struct razer_mouse *m,
+		       void *drv_data,
 		       unsigned int features);
 void razer_synapse_exit(struct razer_mouse *m);
+
+void * razer_synapse_get_drv_data(struct razer_mouse *m);
 
 int razer_synapse_set_led_name(struct razer_mouse *m,
 			       unsigned int index,

@@ -28,7 +28,7 @@ int razer_imperator_init(struct razer_mouse *m,
 {
 	int err;
 
-	err = razer_synapse_init(m, 0);
+	err = razer_synapse_init(m, NULL, 0);
 	if (err)
 		return err;
 
