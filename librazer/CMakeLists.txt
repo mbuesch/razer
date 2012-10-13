@@ -13,6 +13,7 @@ add_library(razer SHARED
 	    hw_deathadder.c
 	    hw_krait.c
 	    hw_lachesis.c
+	    hw_lachesis5k6.c
 	    hw_naga.c
 	    hw_imperator.c)
 
