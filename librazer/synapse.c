@@ -160,7 +160,7 @@ struct razer_synapse {
 	struct razer_mouse_dpimapping dpimappings[SYNAPSE_NR_PROFILES][SYNAPSE_NR_DPIMAPPINGS];
 
 	/* The active scan frequency. */
-	enum razer_mouse_freq cur_freq[SYNAPSE_NR_PROFILES];
+	enum razer_mouse_freq cur_freq;
 
 	/* The active button mapping; per profile. */
 	struct synapse_buttons buttons[SYNAPSE_NR_PROFILES];
@@ -415,13 +415,13 @@ static int synapse_read_config_from_hw(struct razer_synapse *s)
 	s->cur_profile = &s->profiles[globconfig.profile - 1];
 	switch (globconfig.freq) {
 	case 1:
-		s->cur_freq[0] = RAZER_MOUSE_FREQ_1000HZ;
+		s->cur_freq = RAZER_MOUSE_FREQ_1000HZ;
 		break;
 	case 2:
-		s->cur_freq[0] = RAZER_MOUSE_FREQ_500HZ;
+		s->cur_freq = RAZER_MOUSE_FREQ_500HZ;
 		break;
 	case 8:
-		s->cur_freq[0] = RAZER_MOUSE_FREQ_125HZ;
+		s->cur_freq = RAZER_MOUSE_FREQ_125HZ;
 		break;
 	default:
 		razer_error("synapse: "
@@ -588,7 +588,7 @@ static int synapse_do_commit(struct razer_synapse *s)
 	/* Commit global config */
 	memset(&globconfig, 0, sizeof(globconfig));
 	globconfig.profile = s->cur_profile->nr + 1;
-	switch (s->cur_freq[0]) {
+	switch (s->cur_freq) {
 	default:
 	case RAZER_MOUSE_FREQ_1000HZ:
 		globconfig.freq = 1;
