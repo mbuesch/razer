@@ -205,6 +205,33 @@ static struct razer_button_function synapse_button_functions[] = {
 };
 
 
+/* requests:
+ *	description:		command, request / payload
+ *	==================================================
+ *
+ *	get device info:	02, 01
+ *		->reply:	02, 22 / struct synapse_request_devinfo
+ *
+ *	get global config:	05, 01	or
+ *				05, 00
+ *		->reply:	05, 05 / struct synapse_request_globconfig
+ *
+ *	set global config:	05, 05
+ *
+ *	get prof name:		22, 01 / profnr
+ *		->reply:	22, 29 / struct synapse_request_profname
+ *
+ *	set prof name:		22, 29 / struct synapse_request_profile
+ *
+ *	get hwconfig:		06, 01 / profnr
+ *		->reply:	06, 38 / struct synapse_request_hwconfig
+ *
+ *	set hwconfig:		06, 48 / struct synapse_request_hwconfig
+ *
+ *	get ???:		08, 00
+ *		->reply:	08, 04 / all zero
+ */
+
 static le16_t synapse_checksum(const struct synapse_request *req)
 {
 	uint16_t checksum;
@@ -541,7 +568,7 @@ static int synapse_do_commit(struct razer_synapse *s)
 	for (i = 0; i < SYNAPSE_NR_PROFILES; i++) {
 		memset(&hwconfig, 0, sizeof(hwconfig));
 		hwconfig.profile = i + 1;
-		hwconfig.leds = 0x04;
+		hwconfig.leds = 0x04; /* Bit 2 is always set */
 		for (j = 0; j < SYNAPSE_NR_LEDS; j++) {
 			if (s->led_states[i][j])
 				hwconfig.leds |= (1 << j);
