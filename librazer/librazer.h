@@ -156,6 +156,11 @@ enum razer_mouse_res {
 	RAZER_MOUSE_RES_3500DPI		= 3500,
 	RAZER_MOUSE_RES_4000DPI		= 4000,
 	RAZER_MOUSE_RES_5600DPI		= 5600,
+	RAZER_MOUSE_RES_6000DPI		= 6000,
+	RAZER_MOUSE_RES_6400DPI		= 6400,
+	RAZER_MOUSE_RES_7000DPI		= 7000,
+	RAZER_MOUSE_RES_7600DPI		= 7600,
+	RAZER_MOUSE_RES_8200DPI		= 8200,
 };
 
 /** enum razer_mouse_type
@@ -166,7 +171,9 @@ enum razer_mouse_res {
   * @RAZER_MOUSETYPE_NAGA: A "Naga" mouse
   * @RAZER_MOUSETYPE_BOOMSLANGCE: A "Boomslang Collector's Edition" mouse
   * @RAZER_MOUSETYPE_IMPERATOR: An "Imperator" mouse
+  * @RAZER_MOUSETYPE_TAIPAN: A "Taipan" mouse
   */
+
 enum razer_mouse_type {
 	RAZER_MOUSETYPE_DEATHADDER,
 	RAZER_MOUSETYPE_KRAIT,
@@ -175,6 +182,7 @@ enum razer_mouse_type {
 	RAZER_MOUSETYPE_NAGA,
 	RAZER_MOUSETYPE_BOOMSLANGCE,
 	RAZER_MOUSETYPE_IMPERATOR,
+	RAZER_MOUSETYPE_TAIPAN,
 };
 
 /** struct razer_button_function - A logical button function

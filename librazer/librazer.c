@@ -27,6 +27,7 @@
 #include "hw_copperhead.h"
 #include "hw_boomslangce.h"
 #include "hw_imperator.h"
+#include "hw_taipan.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -112,6 +113,11 @@ static const struct razer_mouse_base_ops razer_imperator_base_ops = {
 	.release		= razer_imperator_release,
 };
 
+static const struct razer_mouse_base_ops razer_taipan_base_ops = {
+	.type			= RAZER_MOUSETYPE_TAIPAN,
+	.init			= razer_taipan_init,
+	.release		= razer_taipan_release,
+};
 
 #define USBVENDOR_ANY	0xFFFF
 #define USBPRODUCT_ANY	0xFFFF
@@ -135,6 +141,7 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 	USB_MOUSE(0x1532, 0x0101, &razer_copperhead_base_ops),
 	USB_MOUSE(0x1532, 0x0005, &razer_boomslangce_base_ops),
 	USB_MOUSE(0x1532, 0x0017, &razer_imperator_base_ops),
+	USB_MOUSE(0x1532, 0x0034, &razer_taipan_base_ops),
 	{ 0, }, /* List end */
 };
 #undef USB_MOUSE
