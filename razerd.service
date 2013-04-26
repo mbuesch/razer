@@ -1,0 +1,11 @@
+[Unit]
+Description=Razer device state daemon
+Requires=local-fs.target
+After=local-fs.target
+
+[Service]
+Type=forking
+ExecStart=/usr/local/sbin/razerd -f -B -P /run/razerd/razerd.pid
+
+[Install]
+Alias=multi-user.target.wants/razerd.service
