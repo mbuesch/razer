@@ -56,6 +56,14 @@ class OpSleep(Operation):
 	def run(self, idstr):
 		time.sleep(self.seconds)
 
+class OpScan(Operation):
+	def run(self, idstr):
+		scanDevices()
+
+class OpReconfigure(Operation):
+	def run(self, idstr):
+		reconfigureDevices()
+
 class OpGetFwVer(Operation):
 	def run(self, idstr):
 		verTuple = getRazer().getFwVer(idstr)
@@ -359,11 +367,21 @@ def parse_args():
 			if os.fork() != 0:
 				exit(0) # Exit parent
 		if o in ("-s", "--scan"):
-			scanDevices()
-			exit(0)
+			ops = currentDevOps
+			if not currentDevOps:
+				ops = DevOps(None)
+			ops.add(OpScan())
+			if not currentDevOps:
+				devOpsList.append(ops)
+			continue
 		if o in ("-K", "--reconfigure"):
-			reconfigureDevices()
-			exit(0)
+			ops = currentDevOps
+			if not currentDevOps:
+				ops = DevOps(None)
+			ops.add(OpReconfigure())
+			if not currentDevOps:
+				devOpsList.append(ops)
+			continue
 		if o in ("-d", "--device"):
 			if v == "mouse": # magic; select the first mouse
 				v = findDevice("mouse")
