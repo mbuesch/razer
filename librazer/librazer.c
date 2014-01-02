@@ -138,6 +138,7 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 	USB_MOUSE(0x1532, 0x001E, &razer_lachesis5k6_base_ops), /* 5600 DPI */
 	USB_MOUSE(0x1532, 0x0015, &razer_naga_base_ops), /* classic */
 	USB_MOUSE(0x1532, 0x002e, &razer_naga_base_ops), /* 2012 */
+	USB_MOUSE(0x1532, 0x0040, &razer_naga_base_ops), /* 2014 */
 	USB_MOUSE(0x1532, 0x0101, &razer_copperhead_base_ops),
 	USB_MOUSE(0x1532, 0x0005, &razer_boomslangce_base_ops),
 	USB_MOUSE(0x1532, 0x0017, &razer_imperator_base_ops),

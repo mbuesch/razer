@@ -106,15 +106,21 @@ static int naga_usb_read(struct naga_private *priv,
 			 int request, int command,
 			 void *buf, size_t size)
 {
-	int err;
+	int err, try;
 
-	err = libusb_control_transfer(
-		priv->m->usb_ctx->h,
-		LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_CLASS |
-		LIBUSB_RECIPIENT_INTERFACE,
-		request, command, 0,
-		buf, size,
-		RAZER_USB_TIMEOUT);
+	for (try = 0; try < 3; try++) {
+		err = libusb_control_transfer(
+			priv->m->usb_ctx->h,
+			LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_CLASS |
+			LIBUSB_RECIPIENT_INTERFACE,
+			request, command, 0,
+			buf, size,
+			RAZER_USB_TIMEOUT);
+
+		if (err == size)
+			break;
+	}
+
 	if (err != size) {
 		razer_error("razer-naga: "
 			"USB read 0x%02X 0x%02X failed: %d\n",
