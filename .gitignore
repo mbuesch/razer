@@ -5,6 +5,7 @@ cmake_install.cmake
 install_manifest.txt
 udev.rules
 pm-hook.sh
+razerd.service
 
 *.swp
 *.o

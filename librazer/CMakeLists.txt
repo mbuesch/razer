@@ -63,6 +63,23 @@ install(FILES ${CMAKE_BINARY_DIR}/pm-hook.sh
 		    WORLD_READ WORLD_EXECUTE)
 
 
+add_custom_target(razer_systemd
+		  COMMAND ${CMAKE_SOURCE_DIR}/scripts/paths_replace.sh
+			  ${CMAKE_SOURCE_DIR}/razerd.service.template
+			  ${CMAKE_BINARY_DIR}/razerd.service
+			  ${CMAKE_INSTALL_PREFIX}
+		  DEPENDS ${CMAKE_SOURCE_DIR}/razerd.service.template
+		  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+		  COMMENT "Generate systemd service file")
+add_dependencies(razer razer_systemd)
+
+install(FILES ${CMAKE_BINARY_DIR}/razerd.service
+	DESTINATION /etc/systemd/system/
+	PERMISSIONS OWNER_READ OWNER_WRITE
+		    GROUP_READ
+		    WORLD_READ)
+
+
 install_exec_cmd("udevadm control --reload-rules"
 		 "Please reload udev manually or reboot the system")
 
