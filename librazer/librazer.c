@@ -20,6 +20,7 @@
 #include "profile_emulation.h"
 
 #include "hw_deathadder.h"
+#include "hw_deathadder2013.h"
 #include "hw_naga.h"
 #include "hw_krait.h"
 #include "hw_lachesis.h"
@@ -69,6 +70,12 @@ static const struct razer_mouse_base_ops razer_deathadder_base_ops = {
 	.type			= RAZER_MOUSETYPE_DEATHADDER,
 	.init			= razer_deathadder_init,
 	.release		= razer_deathadder_release,
+};
+
+static const struct razer_mouse_base_ops razer_deathadder2013_base_ops = {
+	.type			= RAZER_MOUSETYPE_DEATHADDER,
+	.init			= razer_deathadder2013_init,
+	.release		= razer_deathadder2013_release,
 };
 
 static const struct razer_mouse_base_ops razer_naga_base_ops = {
@@ -132,6 +139,7 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 	USB_MOUSE(0x1532, 0x0007, &razer_deathadder_base_ops), /* classic */
 	USB_MOUSE(0x1532, 0x0016, &razer_deathadder_base_ops), /* 3500 DPI */
 	USB_MOUSE(0x1532, 0x0029, &razer_deathadder_base_ops), /* black edition */
+	USB_MOUSE(0x1532, 0x0037, &razer_deathadder2013_base_ops), /* 2013 edition */
 //	USB_MOUSE(0x04B4, 0xE006, &razer_deathadder_base_ops), /* cypress bootloader */
 	USB_MOUSE(0x1532, 0x0003, &razer_krait_base_ops),
 	USB_MOUSE(0x1532, 0x000C, &razer_lachesis_base_ops), /* classic */
