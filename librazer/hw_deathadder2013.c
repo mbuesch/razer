@@ -112,15 +112,13 @@ static int deathadder2013_usb_read(struct deathadder2013_private *priv,
 					      LIBUSB_RECIPIENT_INTERFACE,
 					      request, command, 0, buf, size,
 					      RAZER_USB_TIMEOUT);
-
 		if (err == size)
 			break;
 	}
 
 	if (err != size) {
-		razer_error
-		    ("razer-deathadder2013: USB read 0x%02X 0x%02X failed: %d\n",
-		     request, command, err);
+		razer_error("razer-deathadder2013: USB read 0x%02X 0x%02X failed: %d\n",
+			    request, command, err);
 		return err;
 	}
 	return 0;
@@ -135,23 +133,21 @@ static int deathadder2013_send_command(struct deathadder2013_private *priv,
 	for (i = 0; i < 3; i++) {
 		cmd->status = 0x00;
 
-		err =
-		    deathadder2013_usb_write(priv,
-					     LIBUSB_REQUEST_SET_CONFIGURATION,
-					     0x300, cmd, sizeof(*cmd));
+		err = deathadder2013_usb_write(priv,
+					       LIBUSB_REQUEST_SET_CONFIGURATION,
+					       0x300, cmd, sizeof(*cmd));
 		if (err)
 			return err;
-		err =
-		    deathadder2013_usb_read(priv, LIBUSB_REQUEST_CLEAR_FEATURE,
-					    0x300, cmd, sizeof(*cmd));
+		err = deathadder2013_usb_read(priv,
+					      LIBUSB_REQUEST_CLEAR_FEATURE,
+					      0x300, cmd, sizeof(*cmd));
 		if (err)
 			return err;
 		if (cmd->status != 3 &&
 		    cmd->status != 2 && cmd->status != 1 && cmd->status != 0) {
-			razer_error
-			    ("razer-deathadder2013: Command %04X/%04X failed with %02X\n",
-			     le16_to_cpu(cmd->command),
-			     le16_to_cpu(cmd->request), cmd->status);
+			razer_error("razer-deathadder2013: Command %04X/%04X failed with %02X\n",
+				    le16_to_cpu(cmd->command),
+				    le16_to_cpu(cmd->request), cmd->status);
 		}
 
 		razer_msleep(35);
@@ -199,18 +195,12 @@ static int deathadder2013_do_commit(struct deathadder2013_private *priv)
 	deathadder2013_command_init(&cmd);
 	cmd.command = cpu_to_le16(0x0300);
 	cmd.request = cpu_to_le16(0x0104);
-	xres =
-	    (((unsigned int)priv->cur_dpimapping_X->res[RAZER_DIM_0] / 100) -
-	     1) * 4;
-	yres =
-	    (((unsigned int)priv->cur_dpimapping_Y->res[RAZER_DIM_0] / 100) -
-	     1) * 4;
-
+	xres = (((unsigned int)priv->cur_dpimapping_X->res[RAZER_DIM_0] / 100) - 1) * 4;
+	yres = (((unsigned int)priv->cur_dpimapping_Y->res[RAZER_DIM_0] / 100) - 1) * 4;
 	cmd.value0 = cpu_to_le16(xres | (yres << 8));
 	cmd.footer = 0x06;
 
 	err = deathadder2013_send_command(priv, &cmd);
-
 	if (err)
 		return err;
 
@@ -257,18 +247,15 @@ static int deathadder2013_do_commit(struct deathadder2013_private *priv)
 		freq = 8;
 		cmd.footer = 0x0C;
 		break;
-
 	case RAZER_MOUSE_FREQ_500HZ:
 		freq = 2;
 		cmd.footer = 0x06;
 		break;
-
 	case RAZER_MOUSE_FREQ_1000HZ:
 	case RAZER_MOUSE_FREQ_UNKNOWN:
 		freq = 1;
 		cmd.footer = 0x05;
 		break;
-
 	default:
 		return -EINVAL;
 	}
@@ -279,7 +266,6 @@ static int deathadder2013_do_commit(struct deathadder2013_private *priv)
 	cmd.value0 = cpu_to_le16(freq);
 
 	err = deathadder2013_send_command(priv, &cmd);
-
 	if (err)
 		return err;
 
@@ -459,12 +445,8 @@ static int deathadder2013_supported_dpimappings(struct razer_mouse *m,
 	return ARRAY_SIZE(priv->dpimapping);
 }
 
-static struct razer_mouse_dpimapping *deathadder2013_get_dpimapping(struct
-								    razer_mouse_profile
-								    *p,
-								    struct
-								    razer_axis
-								    *axis)
+static struct razer_mouse_dpimapping *deathadder2013_get_dpimapping(struct razer_mouse_profile *p,
+								    struct razer_axis *axis)
 {
 	struct deathadder2013_private *priv = p->mouse->drv_data;
 
