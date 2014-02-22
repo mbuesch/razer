@@ -4,7 +4,7 @@
 #include "razer_private.h"
 
 int razer_deathadder2013_init(struct razer_mouse *m,
-                              struct libusb_device *udev);
+			      struct libusb_device *udev);
 
 void razer_deathadder2013_release(struct razer_mouse *m);
 
