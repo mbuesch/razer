@@ -2153,7 +2153,6 @@ static int parse_args(int argc, char **argv)
 int main(int argc, char **argv)
 {
 	int err;
-	pid_t pid;
 
 	err = parse_args(argc, argv);
 	if (err > 0)
@@ -2162,20 +2161,14 @@ int main(int argc, char **argv)
 		return err;
 
 	if (cmdargs.background) {
-		pid = fork();
-		if (pid == 0) {
-			/* Child process */
-			return mainloop();
+		err = daemon(0, 0);
+		if (err) {
+			logerr("Failed to fork into the background: %s\n",
+			       strerror(errno));
+			return 1;
 		}
-		if (pid > 0) {
-			/* Parent process */
-			logdebug("Forked into background (pid=%lu)\n",
-				 (unsigned long)pid);
-			return 0;
-		}
-		logerr("Failed to fork into the background: %s\n",
-		       strerror(errno));
-		return 1;
+		/* Child process */
+		return mainloop();
 	}
 
 	return mainloop();

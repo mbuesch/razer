@@ -8,6 +8,7 @@ else (BIGENDIAN)
 endif (BIGENDIAN)
 
 add_definitions("-D_GNU_SOURCE")
+add_definitions("-D_BSD_SOURCE")
 add_definitions("-DRAZERCFG_BUILD")
 add_definitions("-D_FORTIFY_SOURCE=2")
 
