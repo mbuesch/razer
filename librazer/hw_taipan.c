@@ -169,7 +169,10 @@ static int taipan_read_fw_ver(struct taipan_private *priv)
 	}
 	razer_error("razer-taipan: Failed to read firmware version\n");
 
-	return -ENODEV;
+	/* FIXME: Ignore the error and return 0 until we find out
+	 *        why some mice fail to return a valid version number.
+	 */
+	return 0;
 }
 
 static int taipan_do_commit(struct taipan_private *priv)
