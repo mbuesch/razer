@@ -22,7 +22,7 @@ import socket
 import select
 import hashlib
 
-RAZER_VERSION	= "0.23"
+RAZER_VERSION	= "0.24"
 
 
 
