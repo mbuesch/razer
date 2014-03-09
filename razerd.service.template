@@ -5,7 +5,7 @@ After=local-fs.target
 
 [Service]
 Type=forking
-ExecStart=$$INSTDIR$$/bin/razerd -f -B -P /run/razerd/razerd.pid
+ExecStart=$$INSTDIR$$/sbin/razerd -f -B -P /run/razerd/razerd.pid
 
 [Install]
 Alias=multi-user.target.wants/razerd.service
