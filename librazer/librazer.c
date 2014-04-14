@@ -962,8 +962,13 @@ int razer_generic_usb_claim(struct razer_usb_context *ctx)
 			err = libusb_set_interface_alt_setting(ctx->h, interf->bInterfaceNumber,
 							       interf->bAlternateSetting);
 			if (err) {
-				err = -EIO;
-				goto err_close;
+				/* This error triggers on some devices.
+				 * Just print a warning and ignore. */
+				razer_info("razer_generic_usb_claim: "
+					   "Failed to set alt setting %d on interface %d. "
+					   "Ignoring...\n",
+					   (int)interf->bAlternateSetting,
+					   (int)interf->bInterfaceNumber);
 			}
 		}
 
