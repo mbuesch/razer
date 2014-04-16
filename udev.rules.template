@@ -3,5 +3,5 @@
 # We just send a rescan command to razerd.
 # It will pick up new devices and forward information to the applications.
 
-ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="1532", RUN+="$$INSTDIR$$/bin/razercfg -B -S1 -s"
+ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="1532", RUN+="$$INSTDIR$$/bin/razercfg -B -S1 -s"
 ACTION=="remove", SUBSYSTEM=="usb", RUN+="$$INSTDIR$$/bin/razercfg -B -S1 -s"
