@@ -576,7 +576,7 @@ class Razer(object):
 		"Set a profile name. newName is expected to be unicode."
 		payload = razer_int_to_be32(profileId)
 		rawstr = unicode(newName)
-		rawstr = str(newName.decode("UTF-16-BE"))[2:]
+		rawstr = rawstr.encode('UTF-16-BE', 'replace')
 		rawstr = rawstr[:min(len(rawstr), 64 * 2)]
 		rawstr += '\0' * (64 * 2 - len(rawstr))
 		payload += rawstr
