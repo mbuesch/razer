@@ -20,12 +20,6 @@ from PyQt4.QtGui import *
 from pyrazer import *
 
 
-def unicode2QString(uni):
-	return QString.fromUtf8(unicode(uni).decode("UTF-8"))
-
-def QString2unicode(qstr):
-	return unicode(qstr.toUtf8(), "UTF-8").encode("UTF-16")
-
 class OneButtonConfig(QWidget):
 	def __init__(self, id, name, supportedFunctions, buttonConfWidget):
 		QWidget.__init__(self, buttonConfWidget)
@@ -348,10 +342,10 @@ class MouseProfileWidget(QWidget):
 		(newName, ok) = QInputDialog.getText(self, self.tr("New profile name"),
 						     self.tr("New profile name:"),
 						     QLineEdit.Normal,
-						     unicode2QString(name))
+						     name)
 		if not ok:
 			return
-		newName = QString2unicode(newName)
+		newName = (newName)
 		razer.setProfileName(self.mouseWidget.mouse, self.profileId, newName)
 		self.mouseWidget.reloadProfiles()
 
