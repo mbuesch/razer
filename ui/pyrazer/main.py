@@ -156,7 +156,7 @@ class Razer(object):
 	SOCKET_PATH	= "/var/run/razerd/socket"
 	PRIVSOCKET_PATH	= "/var/run/razerd/socket.privileged"
 
-	INTERFACE_REVISION = 5
+	INTERFACE_REVISION = 6
 
 	COMMAND_MAX_SIZE = 512
 	COMMAND_HDR_SIZE = 1

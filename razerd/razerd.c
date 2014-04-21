@@ -83,7 +83,7 @@ struct commandline_args {
 #define SOCKPATH		VAR_RUN_RAZERD "/socket"
 #define PRIV_SOCKPATH		VAR_RUN_RAZERD "/socket.privileged"
 
-#define INTERFACE_REVISION	5
+#define INTERFACE_REVISION	6
 
 #define COMMAND_MAX_SIZE	512
 #define COMMAND_HDR_SIZE	sizeof(struct command_hdr)
