@@ -25,6 +25,11 @@ import hashlib
 RAZER_VERSION	= "0.25"
 
 
+# This variable indicates that the module was installed
+# with setup.py. This is used to detect older versions of
+# pyrazer that were not installed with setup.py into the system.
+PYRAZER_SETUP_PY = True
+
 
 class RazerEx(Exception):
 	"Exception thrown by pyrazer code."

@@ -21,6 +21,16 @@ import time
 from ConfigParser import *
 from pyrazer import *
 
+try:
+	PYRAZER_SETUP_PY == True
+except:
+	print "ERROR: Found an old 'pyrazer' module."
+	print "You will probably have to delete the old 'pyrazer' module from the system."
+	print "The command to remove the module might look like this:"
+	print "  rm /usr/local/bin/pyrazer.*"
+	print "You will have to run this manually as root."
+	sys.exit(1)
+
 
 razer = None
 
