@@ -5,7 +5,7 @@
 #
 #   This library connects to the lowlevel 'razerd' system daemon.
 #
-#   Copyright (C) 2008-2011 Michael Buesch <m@bues.ch>
+#   Copyright (C) 2008-2014 Michael Buesch <m@bues.ch>
 #
 #   This program is free software; you can redistribute it and/or
 #   modify it under the terms of the GNU General Public License
@@ -331,18 +331,18 @@ class Razer(object):
 			strlen = razer_be16_to_int(sock.recv(2))
 			if encoding == self.STRING_ENC_ASCII:
 				nrbytes = strlen
-				encode = lambda pl: str(pl)
+				decode = lambda pl: str(pl)
 			elif encoding == self.STRING_ENC_UTF8:
 				nrbytes = strlen
-				encode = lambda pl: unicode(pl, "UTF-8")
+				decode = lambda pl: unicode(pl, "UTF-8")
 			elif encoding == self.STRING_ENC_UTF16BE:
 				nrbytes = strlen * 2
-				encode = lambda pl: unicode(pl, "UTF-16-BE")
+				decode = lambda pl: unicode(pl, "UTF-16-BE")
 			else:
 				raise RazerEx("Received invalid string encoding %d" %\
 					      encoding)
 			payload = sock.recv(nrbytes) if nrbytes else ""
-			payload = encode(payload)
+			payload = decode(payload)
 		elif id == self.NOTIFY_ID_NEWMOUSE:
 			pass
 		elif id == self.NOTIFY_ID_DELMOUSE:
@@ -575,8 +575,7 @@ class Razer(object):
 	def setProfileName(self, idstr, profileId, newName):
 		"Set a profile name. newName is expected to be unicode."
 		payload = razer_int_to_be32(profileId)
-		rawstr = unicode(newName)
-		rawstr = str(newName.decode("UTF-16-BE"))[2:]
+		rawstr = newName.encode("UTF-16-BE")
 		rawstr = rawstr[:min(len(rawstr), 64 * 2)]
 		rawstr += '\0' * (64 * 2 - len(rawstr))
 		payload += rawstr

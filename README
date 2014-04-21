@@ -9,20 +9,20 @@ This is a configuration utility for Razer devices on Linux systems.
 DEPENDENCIES
 ============
 
- * python 2.6 or 2.7
-   http://www.python.org/
+ * Python 2.7
+   https://www.python.org/
    Debian Linux:
-	apt-get install python
+	apt-get install python2.7
 
  * libusb 1.0
    http://libusb.org/
    Debian Linux:
 	apt-get install libusb-1.0-0-dev
 
- * QT4 python bindings (for the graphical qrazercfg tool only)
-   http://www.riverbankcomputing.co.uk/software/pyqt/intro
+ * PySide (for the graphical qrazercfg tool only)
+   https://qt-project.org/wiki/PySide
    Debian Linux:
-	apt-get install python-qt4
+	apt-get install python-pyside
 
  * cmake 2.4 or later (for building only)
    http://www.cmake.org/

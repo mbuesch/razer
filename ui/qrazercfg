@@ -2,7 +2,7 @@
 #
 #   Razer device QT configuration tool
 #
-#   Copyright (C) 2007-2011 Michael Buesch <m@bues.ch>
+#   Copyright (C) 2007-2014 Michael Buesch <m@bues.ch>
 #
 #   This program is free software; you can redistribute it and/or
 #   modify it under the terms of the GNU General Public License
@@ -15,16 +15,33 @@
 #   GNU General Public License for more details.
 
 import sys
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
+from PySide.QtCore import *
+from PySide.QtGui import *
 from pyrazer import *
 
 
-def unicode2QString(uni):
-	return QString.fromUtf8(unicode(uni).decode("UTF-8"))
+class Wrapper(object):
+	def __init__(self, obj):
+		self.obj = obj
 
-def QString2unicode(qstr):
-	return unicode(qstr.toUtf8(), "UTF-8").encode("UTF-16")
+	def __eq__(self, other):
+		return self.obj == other.obj
+
+	def __ne__(self, other):
+		return self.obj != other.obj
+
+class WrappedComboBox(QComboBox):
+	def addItem(self, text, dataObj=None):
+		QComboBox.addItem(self, text, Wrapper(dataObj))
+
+	def itemData(self, index):
+		return QComboBox.itemData(self, index).obj
+
+	def findData(self, dataObj):
+		for i in range(0, self.count()):
+			if self.itemData(i) == dataObj:
+				return i
+		return -1
 
 class OneButtonConfig(QWidget):
 	def __init__(self, id, name, supportedFunctions, buttonConfWidget):
@@ -44,14 +61,14 @@ class OneButtonConfig(QWidget):
 		l = QLabel(self.tr("button is assigned to function"), self)
 		self.layout().addWidget(l)
 
-		self.funcCombo = QComboBox(self)
+		self.funcCombo = WrappedComboBox(self)
 		for func in supportedFunctions:
-			self.funcCombo.addItem(func[1], QVariant(func[0]))
+			self.funcCombo.addItem(func[1], func[0])
 		curFunc = razer.getButtonFunction(buttonConfWidget.profileWidget.mouseWidget.mouse,
 						  buttonConfWidget.profileWidget.profileId,
 						  id)
 		self.initialFunc = curFunc[0]
-		index = self.funcCombo.findData(QVariant(curFunc[0]))
+		index = self.funcCombo.findData(curFunc[0])
 		if index >= 0:
 			self.funcCombo.setCurrentIndex(index)
 		self.layout().addWidget(self.funcCombo)
@@ -61,7 +78,7 @@ class OneButtonConfig(QWidget):
 
 	def getSelectedFunction(self):
 		index = self.funcCombo.currentIndex()
-		return self.funcCombo.itemData(index).toUInt()[0]
+		return self.funcCombo.itemData(index)
 
 	def getInitialFunction(self):
 		return self.initialFunc
@@ -204,7 +221,7 @@ class MouseProfileWidget(QWidget):
 		for axis in axes:
 			axisName = axis[1] + " " if axis[1] else ""
 			self.layout().addWidget(QLabel(self.tr("%sScan resolution:" % axisName), self), yoff, 0)
-			resSel = QComboBox(self)
+			resSel = WrappedComboBox(self)
 			self.connect(resSel, SIGNAL("currentIndexChanged(int)"), self.resChanged)
 			self.layout().addWidget(resSel, yoff, 1)
 			self.resSel.append(resSel)
@@ -266,15 +283,15 @@ class MouseProfileWidget(QWidget):
 								self.profileId,
 								axis[0]))
 		for i, resSel in enumerate(self.resSel):
-			resSel.addItem(self.tr("Unknown mapping"), QVariant(0xFFFFFFFF))
+			resSel.addItem(self.tr("Unknown mapping"), 0xFFFFFFFF)
 			for mapping in supportedMappings:
 				r = [ r for r in mapping.res if r is not None ]
 				r = [ ("%u" % x) if x else self.tr("Unknown") for x in r]
 				rStr = "/".join(r)
 				resSel.addItem(self.tr("Scan resolution %u   (%s DPI)" %\
 						(mapping.id + 1, rStr)),
-						QVariant(mapping.id))
-			index = resSel.findData(QVariant(axisMappings[i]))
+						mapping.id)
+			index = resSel.findData(axisMappings[i])
 			if index >= 0:
 				resSel.setCurrentIndex(index)
 		independent = bool(filter(lambda x: x != axisMappings[0], axisMappings))
@@ -317,13 +334,13 @@ class MouseProfileWidget(QWidget):
 			axisId = 0
 			for resSel in self.resSel:
 				index = resSel.currentIndex()
-				res = resSel.itemData(index).toUInt()[0]
+				res = resSel.itemData(index)
 				razer.setDpiMapping(self.mouseWidget.mouse, self.profileId,
 						    res, axisId)
 				axisId += 1
 		else:
 			index = self.resSel[0].currentIndex()
-			res = self.resSel[0].itemData(index).toUInt()[0]
+			res = self.resSel[0].itemData(index)
 			razer.setDpiMapping(self.mouseWidget.mouse, self.profileId, res)
 			for resSel in self.resSel[1:]:
 				self.mouseWidget.recurseProtect += 1
@@ -348,10 +365,9 @@ class MouseProfileWidget(QWidget):
 		(newName, ok) = QInputDialog.getText(self, self.tr("New profile name"),
 						     self.tr("New profile name:"),
 						     QLineEdit.Normal,
-						     unicode2QString(name))
+						     name)
 		if not ok:
 			return
-		newName = QString2unicode(newName)
 		razer.setProfileName(self.mouseWidget.mouse, self.profileId, newName)
 		self.mouseWidget.reloadProfiles()
 
@@ -372,17 +388,17 @@ class OneDpiMapping(QWidget):
 		dimNames = ( "X", "Y", "Z" )
 		changeSlots = ( self.changedDim0, self.changedDim1, self.changedDim2 )
 		for dimIdx, thisRes in enumerate(filter(lambda r: r is not None, dpimapping.res)):
-			self.mappingSel = QComboBox(self)
+			self.mappingSel = WrappedComboBox(self)
 			name = self.tr("Unknown DPI")
 			if haveMultipleDims:
 				name = dimNames[dimIdx] + ": " + name
-			self.mappingSel.addItem(name, QVariant(0))
+			self.mappingSel.addItem(name, 0)
 			for res in supportedRes:
 				name = self.tr("%u DPI" % res)
 				if haveMultipleDims:
 					name = dimNames[dimIdx] + ": " + name
-				self.mappingSel.addItem(name, QVariant(res))
-			index = self.mappingSel.findData(QVariant(thisRes))
+				self.mappingSel.addItem(name, res)
+			index = self.mappingSel.findData(thisRes)
 			if index >= 0:
 				self.mappingSel.setCurrentIndex(index)
 			self.connect(self.mappingSel, SIGNAL("currentIndexChanged(int)"),
@@ -403,7 +419,7 @@ class OneDpiMapping(QWidget):
 	def changed(self, index, dimIdx):
 		if index <= 0:
 			return
-		resolution = self.mappingSel.itemData(index).toUInt()[0]
+		resolution = self.mappingSel.itemData(index)
 		razer.changeDpiMapping(self.dpiMappingsWidget.mouseWidget.mouse,
 				       self.dpimapping.id,
 				       dimIdx,
@@ -451,7 +467,7 @@ class MouseScanFreqWidget(QWidget):
 		self.layout().setContentsMargins(QMargins())
 
 		self.layout().addWidget(QLabel(self.tr("Scan frequency:"), self), 0, 0)
-		self.freqSel = QComboBox(self)
+		self.freqSel = WrappedComboBox(self)
 		self.layout().addWidget(self.freqSel, 0, 1)
 
 		self.connect(self.freqSel, SIGNAL("currentIndexChanged(int)"), self.freqChanged)
@@ -459,7 +475,7 @@ class MouseScanFreqWidget(QWidget):
 	def freqChanged(self, index):
 		if self.mouseWidget.recurseProtect or index <= 0:
 			return
-		freq = self.freqSel.itemData(index).toUInt()[0]
+		freq = self.freqSel.itemData(index)
 		razer.setFrequency(self.mouseWidget.mouse, self.profileId, freq)
 
 	def update(self):
@@ -468,10 +484,10 @@ class MouseScanFreqWidget(QWidget):
 		self.freqSel.clear()
 		supportedFreqs = razer.getSupportedFreqs(self.mouseWidget.mouse)
 		curFreq = razer.getCurrentFreq(self.mouseWidget.mouse, self.profileId)
-		self.freqSel.addItem(self.tr("Unknown Hz"), QVariant(0))
+		self.freqSel.addItem(self.tr("Unknown Hz"), 0)
 		for freq in supportedFreqs:
-			self.freqSel.addItem(self.tr("%u Hz" % freq), QVariant(freq))
-		index = self.freqSel.findData(QVariant(curFreq))
+			self.freqSel.addItem(self.tr("%u Hz" % freq), freq)
+		index = self.freqSel.findData(curFreq)
 		if index >= 0:
 			self.freqSel.setCurrentIndex(index)
 
@@ -486,7 +502,7 @@ class MouseWidget(QWidget):
 
 		self.setLayout(QVBoxLayout(self))
 
-		self.mousesel = QComboBox(self)
+		self.mousesel = WrappedComboBox(self)
 		self.connect(self.mousesel, SIGNAL("currentIndexChanged(int)"), self.mouseChanged)
 		self.layout().addWidget(self.mousesel)
 		self.layout().addSpacing(15)
