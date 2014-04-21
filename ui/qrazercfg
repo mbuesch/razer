@@ -664,7 +664,6 @@ def main():
 		razer = Razer(enableNotifications=True)
 	except RazerEx, e:
 		print e
-		print "Is razerd running?"
 		sys.exit(1)
 
 	app = QApplication(sys.argv)

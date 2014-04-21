@@ -275,8 +275,15 @@ class Razer(object):
 		self.__sendCommand(self.COMMAND_ID_GETREV)
 		rev = self.__recvU32()
 		if (rev != self.INTERFACE_REVISION):
-			raise RazerEx("Incompatible interface revision. razerd=%u, me=%u" %\
-					(rev, self.INTERFACE_REVISION))
+			additional = ""
+			if rev < self.INTERFACE_REVISION:
+				additional = "\nThe running razerd is too old. " \
+					"Try to delete all razerd binaries and " \
+					"re-install the razercfg package."
+			raise RazerEx("Incompatible razerd daemon socket interface revision.\n"
+				      "razerd reported revision %u, but we expected revision %u."
+				      "%s" %\
+					(rev, self.INTERFACE_REVISION, additional))
 
 	def __constructCommand(self, commandId, idstr, payload):
 		cmd = "%c" % commandId
