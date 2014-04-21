@@ -84,5 +84,8 @@ install(FILES ${CMAKE_BINARY_DIR}/razerd.service
 install_exec_cmd("udevadm control --reload-rules"
 		 "Please reload udev manually or reboot the system")
 
+install_exec_cmd("systemctl --system daemon-reload"
+		 "If you use systemd, please reload systemd manually or reboot the system")
+
 install_exec_cmd("ldconfig"
 		 "Your system will probably be unable to locate librazer.so library")
