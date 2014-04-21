@@ -9,7 +9,7 @@
 # Description:       Razer device state daemon
 ### END INIT INFO
 
-export PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
+export PATH="/usr/local/bin:$PATH"
 NAME=razerd
 DAEMON="$(which $NAME)"
 PIDFILE="/run/razerd/razerd.pid"
