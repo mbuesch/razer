@@ -28,6 +28,7 @@ target_link_libraries(razer usb-1.0)
 install(TARGETS razer DESTINATION lib)
 
 
+#FIXME we should use configure_file()
 add_custom_target(razer_udev_rules
 		  COMMAND ${CMAKE_SOURCE_DIR}/scripts/paths_replace.sh
 			  ${CMAKE_SOURCE_DIR}/udev.rules.template
@@ -46,6 +47,7 @@ install(FILES ${CMAKE_BINARY_DIR}/udev.rules
 		    WORLD_READ)
 
 
+#FIXME we should use configure_file()
 add_custom_target(razer_pm_hook
 		  COMMAND ${CMAKE_SOURCE_DIR}/scripts/paths_replace.sh
 			  ${CMAKE_SOURCE_DIR}/pm-hook.sh.template
@@ -64,6 +66,7 @@ install(FILES ${CMAKE_BINARY_DIR}/pm-hook.sh
 		    WORLD_READ WORLD_EXECUTE)
 
 
+#FIXME we should use configure_file()
 add_custom_target(razer_systemd
 		  COMMAND ${CMAKE_SOURCE_DIR}/scripts/paths_replace.sh
 			  ${CMAKE_SOURCE_DIR}/razerd.service.template
