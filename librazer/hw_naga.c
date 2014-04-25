@@ -72,6 +72,7 @@ struct naga_private {
 	struct razer_axis axes[NAGA_NR_AXES];
 
 	bool commit_pending;
+	struct razer_event_spacing packet_spacing;
 };
 
 
@@ -86,6 +87,7 @@ static int naga_usb_write(struct naga_private *priv,
 {
 	int err;
 
+	razer_event_spacing_enter(&priv->packet_spacing);
 	err = libusb_control_transfer(
 		priv->m->usb_ctx->h,
 		LIBUSB_ENDPOINT_OUT | LIBUSB_REQUEST_TYPE_CLASS |
@@ -93,12 +95,14 @@ static int naga_usb_write(struct naga_private *priv,
 		request, command, 0,
 		(unsigned char *)buf, size,
 		RAZER_USB_TIMEOUT);
+	razer_event_spacing_leave(&priv->packet_spacing);
 	if (err != size) {
 		razer_error("razer-naga: "
 			"USB write 0x%02X 0x%02X failed: %d\n",
 			request, command, err);
 		return err;
 	}
+
 	return 0;
 }
 
@@ -109,6 +113,7 @@ static int naga_usb_read(struct naga_private *priv,
 	int err, try;
 
 	for (try = 0; try < 3; try++) {
+		razer_event_spacing_enter(&priv->packet_spacing);
 		err = libusb_control_transfer(
 			priv->m->usb_ctx->h,
 			LIBUSB_ENDPOINT_IN | LIBUSB_REQUEST_TYPE_CLASS |
@@ -116,17 +121,17 @@ static int naga_usb_read(struct naga_private *priv,
 			request, command, 0,
 			buf, size,
 			RAZER_USB_TIMEOUT);
-
+		razer_event_spacing_leave(&priv->packet_spacing);
 		if (err == size)
 			break;
 	}
-
 	if (err != size) {
 		razer_error("razer-naga: "
 			"USB read 0x%02X 0x%02X failed: %d\n",
 			request, command, err);
 		return err;
 	}
+
 	return 0;
 }
 
@@ -464,6 +469,10 @@ int razer_naga_init(struct razer_mouse *m,
 		return -ENOMEM;
 	priv->m = m;
 	m->drv_data = priv;
+
+	/* Need to wait some time between USB packets to
+	 * not confuse the firmware of some devices. */
+	razer_event_spacing_init(&priv->packet_spacing, 25);
 
 	err = razer_usb_add_used_interface(m->usb_ctx, 0, 0);
 	if (err)
