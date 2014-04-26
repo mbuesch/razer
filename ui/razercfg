@@ -14,17 +14,12 @@
 #   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #   GNU General Public License for more details.
 
-from __future__ import division, absolute_import, print_function, unicode_literals
-
 import sys
 import os
 import getopt
 import time
-try:
-	from configparser import *
-except ImportError:
-	from ConfigParser import *
 from pyrazer import *
+from configparser import *
 
 try:
 	PYRAZER_SETUP_PY == True

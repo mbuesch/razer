@@ -17,7 +17,11 @@
 #   GNU General Public License for more details.
 """
 
-from __future__ import division, absolute_import, print_function, unicode_literals
+import sys
+if sys.version_info[0] != 3:
+	print("Python %d is not supported by razercfg." % sys.version_info[0])
+	print("Please install Python 3.x")
+	sys.exit(1)
 
 import socket
 import select
