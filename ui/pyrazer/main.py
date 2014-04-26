@@ -647,7 +647,6 @@ class Razer(object):
 			axes.append( (id, name, flags) )
 		return axes
 
-#FIXME bytes
 class IHEXParser(object):
 	TYPE_DATA = 0
 	TYPE_EOF  = 1
@@ -662,7 +661,7 @@ class IHEXParser(object):
 	def parse(self):
 		bin = []
 		try:
-			lines = self.ihex.splitlines()
+			lines = self.ihex.decode("ASCII").splitlines()
 			hiAddr = 0
 			for line in lines:
 				line = line.strip()
@@ -695,24 +694,17 @@ class IHEXParser(object):
 					continue
 				if type == self.TYPE_DATA:
 					if len(bin) < addr + count: # Reallocate
-						bin += ['\0'] * (addr + count - len(bin))
+						bin += [b'\0'] * (addr + count - len(bin))
 					for i in range(9, 9 + count * 2, 2):
-						byte = chr(int(line[i:i+2], 16))
-						if bin[(i - 9) / 2 + addr] != '\0':
+						byte = bytes( (int(line[i:i+2], 16), ) )
+						if bin[(i - 9) // 2 + addr] != b'\0':
 							raise RazerEx("Invalid firmware file format (IHEX corruption)")
-						bin[(i - 9) / 2 + addr] = byte
+						bin[(i - 9) // 2 + addr] = byte
 					continue
 				raise RazerEx("Invalid firmware file format (IHEX unsup type %d)" % type)
-		except ValueError:
+		except (ValueError, UnicodeError) as e:
 			raise RazerEx("Invalid firmware file format (IHEX digit format)")
-		return "".join(bin)
-
-class SRECParser(object):
-	def __init__(self, srec):
-		self.srec = srec
-
-	def parse(self):
-		return ""#TODO
+		return b"".join(bin)
 
 class RazerFirmwareParser(object):
 	class Descriptor:
@@ -735,7 +727,7 @@ class RazerFirmwareParser(object):
 
 	def __init__(self, filepath):
 		try:
-			self.data = file(filepath, "rb").read()
+			self.data = open(filepath, "rb").read()
 		except IOError as e:
 			raise RazerEx("Could not read file: %s" % e.strerror)
 		md5sum = hashlib.md5(self.data).hexdigest().lower()
@@ -746,14 +738,14 @@ class RazerFirmwareParser(object):
 		try:
 			rawFwData = self.data[descriptor.start : descriptor.start+descriptor.len]
 			if self.DUMP:
-				file("/tmp/razer.dump", "wb").write(rawFwData)
+				open("/tmp/razer.dump", "wb").write(rawFwData)
 			fwImage = descriptor.parser(rawFwData).parse()
 			if self.DUMP:
-				file("/tmp/razer.dump.image", "wb").write(fwImage)
+				open("/tmp/razer.dump.image", "wb").write(fwImage)
 			if descriptor.binTruncate:
 				fwImage = fwImage[:descriptor.binTruncate]
 			if self.DUMP:
-				file("/tmp/razer.dump.image.trunc", "wb").write(fwImage)
+				open("/tmp/razer.dump.image.trunc", "wb").write(fwImage)
 		except IndexError:
 			raise RazerEx("Invalid firmware file format")
 		self.fwImage = fwImage
