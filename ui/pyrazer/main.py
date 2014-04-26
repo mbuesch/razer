@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 #   Razer device configuration
 #   High level user interface library
@@ -18,9 +17,12 @@
 #   GNU General Public License for more details.
 """
 
+from __future__ import division, absolute_import, print_function, unicode_literals
+
 import socket
 import select
 import hashlib
+import struct
 
 RAZER_VERSION	= "0.25"
 
@@ -34,25 +36,20 @@ PYRAZER_SETUP_PY = True
 class RazerEx(Exception):
 	"Exception thrown by pyrazer code."
 
-def razer_be32_to_int(be32Str):
-	return ((ord(be32Str[0]) << 24) | \
-	        (ord(be32Str[1]) << 16) | \
-	        (ord(be32Str[2]) << 8)  | \
-	        (ord(be32Str[3])))
+__be32_struct = struct.Struct(">I")
+__be16_struct = struct.Struct(">H")
 
-def razer_be16_to_int(be16Str):
-	return ((ord(be16Str[0]) << 8)  | \
-	        (ord(be16Str[1])))
+def razer_be32_to_int(be32, offset=0):
+	return __be32_struct.unpack_from(be32, offset)[0]
+
+def razer_be16_to_int(be16, offset=0):
+	return __be16_struct.unpack_from(be16, offset)[0]
 
 def razer_int_to_be32(integer):
-	return "%c%c%c%c" % ((integer >> 24) & 0xFF,\
-			     (integer >> 16) & 0xFF,\
-			     (integer >> 8) & 0xFF,\
-			     (integer & 0xFF))
+	return __be32_struct.pack(integer)
 
 def razer_int_to_be16(integer):
-	return "%c%c" % ((integer >> 8) & 0xFF,\
-			 (integer & 0xFF))
+	return __be16_struct.pack(integer)
 
 def razer_str2bool(string):
 	string = string.lower().strip()
@@ -62,7 +59,7 @@ def razer_str2bool(string):
 		return True
 	try:
 		return bool(int(string))
-	except (ValueError), e:
+	except ValueError as e:
 		pass
 	raise ValueError
 
@@ -269,12 +266,12 @@ class Razer(object):
 		try:
 			self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 			self.sock.connect(self.SOCKET_PATH)
-		except socket.error, e:
+		except socket.error as e:
 			raise RazerEx("Failed to connect to razerd socket: %s" % e)
 		try:
 			self.privsock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 			self.privsock.connect(self.PRIVSOCKET_PATH)
-		except socket.error, e:
+		except socket.error as e:
 			self.privsock = None # No privileged access
 
 		self.__sendCommand(self.COMMAND_ID_GETREV)
@@ -291,11 +288,12 @@ class Razer(object):
 					(rev, self.INTERFACE_REVISION, additional))
 
 	def __constructCommand(self, commandId, idstr, payload):
-		cmd = "%c" % commandId
-		idstr += '\0' * (self.RAZER_IDSTR_MAX_SIZE - len(idstr))
+		cmd = bytes((commandId,))
+		idstr = idstr.encode("UTF-8")
+		idstr += b'\0' * (self.RAZER_IDSTR_MAX_SIZE - len(idstr))
 		cmd += idstr
 		cmd += payload
-		cmd += '\0' * (self.COMMAND_MAX_SIZE - len(cmd))
+		cmd += b'\0' * (self.COMMAND_MAX_SIZE - len(cmd))
 		return cmd
 
 	def __send(self, data):
@@ -304,7 +302,7 @@ class Razer(object):
 	def __sendPrivileged(self, data):
 		try:
 			self.privsock.sendall(data)
-		except (socket.error, AttributeError):
+		except (socket.error, AttributeError) as e:
 			raise RazerEx("Privileged command failed. Do you have permission?")
 
 	def __sendBulkPrivileged(self, data):
@@ -315,11 +313,11 @@ class Razer(object):
 			if result != 0:
 				raise RazerEx("Privileged bulk write failed. %u" % result)
 
-	def __sendCommand(self, commandId, idstr="", payload=""):
+	def __sendCommand(self, commandId, idstr="", payload=b""):
 		cmd = self.__constructCommand(commandId, idstr, payload)
 		self.__send(cmd)
 
-	def __sendPrivilegedCommand(self, commandId, idstr="", payload=""):
+	def __sendPrivilegedCommand(self, commandId, idstr="", payload=b""):
 		cmd = self.__constructCommand(commandId, idstr, payload)
 		self.__sendPrivileged(cmd)
 
@@ -334,27 +332,30 @@ class Razer(object):
 		"Receive the next message. This will block until a message arrives."
 		hdrlen = 1
 		hdr = sock.recv(hdrlen)
-		id = ord(hdr[0])
+		id = hdr[0]
 		payload = None
 		if id == self.REPLY_ID_U32:
 			payload = razer_be32_to_int(sock.recv(4))
 		elif id == self.REPLY_ID_STR:
-			encoding = ord(sock.recv(1))
+			encoding = sock.recv(1)[0]
 			strlen = razer_be16_to_int(sock.recv(2))
 			if encoding == self.STRING_ENC_ASCII:
 				nrbytes = strlen
-				decode = lambda pl: str(pl)
+				decode = lambda pl: pl.decode("ASCII")
 			elif encoding == self.STRING_ENC_UTF8:
 				nrbytes = strlen
-				decode = lambda pl: unicode(pl, "UTF-8")
+				decode = lambda pl: pl.decode("UTF-8")
 			elif encoding == self.STRING_ENC_UTF16BE:
 				nrbytes = strlen * 2
-				decode = lambda pl: unicode(pl, "UTF-16-BE")
+				decode = lambda pl: pl.decode("UTF-16-BE")
 			else:
 				raise RazerEx("Received invalid string encoding %d" %\
 					      encoding)
-			payload = sock.recv(nrbytes) if nrbytes else ""
-			payload = decode(payload)
+			payload = sock.recv(nrbytes) if nrbytes else b""
+			try:
+				payload = decode(payload)
+			except UnicodeError as e:
+				raise RazerEx("Unicode decode error in received payload")
 		elif id == self.NOTIFY_ID_NEWMOUSE:
 			pass
 		elif id == self.NOTIFY_ID_DELMOUSE:
@@ -369,12 +370,12 @@ class Razer(object):
 		Unexpected messages will be handled by __handleReceivedMessage.
 		This function returns the payload of the expected message."""
 		while 1:
-			pack = self.__receive(sock)
-			if (pack[0] == expectedId):
+			id, payload = self.__receive(sock)
+			if id == expectedId:
 				break
 			else:
-				self.__handleReceivedMessage(pack)
-		return pack[1]
+				self.__handleReceivedMessage((id, payload))
+		return payload
 
 	def __recvU32(self):
 		"Receive an expected REPLY_ID_U32"
@@ -384,7 +385,7 @@ class Razer(object):
 		"Receive an expected REPLY_ID_U32 on the privileged socket"
 		try:
 			return self.__receiveExpectedMessage(self.privsock, self.REPLY_ID_U32)
-		except (socket.error, AttributeError):
+		except (socket.error, AttributeError) as e:
 			raise RazerEx("Privileged recvU32 failed. Do you have permission?")
 
 	def __recvString(self):
@@ -493,9 +494,10 @@ class Razer(object):
 		if len(led.name) > self.RAZER_LEDNAME_MAX_SIZE:
 			raise RazerEx("LED name string too long")
 		payload = razer_int_to_be32(led.profileId)
-		payload += led.name
-		payload += '\0' * (self.RAZER_LEDNAME_MAX_SIZE - len(led.name))
-		payload += "%c" % (1 if led.state else 0)
+		led_name = led.name.encode("UTF-8")
+		payload += led_name
+		payload += b'\0' * (self.RAZER_LEDNAME_MAX_SIZE - len(led_name))
+		payload += b'\x01' if led.state else b'\x00'
 		if led.color:
 			payload += razer_int_to_be32(led.color.toU32())
 		else:
@@ -589,7 +591,7 @@ class Razer(object):
 		payload = razer_int_to_be32(profileId)
 		rawstr = newName.encode("UTF-16-BE")
 		rawstr = rawstr[:min(len(rawstr), 64 * 2)]
-		rawstr += '\0' * (64 * 2 - len(rawstr))
+		rawstr += b'\0' * (64 * 2 - len(rawstr))
 		payload += rawstr
 		self.__sendCommand(self.COMMAND_ID_SETPROFNAME, idstr, payload)
 		return self.__recvU32()
@@ -651,6 +653,7 @@ class Razer(object):
 			axes.append( (id, name, flags) )
 		return axes
 
+#FIXME bytes
 class IHEXParser(object):
 	TYPE_DATA = 0
 	TYPE_EOF  = 1
@@ -739,7 +742,7 @@ class RazerFirmwareParser(object):
 	def __init__(self, filepath):
 		try:
 			self.data = file(filepath, "rb").read()
-		except IOError, e:
+		except IOError as e:
 			raise RazerEx("Could not read file: %s" % e.strerror)
 		md5sum = hashlib.md5(self.data).hexdigest().lower()
 		try:

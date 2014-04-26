@@ -1,4 +1,4 @@
-find_program(PYTHON "python2")
+find_program(PYTHON "python3")
 
 include(TestBigEndian)
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 #   Razer device commandline configuration tool
 #
@@ -14,21 +14,26 @@
 #   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #   GNU General Public License for more details.
 
+from __future__ import division, absolute_import, print_function, unicode_literals
+
 import sys
 import os
 import getopt
 import time
-from ConfigParser import *
+try:
+	from configparser import *
+except ImportError:
+	from ConfigParser import *
 from pyrazer import *
 
 try:
 	PYRAZER_SETUP_PY == True
 except:
-	print "ERROR: Found an old 'pyrazer' module."
-	print "You will probably have to delete the old 'pyrazer' module from the system."
-	print "The command to remove the module might look like this:"
-	print "  rm /usr/local/bin/pyrazer.*"
-	print "You will have to run this manually as root."
+	print("ERROR: Found an old 'pyrazer' module.")
+	print("You will probably have to delete the old 'pyrazer' module from the system.")
+	print("The command to remove the module might look like this:")
+	print("  rm /usr/local/bin/pyrazer.*")
+	print("You will have to run this manually as root.")
 	sys.exit(1)
 
 
@@ -77,8 +82,8 @@ class OpReconfigure(Operation):
 class OpGetFwVer(Operation):
 	def run(self, idstr):
 		verTuple = getRazer().getFwVer(idstr)
-		print "%s: Firmware version %d.%02d" %\
-			(idstr, verTuple[0], verTuple[1])
+		print("%s: Firmware version %d.%02d" %\
+			(idstr, verTuple[0], verTuple[1]))
 
 class OpGetProfile(Operation):
 	def run(self, idstr):
@@ -104,7 +109,7 @@ class OpGetFreq(Operation):
 		for freq in freqs:
 			pfx = "*" if freq == curFreq else " "
 			output.append("%s%u Hz" % (pfx, freq))
-		print ", ".join(output)
+		print(", ".join(output))
 
 class OpGetRes(Operation):
 	def run(self, idstr):
@@ -114,15 +119,14 @@ class OpGetRes(Operation):
 			sys.stdout.write("Profile %2u:   " % (profile + 1))
 			curMapping = getRazer().getDpiMapping(idstr, profile)
 			output = []
-			pm = filter(lambda m: m.profileMask == 0 or\
-					      m.profileMask & (1 << profile),
-				    mappings)
+			pm = [m for m in mappings if m.profileMask == 0 or\
+					      m.profileMask & (1 << profile)]
 			for mapping in pm:
 				pfx = "*" if mapping.id == curMapping else " "
 				r = [ "%u" % r for r in mapping.res if r is not None ]
 				rStr = "/".join(r)
 				output.append("%s%u (%s DPI)" % (pfx, mapping.id + 1, rStr))
-			print ", ".join(output)
+			print(", ".join(output))
 
 class OpPrintLeds(Operation):
 	def run(self, idstr):
@@ -147,7 +151,7 @@ class OpPrintLeds(Operation):
 				color = "/color#%02X%02X%02X" %\
 					(led.color.r, led.color.g, led.color.b)
 			output.append("%s => %s%s" % (led.name, state, color))
-		print ",  ".join(output)
+		print(",  ".join(output))
 
 class OpSetProfile(Operation):
 	def __init__(self, param):
@@ -160,7 +164,7 @@ class OpSetProfile(Operation):
 			if error:
 				raise RazerEx("Failed to set active profile (%s)" %\
 					      Razer.strerror(error))
-		except (ValueError), e:
+		except (ValueError) as e:
 			raise RazerEx("Invalid parameter to --profile option")
 
 class OpSetLedState(Operation):
@@ -224,9 +228,8 @@ class OpSetRes(Operation):
 		if mapping >= 100:
 			# Mapping is in DPI. Get the mapping ID.
 			mappings = getRazer().getSupportedDpiMappings(idstr)
-			pm = filter(lambda m: m.profileMask == 0 or\
-					      m.profileMask & (1 << profile),
-				    mappings)
+			pm = [m for m in mappings if m.profileMask == 0 or\
+					      m.profileMask & (1 << profile)]
 			try:
 				mapping = filter(lambda m: mapping in m.res, pm)[0].id
 			except IndexError:
@@ -264,13 +267,13 @@ class OpFlashFw(Operation):
 	def run(self, idstr):
 		p = RazerFirmwareParser(self.filename)
 		data = p.getImage()
-		print "Flashing firmware on %s ..." % idstr
-		print "!!! DO NOT DISCONNECT ANY DEVICE !!!"
-		print "Sending %d bytes..." % len(data)
+		print("Flashing firmware on %s ..." % idstr)
+		print("!!! DO NOT DISCONNECT ANY DEVICE !!!")
+		print("Sending %d bytes..." % len(data))
 		error = getRazer().flashFirmware(idstr, data)
 		if error:
 			raise RazerEx("Failed to flash firmware (%s)" % Razer.strerror(error))
-		print "Firmware successfully flashed."
+		print("Firmware successfully flashed.")
 
 # List of operations
 class DevOps:
@@ -289,7 +292,7 @@ def scanDevices():
 	getRazer().rescanMice()
 	mice = getRazer().getMice()
 	for mouse in mice:
-		print mouse
+		print(mouse)
 
 def reconfigureDevices():
 	getRazer().rescanDevices()
@@ -299,45 +302,45 @@ def exit(exitcode):
 	sys.exit(exitcode)
 
 def prVersion():
-	print "Razer device configuration tool"
-	print "Version", RAZER_VERSION
+	print("Razer device configuration tool")
+	print("Version", RAZER_VERSION)
 
 def usage():
 	prVersion()
-	print ""
-	print "Usage: razercfg [OPTIONS] [-d DEV DEVOPS] [-d DEV DEVOPS]..."
-	print ""
-	print "-h|--help            Print this help text"
-	print "-v|--version         Print the program version number"
-	print "-B|--background      Fork into the background"
-	print "-s|--scan            Scan for devices and print the bus IDs"
-	print "-K|--reconfigure     Force-reconfigure all detected devices"
-	print ""
-	print "-d|--device DEV      Selects the device with the bus ID \"DEV\""
-	print "    Use the special value \"mouse\" for DEV to select"
-	print "    the first razer mouse device found in the system."
-	print "    If this option is omitted, the first Razer device found is selected."
-	print ""
-	print "-S|--sleep SECS      Sleep SECS seconds."
-	print ""
-	print "Device operations (DEVOPS):"
-	print "These options apply to the device that is specified with -d"
-	print ""
-	print "Options for mice:"
-	print "-V|--fwver               Print the firmware version number"
-	print "-p|--profile profile     Changes the active profile"
-	print "-P|--getprofile          Prints the active profile"
-	print "-r|--res profile:DPI     Changes the scan resolution."
-	print "-R|--getres              Prints the resolutions"
-	print "-f|--freq [profile:]FREQ Changes the scan frequency."
-	print "-F|--getfreq             Prints the frequencies"
-	print "-L|--leds                Print the identifiers of the LEDs on the device"
-	print "-l|--setled [profile:]LED:off  Toggle the LED with the identifier \"LED\" ON or OFF"
-	print "-c|--setledcolor [profile:]LED:aabbcc  Set LED color to RGB 'aabbcc'"
-	print "-X|--flashfw FILE        Flash a firmware image to the device"
-	print ""
-	print "The 'profile' number may be 0 for the current profile. If 'profile' is"
-	print "omitted, the global settings are changed (not possible for every device)."
+	print("")
+	print("Usage: razercfg [OPTIONS] [-d DEV DEVOPS] [-d DEV DEVOPS]...")
+	print("")
+	print("-h|--help            Print this help text")
+	print("-v|--version         Print the program version number")
+	print("-B|--background      Fork into the background")
+	print("-s|--scan            Scan for devices and print the bus IDs")
+	print("-K|--reconfigure     Force-reconfigure all detected devices")
+	print("")
+	print("-d|--device DEV      Selects the device with the bus ID \"DEV\"")
+	print("    Use the special value \"mouse\" for DEV to select")
+	print("    the first razer mouse device found in the system.")
+	print("    If this option is omitted, the first Razer device found is selected.")
+	print("")
+	print("-S|--sleep SECS      Sleep SECS seconds.")
+	print("")
+	print("Device operations (DEVOPS):")
+	print("These options apply to the device that is specified with -d")
+	print("")
+	print("Options for mice:")
+	print("-V|--fwver               Print the firmware version number")
+	print("-p|--profile profile     Changes the active profile")
+	print("-P|--getprofile          Prints the active profile")
+	print("-r|--res profile:DPI     Changes the scan resolution.")
+	print("-R|--getres              Prints the resolutions")
+	print("-f|--freq [profile:]FREQ Changes the scan frequency.")
+	print("-F|--getfreq             Prints the frequencies")
+	print("-L|--leds                Print the identifiers of the LEDs on the device")
+	print("-l|--setled [profile:]LED:off  Toggle the LED with the identifier \"LED\" ON or OFF")
+	print("-c|--setledcolor [profile:]LED:aabbcc  Set LED color to RGB 'aabbcc'")
+	print("-X|--flashfw FILE        Flash a firmware image to the device")
+	print("")
+	print("The 'profile' number may be 0 for the current profile. If 'profile' is")
+	print("omitted, the global settings are changed (not possible for every device).")
 
 def findDevice(deviceType=None):
 	if deviceType is None or deviceType == "mouse":
@@ -478,8 +481,8 @@ def main():
 		devOpsList = parse_args()
 		for devOps in devOpsList:
 			devOps.runAll()
-	except (RazerEx), e:
-		print e
+	except (RazerEx) as e:
+		print(e)
 		return 1
 	return 0
 

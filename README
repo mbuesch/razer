@@ -9,10 +9,10 @@ This is a configuration utility for Razer devices on Linux systems.
 DEPENDENCIES
 ============
 
- * Python 2.7
+ * Python 3.x
    https://www.python.org/
    Debian Linux:
-	apt-get install python2.7
+	apt-get install python3
 
  * libusb 1.0
    http://libusb.org/
