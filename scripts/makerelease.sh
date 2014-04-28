@@ -17,7 +17,7 @@ done
 
 hook_get_version()
 {
-	local file="$1/ui/pyrazer.py"
+	local file="$1/ui/pyrazer/main.py"
 	version="$(cat "$file" | grep -e RAZER_VERSION | head -n1 | cut -d'"' -f2)"
 }
 
