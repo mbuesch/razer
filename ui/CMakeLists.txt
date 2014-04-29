@@ -20,8 +20,12 @@ add_custom_target(pyrazer ALL
 		  DEPENDS ${PYRAZER_BUILD}/stamp)
 
 install(CODE
-	"execute_process(COMMAND ${PYTHON} \"${CMAKE_CURRENT_SOURCE_DIR}/setup.py\"
-			           install --prefix \"${CMAKE_INSTALL_PREFIX}\"
+	"set(PYDESTDIR \"\$ENV{DESTDIR}\")
+	if (\"\${PYDESTDIR}\" STREQUAL \"\")
+		set(PYDESTDIR /)
+	endif()
+	execute_process(COMMAND ${PYTHON} \"${CMAKE_CURRENT_SOURCE_DIR}/setup.py\"
+			           install --root \"\${PYDESTDIR}\" --prefix \"${CMAKE_INSTALL_PREFIX}\"
 		         WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}\"
 			 RESULT_VARIABLE pyrazer_install_res)
 	if (NOT \"\${pyrazer_install_res}\" STREQUAL \"0\")
