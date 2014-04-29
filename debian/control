@@ -1,0 +1,11 @@
+Source: razercfg
+Maintainer: Michael Büsch <m@bues.ch>
+Section: misc
+Priority: optional
+Build-Depends: debhelper (>= 9)
+
+Package: razercfg
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Razer device configuration tool
+ This is a configuration utility for Razer devices on Linux systems.
