@@ -1,3 +1,9 @@
 #!/usr/bin/make -f
+
+override_dh_install:
+	dh_install
+	find ./debian/ -type d -name site-packages -prune -execdir mv site-packages dist-packages \;
+	find ./debian/ -type d -name __pycache__ -prune -execdir rm -r __pycache__ \;
+
 %:
 	dh $@
