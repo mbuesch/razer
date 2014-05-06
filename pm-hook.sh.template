@@ -7,7 +7,7 @@ razer_suspend()
 
 razer_resume()
 {
-	$$INSTDIR$$/bin/razercfg -B -K
+	@CMAKE_INSTALL_PREFIX@/bin/razercfg -B -K
 }
 
 case $1 in
