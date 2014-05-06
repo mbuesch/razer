@@ -33,7 +33,7 @@ Note that almost all distributions ship prebuilt packages of the
 above dependencies.
 
 If you installed a dependency after you already ran "cmake ." and/or "make",
-it might happen that the depencency is still not found.
+it might happen that the dependency is still not found.
 Just delete the cmake status files or unpack a clean razercfg tarball to
 workaround this issue.
 
