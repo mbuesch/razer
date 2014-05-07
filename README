@@ -53,19 +53,17 @@ Then invoke "make" to build the binaries.
 INSTALLING
 ==========
 
-First you need to install the tool libraries and binaries. Do this by typing
-in the following commands:
+First you need to install the tool libraries and binaries. Do this by executing
+the following command as root:
 
-  sudo -i	# become root
   make install
 
 
 If you use systemd:
 
 The "make install" step should already have installed the razerd.service file.
-Run the following commands to start the razerd daemon:
+Run the following commands as root to start the razerd daemon:
 
-  sudo -i	# become root
   systemctl enable razerd.service
   systemctl start razerd.service
 
@@ -75,9 +73,8 @@ If you do NOT use systemd:
 To automatically start the required system daemon "razerd" at system bootup time,
 you need to install the init-script. This software package includes a generic
 example script, that should work out-of-the-box on many Linux distributions.
-To install it, invoke the following commands:
+To install it, invoke the following commands as root:
 
-  sudo -i	# become root
   cp ./razerd.initscript /etc/init.d/razerd
   ln -s /etc/init.d/razerd /etc/rc2.d/S99razerd
   ln -s /etc/init.d/razerd /etc/rc5.d/S99razerd
