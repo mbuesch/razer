@@ -75,6 +75,10 @@ struct naga_private {
 	struct razer_event_spacing packet_spacing;
 };
 
+#define NAGA_FW_MAJOR(ver)		(((ver) >> 8) & 0xFF)
+#define NAGA_FW_MINOR(ver)		((ver) & 0xFF)
+#define NAGA_FW(major, minor)		(((major) << 8) | (minor))
+
 
 static void naga_command_init(struct naga_command *cmd)
 {
@@ -178,7 +182,7 @@ static int naga_read_fw_ver(struct naga_private *priv)
 		ver = be16_to_cpu((be16_t)cmd.value0);
 		if (!err && (ver & 0xFF00) != 0)
 			return ver;
-		razer_msleep(100);
+		razer_msleep(250);
 	}
 	razer_error("razer-naga: Failed to read firmware version\n");
 
@@ -459,10 +463,17 @@ int razer_naga_init(struct razer_mouse *m,
 		    struct libusb_device *usbdev)
 {
 	struct naga_private *priv;
+	struct libusb_device_descriptor desc;
 	unsigned int i;
 	int fwver, err;
 
 	BUILD_BUG_ON(sizeof(struct naga_command) != 90);
+
+	err = libusb_get_device_descriptor(usbdev, &desc);
+	if (err) {
+		razer_error("hw_naga: Failed to get device descriptor\n");
+		return -EIO;
+	}
 
 	priv = zalloc(sizeof(struct naga_private));
 	if (!priv)
@@ -491,6 +502,18 @@ int razer_naga_init(struct razer_mouse *m,
 		goto err_release;
 	}
 	priv->fw_version = fwver;
+	if (desc.idProduct == 0x001F) {
+		/* This is Naga 2011 wired/wireless classic */
+		if (priv->fw_version < NAGA_FW(0x01, 0x04)) {
+			razer_error("hw_naga: The firmware version %d.%d of this Naga "
+				"has known bugs. Please upgrade to version 1.04 or later. "
+				"Razercfg will not work with any older firmware.",
+				NAGA_FW_MAJOR(priv->fw_version),
+				NAGA_FW_MINOR(priv->fw_version));
+			err = -ENODEV;
+			goto err_release;
+		}
+	}
 
 	priv->frequency = RAZER_MOUSE_FREQ_1000HZ;
 	for (i = 0; i < NAGA_NR_LEDS; i++)
