@@ -506,12 +506,10 @@ int razer_naga_init(struct razer_mouse *m,
 		/* This is Naga 2011 wired/wireless classic */
 		if (priv->fw_version < NAGA_FW(0x01, 0x04)) {
 			razer_error("hw_naga: The firmware version %d.%d of this Naga "
-				"has known bugs. Please upgrade to version 1.04 or later. "
-				"Razercfg will not work with any older firmware.",
+				"has known bugs. Please upgrade to version 1.04 or later.",
 				NAGA_FW_MAJOR(priv->fw_version),
 				NAGA_FW_MINOR(priv->fw_version));
-			err = -ENODEV;
-			goto err_release;
+			m->flags |= RAZER_MOUSEFLG_SUGGESTFWUP;
 		}
 	}
 
