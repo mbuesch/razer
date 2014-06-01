@@ -89,13 +89,16 @@ class OpGetFreq(Operation):
 	def run(self, idstr):
 		freqs = getRazer().getSupportedFreqs(idstr)
 		minfo = getRazer().getMouseInfo(idstr)
+		curProf = getRazer().getActiveProfile(idstr)
 		if minfo & Razer.MOUSEINFOFLG_GLOBAL_FREQ:
 			curFreq = getRazer().getCurrentFreq(idstr)
 			self.printFreq(freqs, curFreq)
 		if minfo & Razer.MOUSEINFOFLG_PROFILE_FREQ:
 			profiles = getRazer().getProfiles(idstr)
 			for profile in profiles:
-				sys.stdout.write("Profile %2u:   " % (profile + 1))
+				sys.stdout.write("Profile %2u%s:   " %\
+					(profile + 1,
+					 "*" if profile == curProf else " "))
 				curFreq = getRazer().getCurrentFreq(idstr, profile)
 				self.printFreq(freqs, curFreq)
 
@@ -110,8 +113,11 @@ class OpGetRes(Operation):
 	def run(self, idstr):
 		mappings = getRazer().getSupportedDpiMappings(idstr)
 		profiles = getRazer().getProfiles(idstr)
+		curProf = getRazer().getActiveProfile(idstr)
 		for profile in profiles:
-			sys.stdout.write("Profile %2u:   " % (profile + 1))
+			sys.stdout.write("Profile %2u%s:   " %\
+				(profile + 1,
+				 "*" if profile == curProf else " "))
 			curMapping = getRazer().getDpiMapping(idstr, profile)
 			output = []
 			pm = [m for m in mappings if m.profileMask == 0 or\
@@ -132,8 +138,11 @@ class OpPrintLeds(Operation):
 			self.printLeds(leds)
 		if minfo & Razer.MOUSEINFOFLG_PROFILE_LEDS:
 			profiles = getRazer().getProfiles(idstr)
+			curProf = getRazer().getActiveProfile(idstr)
 			for profile in profiles:
-				sys.stdout.write("Profile %2u LEDs:   " % (profile + 1))
+				sys.stdout.write("Profile %2u%s LEDs:   " %\
+					(profile + 1,
+					 "*" if profile == curProf else " "))
 				leds = getRazer().getLeds(idstr, profile)
 				self.printLeds(leds)
 
