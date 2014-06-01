@@ -374,17 +374,15 @@ struct razer_mouse_profile {
 
 /** enum razer_mouse_flags - Flags for a mouse
  *
- * @RAZER_MOUSEFLG_NEW: The device detection routine of the library
- *	sets this to flag on detection. So the highlevel code
- *	using the library can clear this flag to keep track of
- *	devices it already knows about.
- *
  * @RAZER_MOUSEFLG_PROFEMU: Profiles are emulated in software. The device
  *	does only support one profile in hardware.
+ *
+ * @RAZER_MOUSEFLG_MASK: A mask of all public flags.
  */
 enum razer_mouse_flags {
-	RAZER_MOUSEFLG_NEW		= (1 << 0),
-	RAZER_MOUSEFLG_PROFEMU		= (1 << 1),
+	RAZER_MOUSEFLG_PROFEMU		= (1 << 0),
+
+	RAZER_MOUSEFLG_MASK		= 0x0000FFFF,
 
 	/* Internal flags */
 	RAZER_MOUSEFLG_PRESENT		= (1 << 15),

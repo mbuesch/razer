@@ -653,7 +653,6 @@ static struct razer_mouse * mouse_new(const struct razer_usb_device *id,
 	m->release = mouse_default_release;
 
 	/* Call the driver init */
-	m->flags |= RAZER_MOUSEFLG_NEW;
 	m->base_ops = id->u.mouse_ops;
 	err = m->base_ops->init(m, udev);
 	if (err)
