@@ -176,7 +176,7 @@ class OpSetLedState(Operation):
 			else:
 				profile -= 1
 			leds = getRazer().getLeds(idstr, profile)
-			led = filter(lambda l: l.name == ledName, leds)[0]
+			led = next(filter(lambda l: l.name == ledName, leds))
 			led.state = newState
 			error = getRazer().setLed(idstr, led)
 			if error:
