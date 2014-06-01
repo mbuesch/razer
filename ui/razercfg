@@ -216,10 +216,11 @@ class OpSetRes(Operation):
 		try:
 			(profile, mapping) = self.parseProfileValueStr(self.param, idstr)
 			mapping = int(mapping[0])
-			if profile is None:
-				raise ValueError
 		except ValueError:
 			raise RazerEx("Invalid parameter to --res option")
+		if profile is None:
+			# No profile number was specified. Get the current one.
+			profile = getRazer().getActiveProfile(idstr) + 1
 		if mapping >= 100:
 			# Mapping is in DPI. Get the mapping ID.
 			mappings = getRazer().getSupportedDpiMappings(idstr)
