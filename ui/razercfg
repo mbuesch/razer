@@ -176,7 +176,7 @@ class OpSetLedState(Operation):
 			else:
 				profile -= 1
 			leds = getRazer().getLeds(idstr, profile)
-			led = filter(lambda l: l.name == ledName, leds)[0]
+			led = [led for led in leds if led.name.lower() == ledName.lower()][0]
 			led.state = newState
 			error = getRazer().setLed(idstr, led)
 			if error:
@@ -199,7 +199,7 @@ class OpSetLedColor(Operation):
 			else:
 				profile -= 1
 			leds = getRazer().getLeds(idstr, profile)
-			led = filter(lambda l: l.name == ledName, leds)[0]
+			led = [led for led in leds if led.name.lower() == ledName.lower()][0]
 			led.color = newColor
 			error = getRazer().setLed(idstr, led)
 			if error:
@@ -226,7 +226,7 @@ class OpSetRes(Operation):
 			pm = [m for m in mappings if m.profileMask == 0 or\
 					      m.profileMask & (1 << profile)]
 			try:
-				mapping = filter(lambda m: mapping in m.res, pm)[0].id
+				mapping = [m for m in pm if mapping in m.res][0].id
 			except IndexError:
 				raise RazerEx("Invalid resolution %d" % mapping)
 		else:
