@@ -138,12 +138,13 @@ enum {
 };
 
 enum mouseinfo_flags {
-	MOUSEINFOFLG_RESULTOK		= (1 << 0),
-	MOUSEINFOFLG_GLOBAL_LEDS	= (1 << 1),
-	MOUSEINFOFLG_PROFILE_LEDS	= (1 << 2),
-	MOUSEINFOFLG_GLOBAL_FREQ	= (1 << 3),
-	MOUSEINFOFLG_PROFILE_FREQ	= (1 << 4),
-	MOUSEINFOFLG_PROFNAMEMUTABLE	= (1 << 5),
+	MOUSEINFOFLG_RESULTOK		= (1 << 0), /* Other flags are ok, if this is set. */
+	MOUSEINFOFLG_GLOBAL_LEDS	= (1 << 1), /* The device has global LEDs. */
+	MOUSEINFOFLG_PROFILE_LEDS	= (1 << 2), /* The device has per-profile LEDs. */
+	MOUSEINFOFLG_GLOBAL_FREQ	= (1 << 3), /* The device has global frequency settings. */
+	MOUSEINFOFLG_PROFILE_FREQ	= (1 << 4), /* The device has per-profile frequency settings. */
+	MOUSEINFOFLG_PROFNAMEMUTABLE	= (1 << 5), /* Profile names can be changed. */
+	MOUSEINFOFLG_SUGGESTFWUP	= (1 << 6), /* A firmware update is suggested. */
 };
 
 enum led_flags {
@@ -1222,6 +1223,8 @@ static void command_getmouseinfo(struct client *client, const struct command *cm
 				flags |= MOUSEINFOFLG_PROFNAMEMUTABLE;
 		}
 	}
+	if (mouse->flags & RAZER_MOUSEFLG_SUGGESTFWUP)
+		flags |= MOUSEINFOFLG_SUGGESTFWUP;
 	send_u32(client, flags);
 
 	return;

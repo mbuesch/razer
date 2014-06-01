@@ -585,7 +585,11 @@ class MouseWidget(QWidget):
 		   (ver[0] == 0 and ver[1] == 0):
 			self.fwVer.hide()
 		else:
-			self.fwVer.setText(self.tr("Firmware version: %u.%02u" % (ver[0], ver[1])))
+			extra = ""
+			if minfo & Razer.MOUSEINFOFLG_SUGGESTFWUP:
+				extra = self.tr("\nDue to known bugs in this firmware version, a "
+					"firmware update is STRONGLY suggested!")
+			self.fwVer.setText(self.tr("Firmware version: %u.%02u%s" % (ver[0], ver[1], extra)))
 			self.fwVer.show()
 
 	def reloadProfiles(self):

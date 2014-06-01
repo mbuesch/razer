@@ -377,10 +377,13 @@ struct razer_mouse_profile {
  * @RAZER_MOUSEFLG_PROFEMU: Profiles are emulated in software. The device
  *	does only support one profile in hardware.
  *
+ * @RAZER_MOUSEFLG_SUGGESTFWUP: A firmware update for this device is suggested.
+ *
  * @RAZER_MOUSEFLG_MASK: A mask of all public flags.
  */
 enum razer_mouse_flags {
 	RAZER_MOUSEFLG_PROFEMU		= (1 << 0),
+	RAZER_MOUSEFLG_SUGGESTFWUP	= (1 << 1),
 
 	RAZER_MOUSEFLG_MASK		= 0x0000FFFF,
 
