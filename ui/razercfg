@@ -25,10 +25,8 @@ try:
 	PYRAZER_SETUP_PY == True
 except:
 	print("ERROR: Found an old 'pyrazer' module.")
-	print("You will probably have to delete the old 'pyrazer' module from the system.")
-	print("The command to remove the module might look like this:")
-	print("  rm /usr/local/bin/pyrazer.*")
-	print("You will have to run this manually as root.")
+	print("You should uninstall razercfg from the system (see README)")
+	print("and re-install it properly.")
 	sys.exit(1)
 
 

@@ -147,6 +147,22 @@ While the daemon is running, the user interfaces "razercfg" (commandline) and
 "qrazercfg" (graphical user interface) can be used.
 
 
+UNINSTALLING
+============
+
+If you installed razercfg with your distribution packaging system, use that
+to uninstall razercfg.
+
+If you compiled razercfg from source and installed it with 'make install', you
+can use the 'uninstall.sh' script from the razercfg archive to uninstall
+razercfg from the system.
+It must be called with the install prefix as its first argument.
+That usually is /usr/local, unless specified otherwise in cmake.
+So a call to 'uninstall.sh' might look like this:
+
+  ./uninstall.sh /usr/local
+
+
 ARCHITECTURE
 ============
 
