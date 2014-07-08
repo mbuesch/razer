@@ -65,7 +65,7 @@ uninstall_global()
 {
 	for f in /etc/razer.conf /etc/init.d/razerd /etc/rc*.d/*razerd\
 		 /etc/pm/sleep.d/*-razer /etc/udev/rules.d/*-razer-udev.rules\
-		 /etc/systemd/system/razerd.service; do
+		 /{etc,usr/lib}/systemd/system/razerd.service; do
 
 		local path="$f"
 		[ -e "$path" ] || continue

@@ -47,7 +47,7 @@ install(FILES ${CMAKE_BINARY_DIR}/pm-hook.sh
 configure_file("razerd.service.template" "razerd.service")
 
 install(FILES ${CMAKE_BINARY_DIR}/razerd.service
-	DESTINATION /etc/systemd/system/
+	DESTINATION /usr/lib/systemd/system/
 	PERMISSIONS OWNER_READ OWNER_WRITE
 		    GROUP_READ
 		    WORLD_READ)
