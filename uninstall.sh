@@ -49,14 +49,14 @@ uninstall_prefix()
 		 /sbin/razerd /bin/razerd; do
 
 		local path="${prefix}${f}"
-		[ -e "$path" ] || continue
+		[ -e "$path" -o -h "$path" ] || continue
 		uninstall "$path"
 	done
 
 	for f in "$prefix"/lib/python*/site-packages/pyrazer; do
 
 		local path="$f"
-		[ -e "$path" ] || continue
+		[ -e "$path" -o -h "$path" ] || continue
 		uninstall "$path"
 	done
 }
@@ -69,7 +69,7 @@ uninstall_global()
 		 /usr/lib/systemd/system/razerd.service; do
 
 		local path="$f"
-		[ -e "$path" ] || continue
+		[ -e "$path" -o -h "$path" ] || continue
 		uninstall "$path"
 	done
 }
