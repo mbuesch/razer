@@ -31,7 +31,7 @@ execute_process(COMMAND pkg-config --variable=udevdir udev
 
 install(FILES ${CMAKE_BINARY_DIR}/udev.rules
 	DESTINATION ${UDEV_DIR}/rules.d
-	RENAME 01-razer-udev.rules
+	RENAME 80-razer.rules
 	PERMISSIONS OWNER_READ OWNER_WRITE
 		    GROUP_READ
 		    WORLD_READ)
