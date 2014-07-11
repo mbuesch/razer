@@ -26,13 +26,15 @@ add_subdirectory(librazer)
 
 configure_file("udev.rules.template" "udev.rules")
 
+execute_process(COMMAND pkg-config --variable=udevdir udev
+  OUTPUT_VARIABLE UDEV_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+
 install(FILES ${CMAKE_BINARY_DIR}/udev.rules
-	DESTINATION /etc/udev/rules.d/
+	DESTINATION ${UDEV_DIR}/rules.d
 	RENAME 01-razer-udev.rules
 	PERMISSIONS OWNER_READ OWNER_WRITE
 		    GROUP_READ
 		    WORLD_READ)
-
 
 configure_file("pm-hook.sh.template" "pm-hook.sh" @ONLY)
 
@@ -43,11 +45,13 @@ install(FILES ${CMAKE_BINARY_DIR}/pm-hook.sh
 		    GROUP_READ GROUP_EXECUTE
 		    WORLD_READ WORLD_EXECUTE)
 
-
 configure_file("razerd.service.template" "razerd.service")
 
+execute_process(COMMAND pkg-config --variable=systemdsystemunitdir systemd
+  OUTPUT_VARIABLE SYSTEMD_UNIT_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+
 install(FILES ${CMAKE_BINARY_DIR}/razerd.service
-	DESTINATION /usr/lib/systemd/system/
+	DESTINATION ${SYSTEMD_UNIT_DIR}
 	PERMISSIONS OWNER_READ OWNER_WRITE
 		    GROUP_READ
 		    WORLD_READ)
