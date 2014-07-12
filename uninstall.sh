@@ -64,10 +64,15 @@ uninstall_prefix()
 uninstall_global()
 {
 	for f in /etc/razer.conf /etc/init.d/razerd /etc/rc*.d/*razerd\
-		 /etc/pm/sleep.d/*-razer /etc/udev/rules.d/*-razer-udev.rules\
+		 /etc/pm/sleep.d/*-razer\
+		 /etc/udev/rules.d/*-razer-udev.rules\
+		 "$(pkg-config --variable=udevdir udev)/rules.d/*-razer-udev.rules"\
 		 /lib/udev/rules.d/*-razer-udev.rules\
+		 /usr/lib/udev/rules.d/*-razer-udev.rules\
 		 /etc/systemd/system/razerd.service\
-		 /lib/systemd/system/razerd.service; do
+		 "$(pkg-config --variable=systemdsystemunitdir systemd)/razerd.service"\
+		 /lib/systemd/system/razerd.service\
+		 /usr/lib/systemd/system/razerd.service; do
 
 		local path="$f"
 		[ -e "$path" -o -h "$path" ] || continue
