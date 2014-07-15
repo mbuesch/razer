@@ -64,7 +64,6 @@ If you use systemd:
 The "make install" step should already have installed the razerd.service file.
 Run the following commands as root to start the razerd daemon:
 
-  systemctl enable razerd.service
   systemctl start razerd.service
 
 
