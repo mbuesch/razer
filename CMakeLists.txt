@@ -27,7 +27,8 @@ add_subdirectory(librazer)
 configure_file("udev.rules.template" "udev.rules")
 
 execute_process(COMMAND pkg-config --variable=udevdir udev
-  OUTPUT_VARIABLE UDEV_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+  OUTPUT_VARIABLE UDEV_DIR
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 install(FILES ${CMAKE_BINARY_DIR}/udev.rules
 	DESTINATION ${UDEV_DIR}/rules.d
@@ -48,13 +49,17 @@ install(FILES ${CMAKE_BINARY_DIR}/pm-hook.sh
 configure_file("razerd.service.template" "razerd.service")
 
 execute_process(COMMAND pkg-config --variable=systemdsystemunitdir systemd
-  OUTPUT_VARIABLE SYSTEMD_UNIT_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+  OUTPUT_VARIABLE SYSTEMD_UNIT_DIR
+  ERROR_QUIET
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-install(FILES ${CMAKE_BINARY_DIR}/razerd.service
-	DESTINATION ${SYSTEMD_UNIT_DIR}
-	PERMISSIONS OWNER_READ OWNER_WRITE
-		    GROUP_READ
-		    WORLD_READ)
+if(SYSTEMD_UNIT_DIR)
+	install(FILES ${CMAKE_BINARY_DIR}/razerd.service
+		DESTINATION ${SYSTEMD_UNIT_DIR}
+		PERMISSIONS OWNER_READ OWNER_WRITE
+					GROUP_READ
+					WORLD_READ)
+endif(SYSTEMD_UNIT_DIR)
 
 install_exec_cmd("udevadm control --reload-rules"
 		 "Please reload udev manually or reboot the system")
