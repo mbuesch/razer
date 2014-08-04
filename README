@@ -102,12 +102,12 @@ If no configuration file is available, razerd will work with default settings.
 X WINDOW SYSTEM (X.ORG) CONFIGURATION
 ================================
 
-If you don't have an xorg.conf, you don't have to do anything and it should
-work out-of-the-box.
+If you don't have an xorg.conf, you don't have to do anything and it should work
+out-of-the-box.
 
-X must _not_ be configured to a specific mouse device like /dev/input/mouse0.
-On configuration events, razerd may have to temporarily unregister the mouse
-from the system. This will confuse X, if it's configured to a specific device.
+X must _not_ be configured to a specific mouse device like /dev/input/mouse0. On
+configuration events, razerd may have to temporarily unregister the mouse from
+the system. This will confuse X, if it's configured to a specific device.
 Configure it to the generic /dev/input/mice device instead. This will enable X
 to pick up the mouse again after a configuration event from razerd.
 
@@ -138,8 +138,7 @@ USING THE TOOLS
 
 To use the tools, the razerd daemon needs to be started as root, first. Without
 the background daemon, nothing will work. The daemon is responsible for doing
-the lowlevel hardware accesses and for tracking the current state of the
-device.
+the lowlevel hardware accesses and for tracking the current state of the device.
 While the daemon is running, the user interfaces "razercfg" (commandline) and
 "qrazercfg" (graphical user interface) can be used.
 
@@ -152,9 +151,9 @@ uninstall razercfg.
 
 If you compiled razercfg from source and installed it with `make install`, you
 can use the "uninstall.sh" script from the razercfg archive to uninstall
-razercfg from the system. It must be called with the install prefix as its
-first argument. That usually is /usr/local, unless specified otherwise in
-cmake. A call to uninstall.sh might look like this:
+razercfg from the system. It must be called with the install prefix as its first
+argument. That usually is /usr/local, unless specified otherwise in cmake. A
+call to uninstall.sh might look like this:
 
   ./uninstall.sh /usr/local
 
@@ -204,8 +203,8 @@ The architecture layout of the razer tools looks like this:
 
 So in general, your application wants to access the razer devices through
 pyrazer or (if it's not a python app) through librazerd.
-(Note that librazerd is not written, yet. So currently the only way to
-access the devices is through pyrazer).
+(Note that librazerd is not written, yet. So currently the only way to access
+the devices is through pyrazer).
 Applications should never poke with lowlevel librazer directly, because there
 will be no instance that keeps track of the device state and permissions and
 concurrency.
