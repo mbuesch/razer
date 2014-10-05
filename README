@@ -22,7 +22,7 @@ DEPENDENCIES
  * PySide (for the graphical qrazercfg tool only)
    https://qt-project.org/wiki/PySide
    Debian Linux:
-	apt-get install python-pyside
+	apt-get install python3-pyside
 
  * cmake 2.4 or later (for building only)
    http://www.cmake.org/
