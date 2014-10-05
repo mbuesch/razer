@@ -280,6 +280,10 @@ void razer_ascii_to_utf16(razer_utf16_t *dest, size_t dest_max_chars,
 
 	if (!dest_max_chars)
 		return;
+	/* FIXME: This code is wrong.
+	 * But it works for most strings in the current setup.
+	 * So it probably won't blow up too often.
+	 */
 	while (count < dest_max_chars - 1) {
 		if (!*src)
 			break;
