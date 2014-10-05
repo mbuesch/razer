@@ -37,7 +37,7 @@ enum {
 };
 
 enum {	/* Misc constants */
-	DEATHADDER2013_NR_DPIMAPPINGS = 56,
+	DEATHADDER2013_NR_DPIMAPPINGS = 64,
 	DEATHADDER2013_NR_AXES = 3,
 };
 
