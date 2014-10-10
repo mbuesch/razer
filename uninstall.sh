@@ -46,14 +46,16 @@ uninstall_prefix()
 
 	for f in /bin/pyrazer.py /bin/pyrazer.pyc /bin/pyrazer.pyo\
 		 /bin/razercfg /bin/qrazercfg /bin/razer-gamewrapper\
-		 /sbin/razerd /bin/razerd; do
+		 /sbin/razerd /bin/razerd\
+		 /lib/librazer.so; do
 
 		local path="${prefix}${f}"
 		[ -e "$path" -o -h "$path" ] || continue
 		uninstall "$path"
 	done
 
-	for f in "$prefix"/lib/python*/site-packages/pyrazer; do
+	for f in "$prefix"/lib/python*/site-packages/pyrazer\
+		 "$prefix"/lib/python*/dist-packages/pyrazer; do
 
 		local path="$f"
 		[ -e "$path" -o -h "$path" ] || continue
