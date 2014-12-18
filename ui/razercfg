@@ -173,22 +173,29 @@ class OpSetLedState(Operation):
 	def __init__(self, param):
 		self.param = param
 
+	def setLed(self, idstr, led, state):
+		led.state = state
+		error = getRazer().setLed(idstr, led)
+		if error:
+			raise RazerEx("Failed to set LED state (%s)" %\
+					  Razer.strerror(error))
+
 	def run(self, idstr):
 		try:
 			(profile, config) = self.parseProfileValueStr(self.param, idstr, 2)
-			ledName = config[0].strip()
+			ledName = config[0].strip().lower()
 			newState = razer_str2bool(config[1])
 			if profile is None:
 				profile = Razer.PROFILE_INVALID
 			else:
 				profile -= 1
 			leds = getRazer().getLeds(idstr, profile)
-			led = [led for led in leds if led.name.lower() == ledName.lower()][0]
-			led.state = newState
-			error = getRazer().setLed(idstr, led)
-			if error:
-				raise RazerEx("Failed to set LED state (%s)" %\
-					      Razer.strerror(error))
+			if 'all' == ledName:
+				for led in leds:
+					self.setLed(idstr, led, newState)
+			else:
+				led = [led for led in leds if led.name.lower() == ledName.lower()][0]
+				self.setLed(idstr, led, newState)
 		except (IndexError, ValueError):
 			raise RazerEx("Invalid parameter to --setled option")
 
@@ -339,6 +346,7 @@ def usage():
 	print("-F|--getfreq             Prints the frequencies")
 	print("-L|--leds                Print the identifiers of the LEDs on the device")
 	print("-l|--setled [profile:]LED:off  Toggle the LED with the identifier \"LED\" ON or OFF")
+	print("                               (use \"all\" to toggle all supported LEDs)")
 	print("-c|--setledcolor [profile:]LED:aabbcc  Set LED color to RGB 'aabbcc'")
 	print("-X|--flashfw FILE        Flash a firmware image to the device")
 	print("")
