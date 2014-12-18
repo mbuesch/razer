@@ -466,6 +466,7 @@ int razer_naga_init(struct razer_mouse *m,
 	struct libusb_device_descriptor desc;
 	unsigned int i;
 	int fwver, err;
+	const char *model;
 
 	BUILD_BUG_ON(sizeof(struct naga_command) != 90);
 
@@ -502,8 +503,7 @@ int razer_naga_init(struct razer_mouse *m,
 		goto err_release;
 	}
 	priv->fw_version = fwver;
-	if (desc.idProduct == 0x001F) {
-		/* This is Naga 2011 wired/wireless classic */
+	if (desc.idProduct == RAZER_NAGA_PID_EPIC) {
 		if (priv->fw_version < NAGA_FW(0x01, 0x04)) {
 			razer_error("hw_naga: The firmware version %d.%d of this Naga "
 				"has known bugs. Please upgrade to version 1.04 or later.",
@@ -541,7 +541,25 @@ int razer_naga_init(struct razer_mouse *m,
 			"Scroll", 0);
 
 	m->type = RAZER_MOUSETYPE_NAGA;
-	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, "Naga", 1,
+	switch (desc.idProduct) {
+	default:
+	case RAZER_NAGA_PID_CLASSIC:
+	    model = "Naga";
+	    break;
+	case RAZER_NAGA_PID_EPIC:
+	    model = "Naga Epic";
+	    break;
+	case RAZER_NAGA_PID_2012:
+	    model = "Naga 2012";
+	    break;
+	case RAZER_NAGA_PID_HEX:
+	    model = "Naga Hex";
+	    break;
+	case RAZER_NAGA_PID_2014:
+	    model = "Naga 2014";
+	    break;
+	}
+	razer_generic_usb_gen_idstr(usbdev, m->usb_ctx->h, model, 1,
 				    NULL, m->idstr);
 
 	m->get_fw_version = naga_get_fw_version;

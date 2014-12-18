@@ -144,11 +144,11 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 	USB_MOUSE(0x1532, 0x0003, &razer_krait_base_ops),
 	USB_MOUSE(0x1532, 0x000C, &razer_lachesis_base_ops), /* classic */
 	USB_MOUSE(0x1532, 0x001E, &razer_lachesis5k6_base_ops), /* 5600 DPI */
-	USB_MOUSE(0x1532, 0x0015, &razer_naga_base_ops), /* classic */
-	USB_MOUSE(0x1532, 0x001F, &razer_naga_base_ops), /* 2011 wired/wireless classic */
-	USB_MOUSE(0x1532, 0x002e, &razer_naga_base_ops), /* 2012 */
-	USB_MOUSE(0x1532, 0x0036, &razer_naga_base_ops), /* Hex */
-	USB_MOUSE(0x1532, 0x0040, &razer_naga_base_ops), /* 2014 */
+	USB_MOUSE(0x1532, RAZER_NAGA_PID_CLASSIC, &razer_naga_base_ops),
+	USB_MOUSE(0x1532, RAZER_NAGA_PID_EPIC, &razer_naga_base_ops),
+	USB_MOUSE(0x1532, RAZER_NAGA_PID_2012, &razer_naga_base_ops),
+	USB_MOUSE(0x1532, RAZER_NAGA_PID_HEX, &razer_naga_base_ops),
+	USB_MOUSE(0x1532, RAZER_NAGA_PID_2014, &razer_naga_base_ops),
 	USB_MOUSE(0x1532, 0x0101, &razer_copperhead_base_ops),
 	USB_MOUSE(0x1532, 0x0005, &razer_boomslangce_base_ops),
 	USB_MOUSE(0x1532, 0x0017, &razer_imperator_base_ops),
