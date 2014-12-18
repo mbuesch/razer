@@ -34,6 +34,7 @@
 enum {
 	NAGA_LED_SCROLL = 0,
 	NAGA_LED_LOGO,
+	NAGA_LED_THUMB_GRID,
 	NAGA_NR_LEDS,
 };
 
@@ -59,8 +60,10 @@ struct naga_private {
 
 	/* Firmware version number. */
 	uint16_t fw_version;
-	/* The currently set LED states. */
-	bool led_states[NAGA_NR_LEDS];
+	/* The currently set LED states.
+	 * Note: unsupported LEDs for a particular Naga model
+	 * will be set to RAZER_LED_UNKNOWN */
+	enum razer_led_state led_states[NAGA_NR_LEDS];
 	/* The currently set frequency. */
 	enum razer_mouse_freq frequency;
 	/* The currently set resolution. */
@@ -79,6 +82,18 @@ struct naga_private {
 #define NAGA_FW_MINOR(ver)		((ver) & 0xFF)
 #define NAGA_FW(major, minor)		(((major) << 8) | (minor))
 
+static const struct
+{
+	/* LED name. */
+	const char *name;
+	/* LED id when sending config command request. */
+	uint16_t value0;
+
+} naga_leds[NAGA_NR_LEDS] = {
+	{ "Scrollwheel", 0x0101 },
+	{ "GlowingLogo", 0x0401 },
+	{ "ThumbGrid",   0x0501 },
+};
 
 static void naga_command_init(struct naga_command *cmd)
 {
@@ -193,6 +208,7 @@ static int naga_do_commit(struct naga_private *priv)
 {
 	struct naga_command cmd;
 	unsigned int xres, yres, freq;
+	int led_id;
 	int err;
 
 	/* Set the resolution. */
@@ -206,27 +222,23 @@ static int naga_do_commit(struct naga_private *priv)
 	if (err)
 		return err;
 
-	/* Set the scroll wheel and buttons LEDs. */
-	naga_command_init(&cmd);
-	cmd.command = cpu_to_le16(0x0300);
-	cmd.request = cpu_to_le16(0x0003);
-	cmd.value0 = cpu_to_le16(0x0101);
-	if (priv->led_states[NAGA_LED_SCROLL])
-		cmd.value1 = cpu_to_le16(1);
-	err = naga_send_command(priv, &cmd);
-	if (err)
-		return err;
+	/* Set the LEDs. */
+	for (led_id = 0; led_id < NAGA_NR_LEDS; ++led_id) {
+		if (RAZER_LED_UNKNOWN == priv->led_states[led_id]) {
+			/* Not a supported LED on this model. */
+			continue;
+		}
 
-	/* Set the logo LED. */
-	naga_command_init(&cmd);
-	cmd.command = cpu_to_le16(0x0300);
-	cmd.request = cpu_to_le16(0x0003);
-	cmd.value0 = cpu_to_le16(0x0401);
-	if (priv->led_states[NAGA_LED_LOGO])
-		cmd.value1 = cpu_to_le16(1);
-	err = naga_send_command(priv, &cmd);
-	if (err)
-		return err;
+		naga_command_init(&cmd);
+		cmd.command = cpu_to_le16(0x0300);
+		cmd.request = cpu_to_le16(0x0003);
+		cmd.value0 = cpu_to_le16(naga_leds[led_id].value0);
+		if (priv->led_states[led_id])
+			cmd.value1 = cpu_to_le16(1);
+		err = naga_send_command(priv, &cmd);
+		if (err)
+			return err;
+	}
 
 	/* Set scan frequency. */
 	switch (priv->frequency) {
@@ -288,6 +300,10 @@ static int naga_led_toggle(struct razer_led *led,
 	if ((new_state != RAZER_LED_OFF) &&
 	    (new_state != RAZER_LED_ON))
 		return -EINVAL;
+	if (priv->led_states[led->id] == RAZER_LED_UNKNOWN) {
+		/* Not a supported LED on this model. */
+		return -EINVAL;
+	}
 
 	if (!priv->m->claim_count)
 		return -EBUSY;
@@ -302,35 +318,35 @@ static int naga_get_leds(struct razer_mouse *m,
 			 struct razer_led **leds_list)
 {
 	struct naga_private *priv = m->drv_data;
-	struct razer_led *scroll, *logo;
+	struct razer_led *led;
+	int nb_leds;
+	int led_id;
 
-	scroll = zalloc(sizeof(struct razer_led));
-	if (!scroll)
-		return -ENOMEM;
-	logo = zalloc(sizeof(struct razer_led));
-	if (!logo) {
-		free(scroll);
-		return -ENOMEM;
+	nb_leds = 0;
+	*leds_list = NULL;
+
+	for (led_id = 0; led_id < NAGA_NR_LEDS; ++led_id) {
+		if (RAZER_LED_UNKNOWN == priv->led_states[led_id]) {
+			/* Not a supported LED on this model. */
+			continue;
+		}
+
+		led = zalloc(sizeof(struct razer_led));
+		if (!led)
+			return -ENOMEM;
+
+		led->name = naga_leds[led_id].name;
+		led->id = led_id;
+		led->state = priv->led_states[led_id];
+		led->toggle_state = naga_led_toggle;
+		led->u.mouse = m;
+
+		led->next = *leds_list;
+		*leds_list = led;
+		++nb_leds;
 	}
 
-	scroll->name = "Scrollwheel";
-	scroll->id = NAGA_LED_SCROLL;
-	scroll->state = priv->led_states[NAGA_LED_SCROLL];
-	scroll->toggle_state = naga_led_toggle;
-	scroll->u.mouse = m;
-
-	logo->name = "GlowingLogo";
-	logo->id = NAGA_LED_LOGO;
-	logo->state = priv->led_states[NAGA_LED_LOGO];
-	logo->toggle_state = naga_led_toggle;
-	logo->u.mouse = m;
-
-	/* Link the list */
-	*leds_list = scroll;
-	scroll->next = logo;
-	logo->next = NULL;
-
-	return NAGA_NR_LEDS;
+	return nb_leds;
 }
 
 static int naga_supported_freqs(struct razer_mouse *m,
@@ -514,8 +530,13 @@ int razer_naga_init(struct razer_mouse *m,
 	}
 
 	priv->frequency = RAZER_MOUSE_FREQ_1000HZ;
-	for (i = 0; i < NAGA_NR_LEDS; i++)
-		priv->led_states[i] = RAZER_LED_ON;
+	priv->led_states[NAGA_LED_SCROLL] = RAZER_LED_ON;
+	/* FIXME: not supported for Epic? */
+	priv->led_states[NAGA_LED_LOGO] = RAZER_LED_ON;
+	if (desc.idProduct == RAZER_NAGA_PID_2014)
+		priv->led_states[NAGA_LED_THUMB_GRID] = RAZER_LED_ON;
+	else
+		priv->led_states[NAGA_LED_THUMB_GRID] = RAZER_LED_UNKNOWN;
 
 	priv->profile.nr = 0;
 	priv->profile.get_freq = naga_get_freq;
