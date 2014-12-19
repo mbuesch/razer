@@ -39,8 +39,12 @@ enum {
 };
 
 enum { /* Misc constants */
-	NAGA_NR_DPIMAPPINGS	= 56,
-	NAGA_NR_AXES		= 3,
+	/* Naga Classic/Epic/2012/Hex: from 100 to 5600 DPI. */
+	NAGA_5600_NR_DPIMAPPINGS	= 56,
+	/* Naga 2014: from 100 to 8200 DPI. */
+	NAGA_8200_NR_DPIMAPPINGS	= 82,
+	NAGA_NR_DPIMAPPINGS		= NAGA_8200_NR_DPIMAPPINGS,
+	NAGA_NR_AXES			= 3,
 };
 
 struct naga_command {
@@ -72,6 +76,10 @@ struct naga_private {
 
 	struct razer_mouse_profile profile;
 	struct razer_mouse_dpimapping dpimapping[NAGA_NR_DPIMAPPINGS];
+	/* Number of mappings actually supported by this Naga model. */
+	int nb_dpimappings;
+	/* Model dependent method to initialize a resolution command. */
+	void (*command_init_resolution)(struct naga_command *, struct naga_private *);
 	struct razer_axis axes[NAGA_NR_AXES];
 
 	bool commit_pending;
@@ -98,6 +106,33 @@ static const struct
 static void naga_command_init(struct naga_command *cmd)
 {
 	memset(cmd, 0, sizeof(*cmd));
+}
+
+static void naga_command_init_resolution_5600(struct naga_command *cmd,
+					      struct naga_private *priv)
+{
+	unsigned int xres, yres;
+
+	naga_command_init(cmd);
+	cmd->command = cpu_to_le16(0x0300);
+	cmd->request = cpu_to_le16(0x0104);
+	xres = (((unsigned int)priv->cur_dpimapping_X->res[RAZER_DIM_0] / 100) - 1) * 4;
+	yres = (((unsigned int)priv->cur_dpimapping_Y->res[RAZER_DIM_0] / 100) - 1) * 4;
+	cmd->value0 = cpu_to_le16(xres | (yres << 8));
+}
+
+static void naga_command_init_resolution_8200(struct naga_command *cmd,
+					      struct naga_private *priv)
+{
+	be16_t xres, yres;
+
+	naga_command_init(cmd);
+	cmd->command = cpu_to_le16(0x0700);
+	cmd->request = cpu_to_le16(0x0504);
+	xres = cpu_to_be16(priv->cur_dpimapping_X->res[RAZER_DIM_0]);
+	yres = cpu_to_be16(priv->cur_dpimapping_Y->res[RAZER_DIM_0]);
+	memcpy((uint8_t *)&cmd->value0 + 1, &xres, 2);
+	memcpy((uint8_t *)&cmd->value0 + 3, &yres, 2);
 }
 
 static int naga_usb_write(struct naga_private *priv,
@@ -207,17 +242,12 @@ static int naga_read_fw_ver(struct naga_private *priv)
 static int naga_do_commit(struct naga_private *priv)
 {
 	struct naga_command cmd;
-	unsigned int xres, yres, freq;
+	unsigned int freq;
 	int led_id;
 	int err;
 
 	/* Set the resolution. */
-	naga_command_init(&cmd);
-	cmd.command = cpu_to_le16(0x0300);
-	cmd.request = cpu_to_le16(0x0104);
-	xres = (((unsigned int)priv->cur_dpimapping_X->res[RAZER_DIM_0] / 100) - 1) * 4;
-	yres = (((unsigned int)priv->cur_dpimapping_Y->res[RAZER_DIM_0] / 100) - 1) * 4;
-	cmd.value0 = cpu_to_le16(xres | (yres << 8));
+	priv->command_init_resolution(&cmd, priv);
 	err = naga_send_command(priv, &cmd);
 	if (err)
 		return err;
@@ -402,18 +432,18 @@ static int naga_supported_axes(struct razer_mouse *m,
 static int naga_supported_resolutions(struct razer_mouse *m,
 					    enum razer_mouse_res **res_list)
 {
+	struct naga_private *priv = m->drv_data;
 	enum razer_mouse_res *list;
 	unsigned int i;
-	const unsigned int count = NAGA_NR_DPIMAPPINGS;
 
-	list = zalloc(sizeof(*list) * count);
+	list = zalloc(sizeof(*list) * priv->nb_dpimappings);
 	if (!list)
 		return -ENOMEM;
-	for (i = 0; i < count; i++)
+	for (i = 0; i < priv->nb_dpimappings; i++)
 		list[i] = (i + 1) * 100;
 	*res_list = list;
 
-	return count;
+	return priv->nb_dpimappings;
 }
 
 static struct razer_mouse_profile * naga_get_profiles(struct razer_mouse *m)
@@ -430,7 +460,7 @@ static int naga_supported_dpimappings(struct razer_mouse *m,
 
 	*res_ptr = &priv->dpimapping[0];
 
-	return ARRAY_SIZE(priv->dpimapping);
+	return priv->nb_dpimappings;
 }
 
 static struct razer_mouse_dpimapping * naga_get_dpimapping(struct razer_mouse_profile *p,
@@ -545,7 +575,15 @@ int razer_naga_init(struct razer_mouse *m,
 	priv->profile.set_dpimapping = naga_set_dpimapping;
 	priv->profile.mouse = m;
 
-	for (i = 0; i < NAGA_NR_DPIMAPPINGS; i++) {
+	if (desc.idProduct == RAZER_NAGA_PID_2014) {
+		priv->nb_dpimappings = NAGA_8200_NR_DPIMAPPINGS;
+		priv->command_init_resolution = naga_command_init_resolution_8200;
+	} else {
+		priv->nb_dpimappings = NAGA_5600_NR_DPIMAPPINGS;
+		priv->command_init_resolution = naga_command_init_resolution_5600;
+	}
+
+	for (i = 0; i < priv->nb_dpimappings; i++) {
 		priv->dpimapping[i].nr = i;
 		priv->dpimapping[i].res[RAZER_DIM_0] = (i + 1) * 100;
 		if (priv->dpimapping[i].res[RAZER_DIM_0] == 1000) {
