@@ -50,11 +50,10 @@ enum { /* Misc constants */
 struct naga_command {
 	uint8_t status;
 	uint8_t padding0[3];
-	le16_t command;
-	le16_t request;
-	le16_t value0;
-	le16_t value1;
-	uint8_t padding1[76];
+	be16_t command;
+	be16_t request;
+	uint8_t values[5];
+	uint8_t padding1[75];
 	uint8_t checksum;
 	uint8_t padding2;
 } _packed;
@@ -95,12 +94,12 @@ static const struct
 	/* LED name. */
 	const char *name;
 	/* LED id when sending config command request. */
-	uint16_t value0;
+	uint8_t values[2];
 
 } naga_leds[NAGA_NR_LEDS] = {
-	{ "Scrollwheel", 0x0101 },
-	{ "GlowingLogo", 0x0401 },
-	{ "ThumbGrid",   0x0501 },
+	{ "Scrollwheel", {0x01, 0x01} },
+	{ "GlowingLogo", {0x01, 0x04} },
+	{ "ThumbGrid",   {0x01, 0x05} },
 };
 
 static void naga_command_init(struct naga_command *cmd)
@@ -114,11 +113,12 @@ static void naga_command_init_resolution_5600(struct naga_command *cmd,
 	unsigned int xres, yres;
 
 	naga_command_init(cmd);
-	cmd->command = cpu_to_le16(0x0300);
-	cmd->request = cpu_to_le16(0x0104);
+	cmd->command = cpu_to_be16(0x0003);
+	cmd->request = cpu_to_be16(0x0401);
 	xres = (((unsigned int)priv->cur_dpimapping_X->res[RAZER_DIM_0] / 100) - 1) * 4;
 	yres = (((unsigned int)priv->cur_dpimapping_Y->res[RAZER_DIM_0] / 100) - 1) * 4;
-	cmd->value0 = cpu_to_le16(xres | (yres << 8));
+	cmd->values[0] = xres;
+	cmd->values[1] = yres;
 }
 
 static void naga_command_init_resolution_8200(struct naga_command *cmd,
@@ -127,12 +127,12 @@ static void naga_command_init_resolution_8200(struct naga_command *cmd,
 	be16_t xres, yres;
 
 	naga_command_init(cmd);
-	cmd->command = cpu_to_le16(0x0700);
-	cmd->request = cpu_to_le16(0x0504);
+	cmd->command = cpu_to_be16(0x0007);
+	cmd->request = cpu_to_be16(0x0405);
 	xres = cpu_to_be16(priv->cur_dpimapping_X->res[RAZER_DIM_0]);
 	yres = cpu_to_be16(priv->cur_dpimapping_Y->res[RAZER_DIM_0]);
-	memcpy((uint8_t *)&cmd->value0 + 1, &xres, 2);
-	memcpy((uint8_t *)&cmd->value0 + 3, &yres, 2);
+	memcpy(cmd->values + 1, &xres, 2);
+	memcpy(cmd->values + 3, &yres, 2);
 }
 
 static int naga_usb_write(struct naga_private *priv,
@@ -207,8 +207,8 @@ static int naga_send_command(struct naga_private *priv,
 	    cmd->status != 1 &&
 	    cmd->status != 0) {
 		razer_error("razer-naga: Command %04X/%04X failed with %02X\n",
-			    le16_to_cpu(cmd->command),
-			    le16_to_cpu(cmd->request),
+			    be16_to_cpu(cmd->command),
+			    be16_to_cpu(cmd->request),
 			    cmd->status);
 	}
 
@@ -218,6 +218,7 @@ static int naga_send_command(struct naga_private *priv,
 static int naga_read_fw_ver(struct naga_private *priv)
 {
 	struct naga_command cmd;
+	be16_t be16;
 	uint16_t ver;
 	int err;
 	unsigned int i;
@@ -226,10 +227,11 @@ static int naga_read_fw_ver(struct naga_private *priv)
 	 * valid version number */
 	for (i = 0; i < 5; i++) {
 		naga_command_init(&cmd);
-		cmd.command = cpu_to_le16(0x0200);
-		cmd.request = cpu_to_le16(0x8100);
+		cmd.command = cpu_to_be16(0x0002);
+		cmd.request = cpu_to_be16(0x0081);
 		err = naga_send_command(priv, &cmd);
-		ver = be16_to_cpu((be16_t)cmd.value0);
+		memcpy(&be16, &cmd.values, 2);
+		ver = be16_to_cpu(be16);
 		if (!err && (ver & 0xFF00) != 0)
 			return ver;
 		razer_msleep(250);
@@ -242,7 +244,7 @@ static int naga_read_fw_ver(struct naga_private *priv)
 static int naga_do_commit(struct naga_private *priv)
 {
 	struct naga_command cmd;
-	unsigned int freq;
+	uint8_t freq;
 	int led_id;
 	int err;
 
@@ -260,11 +262,11 @@ static int naga_do_commit(struct naga_private *priv)
 		}
 
 		naga_command_init(&cmd);
-		cmd.command = cpu_to_le16(0x0300);
-		cmd.request = cpu_to_le16(0x0003);
-		cmd.value0 = cpu_to_le16(naga_leds[led_id].value0);
+		cmd.command = cpu_to_be16(0x0003);
+		cmd.request = cpu_to_be16(0x0300);
+		memcpy(cmd.values, naga_leds[led_id].values, 2);
 		if (priv->led_states[led_id])
-			cmd.value1 = cpu_to_le16(1);
+			cmd.values[2] = 1;
 		err = naga_send_command(priv, &cmd);
 		if (err)
 			return err;
@@ -286,9 +288,9 @@ static int naga_do_commit(struct naga_private *priv)
 		return -EINVAL;
 	}
 	naga_command_init(&cmd);
-	cmd.command = cpu_to_le16(0x0100);
-	cmd.request = cpu_to_le16(0x0500);
-	cmd.value0 = cpu_to_le16(freq);
+	cmd.command = cpu_to_be16(0x0001);
+	cmd.request = cpu_to_be16(0x0005);
+	cmd.values[0] = freq;
 	err = naga_send_command(priv, &cmd);
 	if (err)
 		return err;
