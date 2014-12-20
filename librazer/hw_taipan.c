@@ -43,10 +43,10 @@ enum { /* Misc constants */
 struct taipan_command {
 	uint8_t status;
 	uint8_t padding0[4];
-	le16_t command;
-	le16_t request;
-	le16_t value0;
-	le16_t value1;
+	be16_t command;
+	be16_t request;
+	be16_t value0;
+	be16_t value1;
 	uint8_t padding1[75];
 	uint8_t checksum;
 	uint8_t padding2;
@@ -140,8 +140,8 @@ static int taipan_send_command(struct taipan_private *priv,
 	    cmd->status != 1 &&
 	    cmd->status != 0) {
 		razer_error("razer-taipan: Command %04X/%04X failed with %02X\n",
-			    le16_to_cpu(cmd->command),
-			    le16_to_cpu(cmd->request),
+			    be16_to_cpu(cmd->command),
+			    be16_to_cpu(cmd->request),
 			    cmd->status);
 	}
 
@@ -162,7 +162,7 @@ static int taipan_read_fw_ver(struct taipan_private *priv)
 		cmd.command = cpu_to_be16(0x0200);
 		cmd.request = cpu_to_be16(0x8100);
 		err = taipan_send_command(priv, &cmd);
-		ver = be16_to_cpu((be16_t)cmd.value0);
+		ver = be16_to_cpu(cmd.value0);
 		if (!err && (ver & 0xFF00) != 0)
 			return ver;
 		razer_msleep(100);
