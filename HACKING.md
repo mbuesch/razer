@@ -9,13 +9,14 @@ No matter the method, the basic requirements are:
 - a Windows machine with [Razer Synapse](http://www.razerzone.com/synapse/) installed (note: you'll need to register)
 - another mouse: to reduce protocol chatter by avoiding moving the mouse spied on
 
-## Using USBPcap
+## Using USBPcap or Wireshark
 
 You can sniff the USB protocol on Windows using [USBPcap](http://desowin.org/usbpcap/index.html). Take a look at the [illustrated tour](http://desowin.org/usbpcap/tour.html) for more information.
+Altenatively you can use [Wireshark](https://www.wireshark.org/).
 
-## Using a guest VirtualBox VM and usbmon.
+## Using a guest VirtualBox VM and usbmon or QEMU and usbmon.
 
-1. install Windows: you can get an evaluation copy (usable for 90 days) of [Windows 7 Entreprise](http://www.microsoft.com/en-us/evalcenter/evaluate-windows-7-enterprise) (note: you'll need to register)
+1. install Windows: you can get an evaluation copy (usable for 90 days) of [Windows 7 Enterprise](http://www.microsoft.com/en-us/evalcenter/evaluate-windows-7-enterprise) (note: you'll need to register)
 
 2. find your mouse USB bus and device numbers:
 
@@ -40,3 +41,5 @@ Bus 005 Device 010: ID 1532:0040 Razer USA, Ltd
  ```
 
 See the [usbmon documentation](https://www.kernel.org/doc/Documentation/usb/usbmon.txt) for the details of the output format.
+
+Alternatively to VirtualBox VM, you may use [QEMU](http://wiki.qemu.org/Main_Page).
