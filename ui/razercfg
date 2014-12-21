@@ -18,6 +18,7 @@ import sys
 import os
 import getopt
 import time
+import re
 from pyrazer import *
 from configparser import *
 
@@ -226,30 +227,47 @@ class OpSetRes(Operation):
 	def __init__(self, param):
 		self.param = param
 
+	def setDpiMapping(self, idstr, profile, axisId, value):
+		# Get profile mappings.
+		mappings = [m for m in getRazer().getSupportedDpiMappings(idstr) \
+					if m.profileMask == 0 or m.profileMask & (1 << profile)]
+		if value >= 100:
+			# Value is in DPI.
+			mappings = [m for m in mappings if value in m.res]
+		else:
+			# Value is a mapping ID.
+			mappings = [m for m in mappings if (value - 1) == m.id]
+		try:
+			mappingId = mappings[0].id
+		except IndexError:
+			raise RazerEx("Invalid resolution %d" % value)
+		error = getRazer().setDpiMapping(idstr, profile - 1, mappingId, axisId=axisId)
+		if error:
+			raise RazerEx("Failed to set resolution to %u (%s)" %\
+					(mappingId, Razer.strerror(error)))
+
 	def run(self, idstr):
 		try:
-			(profile, mapping) = self.parseProfileValueStr(self.param, idstr)
-			mapping = int(mapping[0])
+			(profile, values) = self.parseProfileValueStr(self.param, idstr)
+			resolutions = []
+			for arg in values[0].split(','):
+				m = re.match('^\d+$', arg)
+				if m is not None:
+					resolutions.append((None, int(arg)))
+					continue
+				m = re.match('^(\d+)x(\d+)$', arg)
+				if m is not None:
+					resolutions.append((0, int(m.group(1))))
+					resolutions.append((1, int(m.group(2))))
+					continue
+				raise ValueError
 		except ValueError:
 			raise RazerEx("Invalid parameter to --res option")
 		if profile is None:
 			# No profile number was specified. Get the current one.
 			profile = getRazer().getActiveProfile(idstr) + 1
-		if mapping >= 100:
-			# Mapping is in DPI. Get the mapping ID.
-			mappings = getRazer().getSupportedDpiMappings(idstr)
-			pm = [m for m in mappings if m.profileMask == 0 or\
-					      m.profileMask & (1 << profile)]
-			try:
-				mapping = [m for m in pm if mapping in m.res][0].id
-			except IndexError:
-				raise RazerEx("Invalid resolution %d" % mapping)
-		else:
-			mapping = mapping - 1
-		error = getRazer().setDpiMapping(idstr, profile - 1, mapping)
-		if error:
-			raise RazerEx("Failed to set resolution to %u (%s)" %\
-					(mapping, Razer.strerror(error)))
+		for axisId, value in resolutions:
+			self.setDpiMapping(idstr, profile, axisId, value)
 
 class OpSetFreq(Operation):
 	def __init__(self, param):
@@ -340,7 +358,7 @@ def usage():
 	print("-V|--fwver                          Print the firmware version number")
 	print("-p|--profile PROF                   Changes the active profile")
 	print("-P|--getprofile                     Prints the active profile")
-	print("-r|--res [PROF:]RES                 Changes the scan resolution")
+	print("-r|--res [PROF:]RES[xRES]           Changes the scan resolution")
 	print("-R|--getres                         Prints the resolutions")
 	print("-f|--freq [PROF:]FREQ               Changes the scan frequency")
 	print("-F|--getfreq                        Prints the frequencies")
