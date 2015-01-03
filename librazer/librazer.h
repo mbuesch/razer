@@ -76,6 +76,17 @@ enum razer_led_state {
 	RAZER_LED_UNKNOWN,
 };
 
+/** enum razer_led_mode - The LED working mode
+ * @RAZER_LED_MODE_STATIC: The LED has a static color
+ * @RAZER_LED_MODE_SPECTRUM: The LED color goes through a spectrum of colors
+ * @RAZER_LED_MODE_BREATHING: The LED has a static color and pulsates from off to on
+ */
+enum razer_led_mode {
+	RAZER_LED_MODE_STATIC    = 0,
+	RAZER_LED_MODE_SPECTRUM  = 1,
+	RAZER_LED_MODE_BREATHING = 2
+};
+
 /** struct razer_rgb_color - An RGB color
  * @r: Red value.
  * @g: Green value.
@@ -96,6 +107,9 @@ struct razer_rgb_color {
   * @name: The human readable name string for the LED.
   * @id: A unique ID cookie
   * @state: The state of the LED (on, off, unknown)
+  * @mode: The mode of the LED (static, spectrum, breathing)
+  * @supported_modes_mask: A mask of supported LED modes.
+  * The RAZER_LED_MODE_STATIC is assumed as the only supported mode if 0.
   * @color: The color of the LED.
   *
   * @toggle_state: Toggle the state. Note that a new_state of
@@ -103,6 +117,9 @@ struct razer_rgb_color {
   *
   * @change_color: Change the color of the LED.
   *	May be NULL, if the color cannot be changed.
+  *
+  * @set_mode: Set the mode of the LED.
+  * May be NULL if the mode cannot be changed.
   *
   * @u: This union contains a pointer to the parent device.
   */
@@ -112,6 +129,8 @@ struct razer_led {
 	const char *name;
 	unsigned int id;
 	enum razer_led_state state;
+	enum razer_led_mode mode;
+	unsigned int supported_modes_mask;
 	struct razer_rgb_color color;
 
 	int (*toggle_state)(struct razer_led *led,
@@ -119,6 +138,9 @@ struct razer_led {
 
 	int (*change_color)(struct razer_led *led,
 			    const struct razer_rgb_color *new_color);
+
+	int (*set_mode)(struct razer_led *led,
+			    enum razer_led_mode new_mode);
 
 	union {
 		struct razer_mouse *mouse;
@@ -161,6 +183,9 @@ enum razer_mouse_res {
 	RAZER_MOUSE_RES_7000DPI		= 7000,
 	RAZER_MOUSE_RES_7600DPI		= 7600,
 	RAZER_MOUSE_RES_8200DPI		= 8200,
+	RAZER_MOUSE_RES_8800DPI		= 8800,
+	RAZER_MOUSE_RES_9400DPI		= 9400,
+	RAZER_MOUSE_RES_10000DPI	= 10000
 };
 
 /** enum razer_mouse_type
@@ -341,8 +366,10 @@ struct razer_mouse_dpimapping {
  *	If axis is NULL, sets the mapping of all axes.
  *
  * @get_button_function: Get the currently assigned function for a button.
+ *  May be NULL.
  *
  * @set_button_function: Assign a new function to a button.
+ *  May be NULL.
  */
 struct razer_mouse_profile {
 	unsigned int nr;
@@ -423,7 +450,7 @@ enum {
   *	An error is a commit error. The mouse is always released properly.
   *
   * @commit: Commit the current settings.
-  *	This usually doesn't have to be called explicitely.
+  *	This usually doesn't have to be called explicitly.
   *	May be NULL.
   *
   * @get_fw_version: Read the firmware version from the device.
@@ -464,6 +491,7 @@ enum {
   * @supported_resolutions: Returns a list of supported scan resolutions
   *	for this mouse in res_ptr.
   *	The return value is a positive list length or a negative error code.
+  *	The caller is responsible to free res_ptr.
   *
   * @supported_freqs: Get an array of supported scan frequencies.
   * 	Returns the array size or a negative error code.
@@ -479,11 +507,13 @@ enum {
   *	in res_ptr.
   *	The function return value is the positive list size or a negative
   *	error code.
+  *	May be NULL.
   *
   * @supported_button_functions: Returns a list of possible function assignments
   *	for the physical buttons in res_ptr.
   *	The function return value is the positive list size or a negative
   *	error code.
+  *	May be NULL.
   */
 struct razer_mouse {
 	struct razer_mouse *next;

@@ -150,9 +150,23 @@ class OneLedConfig(QWidget):
 		self.layout().addWidget(self.stateCb, 0, 0)
 		self.stateCb.setCheckState(Qt.Checked if led.state else Qt.Unchecked)
 
+		if led.supported_modes:
+			self.modeComBox = WrappedComboBox(self)
+			self.layout().addWidget(self.modeComBox, 0, 1)
+			for mode in led.supported_modes:
+				self.modeComBox.addItem(mode.toString(), mode.val)
+
+			self.connect(self.modeComBox, SIGNAL("currentIndexChanged(int)"),
+					self.modeChanged)
+
+			index = self.modeComBox.findData(led.mode.val)
+			if index >= 0:
+				self.modeComBox.setCurrentIndex(index)
+
+
 		if led.color is not None and led.canChangeColor:
 			self.colorPb = QPushButton(self.tr("change color..."), self)
-			self.layout().addWidget(self.colorPb, 0, 1)
+			self.layout().addWidget(self.colorPb, 0, 2)
 
 			self.connect(self.colorPb, SIGNAL("released()"),
 				     self.colorChangePressed)
@@ -172,6 +186,10 @@ class OneLedConfig(QWidget):
 		self.led.color.r = c.red()
 		self.led.color.g = c.green()
 		self.led.color.b = c.blue()
+		razer.setLed(self.ledsWidget.mouseWidget.mouse, self.led)
+
+	def modeChanged(self, currentIndex):
+		self.led.mode.val = self.modeComBox.itemData(currentIndex)
 		razer.setLed(self.ledsWidget.mouseWidget.mouse, self.led)
 
 class LedsWidget(QGroupBox):

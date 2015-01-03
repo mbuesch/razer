@@ -204,6 +204,7 @@ struct command {
 			uint32_t profile_id;
 			char led_name[RAZER_LEDNAME_MAX_SIZE];
 			uint8_t new_state;
+			uint8_t new_mode;
 			uint32_t color;
 		} _packed setled;
 
@@ -1271,6 +1272,8 @@ static void command_getleds(struct client *client, const struct command *cmd, un
 		send_u32(client, flags);
 		send_string(client, led->name);
 		send_u32(client, led->state);
+		send_u32(client, led->mode);
+		send_u32(client, led->supported_modes_mask);
 		send_u32(client, ((uint32_t)led->color.r << 16) |
 				 ((uint32_t)led->color.g << 8) |
 				 ((uint32_t)led->color.b << 0));
@@ -1302,6 +1305,7 @@ static void command_setled(struct client *client, const struct command *cmd, uns
 	struct razer_mouse_profile *profile;
 	struct razer_led *leds_list = NULL, *led;
 	enum razer_led_state new_state;
+	enum razer_led_mode new_mode;
 	struct razer_rgb_color new_color;
 	int err, count;
 	uint32_t errorcode = ERR_NONE;
@@ -1356,6 +1360,17 @@ static void command_setled(struct client *client, const struct command *cmd, uns
 			mouse->release(mouse);
 			errorcode = ERR_FAIL;
 			goto error;
+		}
+	}
+	new_mode = cmd->setled.new_mode;
+	if (new_mode != led->mode) {
+		if (led->set_mode) {
+			err = led->set_mode(led, new_mode);
+			if (err) {
+				mouse->release(mouse);
+				errorcode = ERR_FAIL;
+				goto error;
+			}
 		}
 	}
 	if (led->change_color) {

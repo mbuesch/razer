@@ -133,13 +133,42 @@ class RazerRGB(object):
 			   g=int(string[2:4], 16),
 			   b=int(string[4:6], 16))
 
+class RazerLEDMode(object):
+	"Representation of LED mode"
+
+	LED_MODE_STATIC				= 0
+	LED_MODE_SPECTRUM			= 1
+	LED_MODE_BREATHING			= 2
+
+	def __init__(self, val):
+		self.val = val
+
+	def toString(self):
+		return {
+			self.LED_MODE_STATIC:    'Static',
+			self.LED_MODE_SPECTRUM:  'Spectrum',
+			self.LED_MODE_BREATHING: 'Breathing'
+		}[self.val]
+
+	@classmethod
+	def listFromSupportedModes(cls, mask):
+		modes = []
+		for mode in [cls.LED_MODE_STATIC, cls.LED_MODE_SPECTRUM, cls.LED_MODE_BREATHING]:
+			if mask | (1 << mode):
+				modes.append(cls(mode))
+
+		return modes
+
+
 class RazerLED(object):
 	"LED representation"
 
-	def __init__(self, profileId, name, state, color, canChangeColor):
+	def __init__(self, profileId, name, state, mode, supported_modes, color, canChangeColor):
 		self.profileId = profileId
 		self.name = name
 		self.state = state
+		self.mode = mode
+		self.supported_modes = supported_modes
 		self.color = color
 		self.canChangeColor = canChangeColor
 
@@ -479,13 +508,15 @@ class Razer(object):
 			flags = self.__recvU32()
 			name = self.__recvString()
 			state = self.__recvU32()
+			mode = RazerLEDMode(self.__recvU32())
+			supported_modes = RazerLEDMode.listFromSupportedModes(self.__recvU32())
 			color = self.__recvU32()
 			if (flags & self.LED_FLAG_HAVECOLOR) == 0:
 				color = None
 			else:
 				color = RazerRGB.fromU32(color)
 			canChangeColor = bool(flags & self.LED_FLAG_CHANGECOLOR)
-			leds.append(RazerLED(profileId, name, state, color, canChangeColor))
+			leds.append(RazerLED(profileId, name, state, mode, supported_modes, color, canChangeColor))
 		return leds
 
 	def setLed(self, idstr, led):
@@ -497,6 +528,7 @@ class Razer(object):
 		payload += led_name
 		payload += b'\0' * (self.RAZER_LEDNAME_MAX_SIZE - len(led_name))
 		payload += b'\x01' if led.state else b'\x00'
+		payload += bytes([led.mode.val])
 		if led.color:
 			payload += razer_int_to_be32(led.color.toU32())
 		else:
