@@ -128,7 +128,6 @@ struct deathadder_chroma_command
 
     union {
         uint8_t bvalue[80];
-        be32_t  lvalue[20];
         struct {
             uint8_t padding1;
             be16_t  value[38];
@@ -295,7 +294,10 @@ static int deathadder_chroma_send_get_firmware_command(struct razer_mouse *m)
     if (err)
         return err;
 
-    drv_data->fw_version = be32_to_cpu(cmd.lvalue[0]);
+    uint8_t  fw_major    = cmd.bvalue[0];
+    uint16_t fw_minor    = be16_to_cpu(cmd.value[0]);
+    drv_data->fw_version = (fw_major << 8) | fw_minor;
+
     return 0;
 }
 
@@ -507,12 +509,14 @@ static int deathadder_chroma_led_toggle_state(struct razer_led *led,
 static int deathadder_chroma_led_change_color(
         struct razer_led *led, const struct razer_rgb_color *new_color)
 {
-    // TODO EINVAL if spectrum?
     struct deathadder_chroma_driver_data *drv_data = led->u.mouse->drv_data;
     struct deathadder_chroma_led *priv_led =
             deathadder_chroma_get_led(drv_data, led->id);
 
     if (!priv_led)
+        return -EINVAL;
+
+    if (priv_led->mode == DEATHADDER_CHROMA_LED_MODE_SPECTRUM)
         return -EINVAL;
 
     priv_led->color = (struct deathadder_chroma_rgb_color) {
@@ -626,7 +630,6 @@ static int deathadder_chroma_get_leds(struct razer_mouse *m,
     *scroll = (struct razer_led) {
         .id           = drv_data->scroll_led.id,
         .name         = DEATHADDER_CHROMA_SCROLL_NAME,
-        .mode         = deathadder_chroma_translate_led_mode(drv_data->scroll_led.mode),
         .state        = scroll_state,
         .u.mouse      = m,
         .toggle_state = deathadder_chroma_led_toggle_state,
@@ -639,6 +642,7 @@ static int deathadder_chroma_get_leds(struct razer_mouse *m,
             .b = drv_data->scroll_led.color.b,
             .valid = 1
         },
+        .mode = deathadder_chroma_translate_led_mode(drv_data->scroll_led.mode),
         .supported_modes_mask = supported_modes
     };
 
@@ -649,7 +653,6 @@ static int deathadder_chroma_get_leds(struct razer_mouse *m,
     *logo = (struct razer_led) {
         .id           = drv_data->logo_led.id,
         .name         = DEATHADDER_CHROMA_LOGO_NAME,
-        .mode         = deathadder_chroma_translate_led_mode(drv_data->logo_led.mode),
         .state        = logo_state,
         .u.mouse      = m,
         .toggle_state = deathadder_chroma_led_toggle_state,
@@ -661,6 +664,7 @@ static int deathadder_chroma_get_leds(struct razer_mouse *m,
             .b = drv_data->logo_led.color.b,
             .valid = 1
         },
+        .mode = deathadder_chroma_translate_led_mode(drv_data->logo_led.mode),
         .supported_modes_mask = supported_modes
     };
 
