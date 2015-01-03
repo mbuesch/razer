@@ -149,11 +149,12 @@ class OpPrintLeds(Operation):
 		output = []
 		for led in leds:
 			state = "on" if led.state else "off"
+			mode  = led.mode.toString()
 			color = ""
 			if led.color is not None:
-				color = "/color#%02X%02X%02X" %\
+				color = "color#%02X%02X%02X" %\
 					(led.color.r, led.color.g, led.color.b)
-			output.append("%s => %s%s" % (led.name, state, color))
+			output.append("%s => %s/%s/%s" % (led.name, state, mode, color))
 		print(",  ".join(output))
 
 class OpSetProfile(Operation):
@@ -222,6 +223,30 @@ class OpSetLedColor(Operation):
 					      Razer.strerror(error))
 		except (IndexError, ValueError):
 			raise RazerEx("Invalid parameter to --setledcolor option")
+
+class OpSetLedMode(Operation):
+	def __init__(self, param):
+		self.param = param
+
+	def run(self, idstr):
+		try:
+			(profile, config) = self.parseProfileValueStr(self.param, idstr, 2)
+			ledName = config[0].strip().lower()
+			newMode = RazerLEDMode.fromString(config[1].lower())
+			if profile is None:
+				profile = Razer.PROFILE_INVALID
+			else:
+				profile -= 1
+			leds = getRazer().getLeds(idstr, profile)
+			led = [led for led in leds if led.name.lower() == ledName.lower()][0]
+			led.mode = newMode
+			error = getRazer().setLed(idstr, led)
+			if error:
+				raise RazerEx("Failed to set LED mode (%s)" %\
+					      Razer.strerror(error))
+		except (KeyError, IndexError, ValueError):
+			raise RazerEx("Invalid parameter to --setledmode option")
+
 
 class OpSetRes(Operation):
 	def __init__(self, param):
@@ -367,6 +392,9 @@ def usage():
 	print("                                    Use the special identifier \"all\"")
 	print("                                    to toggle all supported LEDs.")
 	print("-c|--setledcolor [PROF:]LED:rrggbb  Set LED color to RGB 'rrggbb'")
+	print("-m|--setledmode  [PROF:]LED:MODE    Set LED mode to MODE ('static', 'spectrum'")
+	print("                                                               or 'breathing')")
+	print("")
 	print("-X|--flashfw FILE                   Flash a firmware image to the device")
 	print("")
 	print("The profile number \"PROF\" may be 0 for the current profile. If omitted,")
@@ -388,12 +416,12 @@ def parse_args():
 
 	try:
 		(opts, args) = getopt.getopt(sys.argv[1:],
-			"hvBsKd:r:Rf:FLl:VS:X:c:p:P",
+			"hvBsKd:r:Rf:FLl:VS:X:c:p:Pm:",
 			[ "help", "version", "background",
 			  "scan", "reconfigure", "device=", "res=",
 			  "getres", "freq=", "getfreq", "leds", "setled=",
 			  "fwver", "config=", "sleep=", "flashfw=",
-			  "setledcolor=",
+			  "setledcolor=", "setledmode=",
 			  "profile=", "getprofile", ])
 	except getopt.GetoptError:
 		usage()
@@ -476,6 +504,11 @@ def parse_args():
 			if not currentDevOps:
 				currentDevOps = DevOps(findDevice())
 			currentDevOps.add(OpSetLedColor(v))
+			continue
+		if o in ("-m", "--setledmode"):
+			if not currentDevOps:
+				currentDevOps = DevOps(findDevice())
+			currentDevOps.add(OpSetLedMode(v))
 			continue
 		if o in ("-V", "--fwver"):
 			if not currentDevOps:

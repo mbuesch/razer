@@ -145,9 +145,9 @@ class RazerLEDMode(object):
 
 	def toString(self):
 		return {
-			self.LED_MODE_STATIC:    'Static',
-			self.LED_MODE_SPECTRUM:  'Spectrum',
-			self.LED_MODE_BREATHING: 'Breathing'
+			self.LED_MODE_STATIC:    'static',
+			self.LED_MODE_SPECTRUM:  'spectrum',
+			self.LED_MODE_BREATHING: 'breathing'
 		}[self.val]
 
 	@classmethod
@@ -158,6 +158,14 @@ class RazerLEDMode(object):
 				modes.append(cls(mode))
 
 		return modes
+
+	@classmethod
+	def fromString(cls, string):
+		return {
+			'static':    cls(cls.LED_MODE_STATIC),
+			'spectrum':  cls(cls.LED_MODE_SPECTRUM),
+			'breathing': cls(cls.LED_MODE_BREATHING)
+		}[string]
 
 
 class RazerLED(object):
