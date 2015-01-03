@@ -31,9 +31,6 @@
 #define DEATHADDER_CHROMA_DEVICE_NAME    "DeathAdder Chroma"
 #define DEATHADDER_CHROMA_SCROLL_NAME    "Scroll"
 #define DEATHADDER_CHROMA_LOGO_NAME      "GlowingLogo"
-#define DEATHADDER_CHROMA_STATIC_NAME    "Static"
-#define DEATHADDER_CHROMA_SPECTRUM_NAME  "Spectrum"
-#define DEATHADDER_CHROMA_BREATHING_NAME "Breathing"
 
 enum deathadder_chroma_led_id
 {
@@ -88,17 +85,17 @@ enum deathadder_chroma_request
 
 enum
 {
-    DEATHADDER_CHROMA_MAX_FREQUENCY           = RAZER_MOUSE_FREQ_1000HZ,
-    DEATHADDER_CHROMA_MAX_RESOLUTION          = RAZER_MOUSE_RES_10000DPI,
-    DEATHADDER_CHROMA_RESOLUTION_STEP         = RAZER_MOUSE_RES_100DPI,
-    DEATHADDER_CHROMA_SUPPORTED_FREQ_NUM      = 3,
-    DEATHADDER_CHROMA_LED_NUM                 = 2,
-    DEATHADDER_CHROMA_AXES_NUM                = 2,
-    DEATHADDER_CHROMA_DPIMAPPINGS_NUM         = 5,
+    DEATHADDER_CHROMA_MAX_FREQUENCY          = RAZER_MOUSE_FREQ_1000HZ,
+    DEATHADDER_CHROMA_MAX_RESOLUTION         = RAZER_MOUSE_RES_10000DPI,
+    DEATHADDER_CHROMA_RESOLUTION_STEP        = RAZER_MOUSE_RES_100DPI,
+    DEATHADDER_CHROMA_SUPPORTED_FREQ_NUM     = 3,
+    DEATHADDER_CHROMA_LED_NUM                = 2,
+    DEATHADDER_CHROMA_AXES_NUM               = 2,
+    DEATHADDER_CHROMA_DPIMAPPINGS_NUM        = 5,
 
-    DEATHADDER_CHROMA_USB_SETUP_PACKET_VALUE  = 0x300,
-    DEATHADDER_CHROMA_SUCCESS_STATUS          = 0x02,
-    DEATHADDER_CHROMA_PACKET_SPACING_MS       = 35,
+    DEATHADDER_CHROMA_USB_SETUP_PACKET_VALUE = 0x300,
+    DEATHADDER_CHROMA_SUCCESS_STATUS         = 0x02,
+    DEATHADDER_CHROMA_PACKET_SPACING_MS      = 35,
 
     /*
      * Experiments suggest that the value in the 'magic' byte of the command
@@ -155,24 +152,24 @@ struct deathadder_chroma_rgb_color
 
 struct deathadder_chroma_led
 {
-    enum deathadder_chroma_led_id id;
-    enum deathadder_chroma_led_mode mode;
-    enum deathadder_chroma_led_state state;
+    enum deathadder_chroma_led_id      id;
+    enum deathadder_chroma_led_mode    mode;
+    enum deathadder_chroma_led_state   state;
     struct deathadder_chroma_rgb_color color;
 };
 
 struct deathadder_chroma_driver_data
 {
-    uint32_t fw_version;
-    char serial[DEATHADDER_CHROMA_REQUEST_SIZE_GET_SERIAL_NO];
-    struct razer_event_spacing packet_spacing;
+    struct razer_event_spacing     packet_spacing;
+    struct razer_mouse_profile     profile;
     struct razer_mouse_dpimapping *current_dpimapping;
-    struct razer_mouse_dpimapping dpimappings[DEATHADDER_CHROMA_DPIMAPPINGS_NUM];
-    struct deathadder_chroma_led scroll_led;
-    struct deathadder_chroma_led logo_led;
-    enum razer_mouse_freq current_freq;
-    struct razer_mouse_profile profile;
-    struct razer_axis axes[DEATHADDER_CHROMA_AXES_NUM];
+    enum razer_mouse_freq          current_freq;
+    struct deathadder_chroma_led   scroll_led;
+    struct deathadder_chroma_led   logo_led;
+    struct razer_mouse_dpimapping  dpimappings[DEATHADDER_CHROMA_DPIMAPPINGS_NUM];
+    struct razer_axis              axes[DEATHADDER_CHROMA_AXES_NUM];
+    uint16_t                       fw_version;
+    char                   serial[DEATHADDER_CHROMA_REQUEST_SIZE_GET_SERIAL_NO];
 };
 
 static uint8_t deathadder_chroma_checksum(struct deathadder_chroma_command *cmd)
