@@ -526,7 +526,7 @@ static int deathadder_chroma_change_dpimapping(struct razer_mouse_dpimapping *d,
 {
 	struct deathadder_chroma_driver_data *drv_data;
 
-	if (!(d->dimension_mask | (1 << dim)))
+	if (!(d->dimension_mask & (1 << dim)))
 		return -EINVAL;
 
 	if (res == RAZER_MOUSE_RES_UNKNOWN)

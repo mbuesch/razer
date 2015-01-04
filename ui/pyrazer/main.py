@@ -153,8 +153,8 @@ class RazerLEDMode(object):
 	@classmethod
 	def listFromSupportedModes(cls, mask):
 		modes = []
-		for mode in [cls.LED_MODE_STATIC, cls.LED_MODE_SPECTRUM, cls.LED_MODE_BREATHING]:
-			if mask | (1 << mode):
+		for mode in (cls.LED_MODE_STATIC, cls.LED_MODE_SPECTRUM, cls.LED_MODE_BREATHING):
+			if mask & (1 << mode):
 				modes.append(cls(mode))
 
 		return modes
