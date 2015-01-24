@@ -20,9 +20,7 @@
 #include "hw_deathadder_chroma.h"
 #include "razer_private.h"
 
-#include <assert.h>
 #include <errno.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -142,10 +140,6 @@ struct deathadder_chroma_command
 	uint8_t checksum;
 	uint8_t padding3;
 } _packed;
-
-static_assert(sizeof(struct deathadder_chroma_command) == 90,
-	      "The size of deathadder_chroma_command structure "
-	      "must equal 90 bytes.");
 
 #define DEATHADDER_CHROMA_COMMAND_INIT                                         \
 	(struct deathadder_chroma_command)                                     \
@@ -754,6 +748,8 @@ int razer_deathadder_chroma_init(struct razer_mouse *m,
 	size_t i;
 	struct deathadder_chroma_driver_data *drv_data;
 	struct deathadder_chroma_led *scroll_led, *logo_led;
+
+	BUILD_BUG_ON(sizeof(struct deathadder_chroma_command) != 90);
 
 	drv_data = zalloc(sizeof(*drv_data));
 	if (!drv_data)

@@ -32,6 +32,7 @@
 #include <getopt.h>
 #include <syslog.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
 #ifdef __DragonFly__
 #include <sys/endian.h>
@@ -40,7 +41,6 @@
 #endif
 
 
-typedef _Bool bool;
 #undef min
 #undef max
 #undef offsetof

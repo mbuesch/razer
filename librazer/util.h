@@ -10,6 +10,7 @@
 #include <time.h>
 #include <byteswap.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 
 #undef min
@@ -27,8 +28,6 @@
 #define ARRAY_SIZE(array)	(sizeof(array) / sizeof((array)[0]))
 
 #define _packed			__attribute__((__packed__))
-
-typedef _Bool bool;
 
 typedef uint16_t	be16_t;
 typedef uint32_t	be32_t;
