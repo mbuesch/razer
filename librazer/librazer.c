@@ -559,6 +559,132 @@ static bool mouse_apply_one_config(struct config_file *f,
 		}
 		razer_free_leds(leds);
 		goto error;
+	} else if (strcasecmp(item, "mode") == 0) {
+		enum razer_led_mode mode;
+		struct razer_led *leds, *led;
+		const char *ledname, *ledmode;
+		int profile;
+
+		err = razer_split_tuple(value, ':', tmplen, a, b, c, NULL);
+		if (err && err != -ENODATA)
+			goto error;
+		if (!strlen(a) || !strlen(b))
+			goto error;
+		if (strlen(c)) {
+			/* A profile was specified */
+			err = razer_string_to_int(razer_string_strip(a), &profile);
+			if (err || profile < 1)
+				goto error;
+			prof = find_prof(m, profile - 1);
+			if (!prof)
+				goto error;
+			ledname = razer_string_strip(b);
+			ledmode = razer_string_strip(c);
+		} else {
+			/* Modify global LEDs */
+			prof = NULL;
+			ledname = razer_string_strip(a);
+			ledmode = razer_string_strip(b);
+		}
+		err = razer_string_to_mode(ledmode, &mode);
+		if (err)
+			goto error;
+		if (prof) {
+			if (prof->get_leds) {
+				err = prof->get_leds(prof, &leds);
+			} else {
+				/* Try to fall back to global */
+				if (!m->global_get_leds)
+					goto ok; /* No LEDs. Ignore config. */
+				err = m->global_get_leds(m, &leds);
+			}
+		} else {
+			if (!m->global_get_leds)
+				goto ok; /* No LEDs. Ignore config. */
+			err = m->global_get_leds(m, &leds);
+		}
+		if (err < 0)
+			goto error;
+		if (err == 0)
+			goto ok; /* No LEDs. Ignore config. */
+		for (led = leds; led; led = led->next) {
+			if (strcasecmp(led->name, ledname) != 0)
+				continue;
+			if (!led->set_mode) {
+				razer_free_leds(leds);
+				goto invalid;
+			}
+			err = led->set_mode(led, mode);
+			razer_free_leds(leds);
+			if (err)
+				goto error;
+			goto ok;
+		}
+		razer_free_leds(leds);
+		goto error;
+	} else if (strcasecmp(item, "color") == 0) {
+		struct razer_rgb_color color;
+		struct razer_led *leds, *led;
+		const char *ledname, *ledcolor;
+		int profile;
+
+		err = razer_split_tuple(value, ':', tmplen, a, b, c, NULL);
+		if (err && err != -ENODATA)
+			goto error;
+		if (!strlen(a) || !strlen(b))
+			goto error;
+		if (strlen(c)) {
+			/* A profile was specified */
+			err = razer_string_to_int(razer_string_strip(a), &profile);
+			if (err || profile < 1)
+				goto error;
+			prof = find_prof(m, profile - 1);
+			if (!prof)
+				goto error;
+			ledname = razer_string_strip(b);
+			ledcolor = razer_string_strip(c);
+		} else {
+			/* Modify global LEDs */
+			prof = NULL;
+			ledname = razer_string_strip(a);
+			ledcolor = razer_string_strip(b);
+		}
+		err = razer_string_to_color(ledcolor, &color);
+		if (err)
+			goto error;
+		if (prof) {
+			if (prof->get_leds) {
+				err = prof->get_leds(prof, &leds);
+			} else {
+				/* Try to fall back to global */
+				if (!m->global_get_leds)
+					goto ok; /* No LEDs. Ignore config. */
+				err = m->global_get_leds(m, &leds);
+			}
+		} else {
+			if (!m->global_get_leds)
+				goto ok; /* No LEDs. Ignore config. */
+			err = m->global_get_leds(m, &leds);
+		}
+		if (err < 0)
+			goto error;
+		if (err == 0)
+			goto ok; /* No LEDs. Ignore config. */
+		for (led = leds; led; led = led->next) {
+			if (strcasecmp(led->name, ledname) != 0)
+				continue;
+			if (!led->change_color) {
+				razer_free_leds(leds);
+				goto invalid;
+			}
+			err = led->change_color(led, &color);
+			razer_free_leds(leds);
+			if (err)
+				goto error;
+			goto ok;
+		}
+		razer_free_leds(leds);
+		goto error;
 	} else if (strcasecmp(item, "disabled") == 0) {
 		goto ok;
 	} else

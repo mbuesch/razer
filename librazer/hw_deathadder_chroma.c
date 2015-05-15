@@ -34,7 +34,7 @@ static enum razer_mouse_res deathadder_chroma_resolution_stages_list[] = {
     RAZER_MOUSE_RES_5600DPI, RAZER_MOUSE_RES_10000DPI};
 
 #define DEATHADDER_CHROMA_DEVICE_NAME "DeathAdder Chroma"
-#define DEATHADDER_CHROMA_SCROLL_NAME "Scroll"
+#define DEATHADDER_CHROMA_SCROLL_NAME "Scrollwheel"
 #define DEATHADDER_CHROMA_LOGO_NAME "GlowingLogo"
 
 enum deathadder_chroma_led_id {

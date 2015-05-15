@@ -112,6 +112,36 @@ int razer_string_to_bool(const char *string, bool *b)
 	return -EINVAL;
 }
 
+int razer_string_to_mode(const char *string, enum razer_led_mode *mode)
+{
+	if (strcasecmp(string, "static") == 0) {
+		*mode = RAZER_LED_MODE_STATIC;
+		return 0;
+	}
+	if (strcasecmp(string, "spectrum") == 0) {
+		*mode = RAZER_LED_MODE_SPECTRUM;
+		return 0;
+	}
+	if (strcasecmp(string, "breathing") == 0) {
+		*mode = RAZER_LED_MODE_BREATHING;
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
+int razer_string_to_color(const char *string, struct razer_rgb_color *color)
+{
+	uint32_t temp = (uint32_t)strtol(string, NULL, 16);
+
+	color->r = (uint8_t)((temp >> 16) & 0xFF);
+	color->g = (uint8_t)((temp >> 8) & 0xFF);
+	color->b = (uint8_t)(temp & 0xFF);
+	color->valid = 1;
+
+	return 0;
+}
+
 char * razer_string_strip(char *str)
 {
 	char *start = str;

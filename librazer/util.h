@@ -74,6 +74,8 @@ char * razer_strsplit(char *str, char sep);
 int razer_split_tuple(const char *str, char sep, size_t elems_max_len, ...);
 int razer_string_to_int(const char *string, int *i);
 int razer_string_to_bool(const char *string, bool *b);
+int razer_string_to_mode(const char *string, enum razer_led_mode *mode);
+int razer_string_to_color(const char *string, struct razer_rgb_color *color);
 char * razer_string_strip(char *str);
 
 void razer_timeval_add_msec(struct timeval *tv, unsigned int msec);
