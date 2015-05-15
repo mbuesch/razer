@@ -28,7 +28,7 @@ import select
 import hashlib
 import struct
 
-RAZER_VERSION	= "0.31"
+RAZER_VERSION	= "0.32"
 
 
 class RazerEx(Exception):
