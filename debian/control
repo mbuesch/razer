@@ -2,10 +2,16 @@ Source: razercfg
 Maintainer: Michael Büsch <m@bues.ch>
 Section: misc
 Priority: optional
-Build-Depends: debhelper (>= 9)
+Build-Depends: debhelper (>= 9),
+ cmake,
+ dh-systemd,
+ libusb-1.0-0-dev,
+ pkg-config,
+ python3-dev,
 
 Package: razercfg
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
+Suggests: python3-pyside
 Description: Razer device configuration tool
  This is a configuration utility for Razer devices on Linux systems.
