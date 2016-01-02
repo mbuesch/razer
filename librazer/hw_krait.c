@@ -52,7 +52,7 @@ static int krait_usb_write(struct krait_private *priv,
 		request, command, 0,
 		buf, size,
 		RAZER_USB_TIMEOUT);
-	if (err != size)
+	if (err < 0 || (size_t)err != size)
 		return err;
 	return 0;
 }
@@ -71,7 +71,7 @@ static int krait_usb_read(struct krait_private *priv,
 		request, command, 0,
 		(unsigned char *)buf, size,
 		RAZER_USB_TIMEOUT);
-	if (err != size)
+	if (err < 0 || (size_t)err != size)
 		return err;
 	return 0;
 }

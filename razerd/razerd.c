@@ -434,7 +434,7 @@ static int create_pidfile(void)
 		 (unsigned long)pid);
 	res = write(fd, buf, strlen(buf));
 	close(fd);
-	if (res != strlen(buf)) {
+	if (res < 0 || (size_t)res != strlen(buf)) {
 		logerr("Failed to write PID-file %s: %s\n",
 		       cmdargs.pidfile, strerror(errno));
 		return -1;
@@ -807,7 +807,7 @@ static int recv_bulk(struct client *client, char *buf, unsigned int len)
 			if (nr > 0)
 				break;
 		}
-		if (nr != next_len) {
+		if (nr < 0 || (unsigned int)nr != next_len) {
 			send_u32(client, ERR_PAYLOAD);
 			return -1;
 		}
@@ -1540,7 +1540,7 @@ static void command_setprofname(struct client *client, const struct command *cmd
 		goto error;
 	}
 	for (i = 0; i < ARRAY_SIZE(namebuf) - 1; i++)
-		namebuf[i] = be16_to_cpu(((uint16_t *)cmd->setprofname.utf16be_name)[i]);
+		namebuf[i] = be16_to_cpu(((const uint16_t *)cmd->setprofname.utf16be_name)[i]);
 	if (profile->set_name(profile, namebuf)) {
 		errorcode = ERR_FAIL;
 		goto error;

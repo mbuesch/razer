@@ -80,7 +80,7 @@ static void taipan_command_init(struct taipan_command *cmd)
 
 static int taipan_usb_write(struct taipan_private *priv,
 			    int request, int command,
-			    const void *buf, size_t size)
+			    void *buf, size_t size)
 {
 	int err;
 
@@ -91,7 +91,7 @@ static int taipan_usb_write(struct taipan_private *priv,
 		request, command, 0,
 		(unsigned char *)buf, size,
 		RAZER_USB_TIMEOUT);
-	if (err != size) {
+	if (err < 0 || (size_t)err != size) {
 		razer_error("razer-taipan: "
 			"USB write 0x%02X 0x%02X failed: %d\n",
 			request, command, err);
@@ -113,7 +113,7 @@ static int taipan_usb_read(struct taipan_private *priv,
 		request, command, 0,
 		buf, size,
 		RAZER_USB_TIMEOUT);
-	if (err != size) {
+	if (err < 0 || (size_t)err != size) {
 		razer_error("razer-taipan: "
 			"USB read 0x%02X 0x%02X failed: %d\n",
 			request, command, err);

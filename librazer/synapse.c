@@ -237,7 +237,7 @@ static le16_t synapse_checksum(const struct synapse_request *req)
 {
 	uint16_t checksum;
 
-	checksum = razer_xor8_checksum((uint8_t *)req + 2,
+	checksum = razer_xor8_checksum((const uint8_t *)req + 2,
 				       sizeof(*req) - 4);
 	if (!(req->flags & SYNAPSE_REQ_FLG_TRANSOK))
 		checksum |= 0x100;
@@ -258,7 +258,7 @@ static int synapse_usb_write(struct razer_synapse *s,
 		request, command, index,
 		buf, size,
 		RAZER_USB_TIMEOUT);
-	if (err != size) {
+	if (err < 0 || (size_t)err != size) {
 		razer_error("synapse: usb_write failed\n");
 		return -EIO;
 	}
@@ -280,7 +280,7 @@ static int synapse_usb_read(struct razer_synapse *s,
 		request, command, index,
 		buf, size,
 		RAZER_USB_TIMEOUT);
-	if (err != size) {
+	if (err < 0 || (size_t)err != size) {
 		razer_error("synapse: usb_read failed\n");
 		return -EIO;
 	}
@@ -832,7 +832,7 @@ static int synapse_dpimapping_modify(struct razer_mouse_dpimapping *d,
 {
 	struct razer_synapse *s = d->mouse->drv_data;
 
-	if ((int)dim < 0 || (int)dim >= ARRAY_SIZE(d->res))
+	if ((int)dim < 0 || (unsigned int)dim >= ARRAY_SIZE(d->res))
 		return -EINVAL;
 
 	if (!s->m->claim_count)

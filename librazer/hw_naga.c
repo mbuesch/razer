@@ -137,7 +137,7 @@ static void naga_command_init_resolution_8200(struct naga_command *cmd,
 
 static int naga_usb_write(struct naga_private *priv,
 			  int request, int command,
-			  const void *buf, size_t size)
+			  void *buf, size_t size)
 {
 	int err;
 
@@ -150,7 +150,7 @@ static int naga_usb_write(struct naga_private *priv,
 		(unsigned char *)buf, size,
 		RAZER_USB_TIMEOUT);
 	razer_event_spacing_leave(&priv->packet_spacing);
-	if (err != size) {
+	if (err < 0 || (size_t)err != size) {
 		razer_error("razer-naga: "
 			"USB write 0x%02X 0x%02X failed: %d\n",
 			request, command, err);
@@ -176,10 +176,10 @@ static int naga_usb_read(struct naga_private *priv,
 			buf, size,
 			RAZER_USB_TIMEOUT);
 		razer_event_spacing_leave(&priv->packet_spacing);
-		if (err == size)
+		if (err >= 0 && (size_t)err == size)
 			break;
 	}
-	if (err != size) {
+	if (err < 0 || (size_t)err != size) {
 		razer_error("razer-naga: "
 			"USB read 0x%02X 0x%02X failed: %d\n",
 			request, command, err);
@@ -436,13 +436,13 @@ static int naga_supported_resolutions(struct razer_mouse *m,
 {
 	struct naga_private *priv = m->drv_data;
 	enum razer_mouse_res *list;
-	unsigned int i;
+	int i;
 
 	list = zalloc(sizeof(*list) * priv->nb_dpimappings);
 	if (!list)
 		return -ENOMEM;
 	for (i = 0; i < priv->nb_dpimappings; i++)
-		list[i] = (i + 1) * 100;
+		list[i] = (enum razer_mouse_res)((i + 1) * 100);
 	*res_list = list;
 
 	return priv->nb_dpimappings;
@@ -512,8 +512,7 @@ int razer_naga_init(struct razer_mouse *m,
 {
 	struct naga_private *priv;
 	struct libusb_device_descriptor desc;
-	unsigned int i;
-	int fwver, err;
+	int i, fwver, err;
 	const char *model;
 
 	BUILD_BUG_ON(sizeof(struct naga_command) != 90);
@@ -586,8 +585,8 @@ int razer_naga_init(struct razer_mouse *m,
 	}
 
 	for (i = 0; i < priv->nb_dpimappings; i++) {
-		priv->dpimapping[i].nr = i;
-		priv->dpimapping[i].res[RAZER_DIM_0] = (i + 1) * 100;
+		priv->dpimapping[i].nr = (unsigned int)i;
+		priv->dpimapping[i].res[RAZER_DIM_0] = (enum razer_mouse_res)((i + 1) * 100);
 		if (priv->dpimapping[i].res[RAZER_DIM_0] == 1000) {
 			priv->cur_dpimapping_X = &priv->dpimapping[i];
 			priv->cur_dpimapping_Y = &priv->dpimapping[i];

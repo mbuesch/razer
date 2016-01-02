@@ -80,7 +80,7 @@ static void deathadder2013_command_init(struct deathadder2013_command *cmd)
 
 static int deathadder2013_usb_write(struct deathadder2013_private *priv,
 				    int request, int command,
-				    const void *buf, size_t size)
+				    void *buf, size_t size)
 {
 	int err;
 
@@ -90,7 +90,7 @@ static int deathadder2013_usb_write(struct deathadder2013_private *priv,
 				      LIBUSB_RECIPIENT_INTERFACE, request,
 				      command, 0, (unsigned char *)buf, size,
 				      RAZER_USB_TIMEOUT);
-	if (err != size) {
+	if (err < 0 || (size_t)err != size) {
 		razer_error("razer-deathadder2013: "
 			    "USB write 0x%02X 0x%02X failed: %d\n",
 			    request, command, err);
@@ -112,11 +112,11 @@ static int deathadder2013_usb_read(struct deathadder2013_private *priv,
 					      LIBUSB_RECIPIENT_INTERFACE,
 					      request, command, 0, buf, size,
 					      RAZER_USB_TIMEOUT);
-		if (err == size)
+		if (err >= 0 && (size_t)err == size)
 			break;
 	}
 
-	if (err != size) {
+	if (err < 0 || (size_t)err != size) {
 		razer_error("razer-deathadder2013: USB read 0x%02X 0x%02X failed: %d\n",
 			    request, command, err);
 		return err;

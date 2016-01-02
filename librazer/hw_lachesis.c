@@ -190,7 +190,7 @@ static int lachesis_usb_write(struct lachesis_private *priv,
 		request, command, index,
 		buf, size,
 		RAZER_USB_TIMEOUT);
-	if (err != size) {
+	if (err < 0 || (size_t)err != size) {
 		razer_error("hw_lachesis: usb_write failed\n");
 		return -EIO;
 	}
@@ -212,7 +212,7 @@ static int lachesis_usb_read(struct lachesis_private *priv,
 		request, command, index,
 		buf, size,
 		RAZER_USB_TIMEOUT);
-	if (err != size) {
+	if (err < 0 || (size_t)err != size) {
 		razer_error("hw_lachesis: usb_read failed\n");
 		return -EIO;
 	}
@@ -659,7 +659,7 @@ static int lachesis_dpimapping_modify(struct razer_mouse_dpimapping *d,
 {
 	struct lachesis_private *priv = d->mouse->drv_data;
 
-	if ((int)dim < 0 || (int)dim >= ARRAY_SIZE(d->res))
+	if ((int)dim < 0 || (unsigned int)dim >= ARRAY_SIZE(d->res))
 		return -EINVAL;
 
 	if (!priv->m->claim_count)

@@ -125,7 +125,7 @@ static struct razer_button_function copperhead_button_functions[] = {
 
 static int copperhead_usb_write(struct copperhead_private *priv,
 				int request, int command, int index,
-				const void *buf, size_t size)
+				void *buf, size_t size)
 {
 	int err;
 
@@ -135,7 +135,7 @@ static int copperhead_usb_write(struct copperhead_private *priv,
 		LIBUSB_RECIPIENT_OTHER,
 		request, command, index,
 		(unsigned char *)buf, size, RAZER_USB_TIMEOUT);
-	if (err != size) {
+	if (err < 0 || (size_t)err != size) {
 		razer_error("razer-copperhead: "
 			"USB write 0x%02X 0x%02X 0x%02X failed: %d\n",
 			request, command, index, err);
@@ -157,7 +157,7 @@ static int copperhead_usb_read(struct copperhead_private *priv,
 		LIBUSB_RECIPIENT_OTHER,
 		request, command, index,
 		(unsigned char *)buf, size, RAZER_USB_TIMEOUT);
-	if (err != size) {
+	if (err < 0 || (size_t)err != size) {
 		razer_error("razer-copperhead: "
 			"USB read 0x%02X 0x%02X 0x%02X failed: %d\n",
 			request, command, index, err);

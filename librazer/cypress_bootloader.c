@@ -106,7 +106,7 @@ razer_dump("cypress command", command, sizeof(*command));
 	err = libusb_bulk_transfer(c->usb.h, c->ep_out,
 				   (unsigned char *)command, command_size,
 				   &transferred, RAZER_USB_TIMEOUT);
-	if (err || transferred != command_size) {
+	if (err || transferred < 0 || (size_t)transferred != command_size) {
 		razer_error("cypress: Failed to send command 0x%02X\n",
 			    be16_to_cpu(command->command));
 		return -1;
