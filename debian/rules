@@ -5,5 +5,8 @@ override_dh_install:
 	find ./debian/ -type d -name site-packages -prune -execdir mv site-packages dist-packages \;
 	find ./debian/ -type d -name __pycache__ -prune -execdir rm -r __pycache__ \;
 
+override_dh_installinit:
+	dh_installinit --name=razerd
+
 %:
-	dh $@
+	dh $@ --with systemd
