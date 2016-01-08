@@ -55,7 +55,9 @@ uninstall_prefix()
 	done
 
 	for f in "$prefix"/lib/python*/site-packages/pyrazer\
-		 "$prefix"/lib/python*/dist-packages/pyrazer; do
+		 "$prefix"/lib/python*/dist-packages/pyrazer\
+		 "$prefix"/lib/python*/site-packages/razercfg-*.egg-info\
+		 "$prefix"/lib/python*/dist-packages/razercfg-*.egg-info; do
 
 		local path="$f"
 		[ -e "$path" -o -h "$path" ] || continue
