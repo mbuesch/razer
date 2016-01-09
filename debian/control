@@ -11,7 +11,16 @@ Build-Depends: debhelper (>= 9),
 
 Package: razercfg
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${python3:Depends}, ${shlibs:Depends}, ${misc:Depends}
 Suggests: python3-pyside
 Description: Razer device configuration tool
- This is a configuration utility for Razer devices on Linux systems.
+ This is a system daemon and Python-powered CLI configuration utility for Razer
+ devices on Linux systems.
+
+Package: qrazercfg
+Architecture: any
+Depends: ${misc:Depends}, python3-pyside, razercfg
+Description: Graphical Razer device configuration tool
+ Python- and QT-powered configuration utility for the configuration of Razer
+ devices on Linux systems.
+
