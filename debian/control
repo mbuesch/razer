@@ -8,6 +8,7 @@ Build-Depends: debhelper (>= 9),
  libusb-1.0-0-dev,
  pkg-config,
  python3-dev,
+ dh-python
 
 Package: razercfg
 Architecture: any
