@@ -180,6 +180,10 @@ razer_logfunc_t razer_logfunc_error;
 razer_logfunc_t razer_logfunc_debug;
 
 
+struct config_file* razer_get_config() {
+	return razer_config_file;
+}
+
 static inline bool razer_initialized(void)
 {
 	return !!libusb_ctx;

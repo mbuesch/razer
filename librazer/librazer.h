@@ -658,6 +658,12 @@ void razer_unregister_event_handler(razer_event_handler_t handler);
  */
 int razer_load_config(const char *path);
 
+/**
+ * razer_get_config - Get the config struct
+ */
+
+struct config_file* razer_get_config();
+
 typedef void (*razer_logfunc_t)(const char *fmt, ...);
 
 /** razer_set_logging - Set log callbacks.
