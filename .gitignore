@@ -6,7 +6,7 @@ install_manifest.txt
 udev.rules
 pm-hook.sh
 razerd.service
-
+razercfg.desktop
 *.swp
 *.o
 *.pyc

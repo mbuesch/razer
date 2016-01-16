@@ -47,6 +47,7 @@ uninstall_prefix()
 	for f in /bin/pyrazer.py /bin/pyrazer.pyc /bin/pyrazer.pyo\
 		 /bin/razercfg /bin/qrazercfg /bin/razer-gamewrapper\
 		 /sbin/razerd /bin/razerd\
+		 /share/applications/razercfg.desktop\
 		 /lib/librazer.so; do
 
 		local path="${prefix}${f}"
@@ -76,6 +77,7 @@ uninstall_global()
 		 /etc/systemd/system/razerd.service\
 		 "$(pkg-config --variable=systemdsystemunitdir systemd)/razerd.service"\
 		 /lib/systemd/system/razerd.service\
+		 /usr/share/applications/razercfg.desktop\
 		 /usr/lib/systemd/system/razerd.service; do
 
 		local path="$f"

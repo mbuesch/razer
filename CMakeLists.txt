@@ -70,5 +70,13 @@ if(SYSTEMD_UNIT_DIR)
 			 "If you use systemd, enable razerd.service manually")
 endif(SYSTEMD_UNIT_DIR)
 
+configure_file("razercfg.desktop.template" "razercfg.desktop")
+
+install(FILES ${CMAKE_BINARY_DIR}/razercfg.desktop
+	DESTINATION ${CMAKE_INSTALL_PREFIX}/share/applications/
+	PERMISSIONS OWNER_READ OWNER_WRITE
+		    GROUP_READ
+		    WORLD_READ)
+
 add_subdirectory(razerd)
 add_subdirectory(ui)
