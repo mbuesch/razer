@@ -48,7 +48,7 @@ uninstall_prefix()
 		 /bin/razercfg /bin/qrazercfg /bin/razer-gamewrapper\
 		 /sbin/razerd /bin/razerd\
 		 /share/applications/razercfg.desktop\
-		 /lib/librazer.so; do
+		 /lib/librazer.so /lib/librazer.so.1; do
 
 		local path="${prefix}${f}"
 		[ -e "$path" -o -h "$path" ] || continue

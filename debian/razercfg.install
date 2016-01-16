@@ -7,3 +7,4 @@ usr/bin/razerd /usr/bin
 usr/bin/razercfg /usr/bin
 usr/bin/razer-gamewrapper /usr/bin
 usr/lib/librazer.so /usr/lib
+usr/lib/librazer.so.1 /usr/lib

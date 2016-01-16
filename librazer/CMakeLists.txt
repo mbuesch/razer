@@ -21,6 +21,8 @@ add_library(razer SHARED
 	    hw_taipan.c)
 
 set_target_properties(razer PROPERTIES COMPILE_FLAGS ${GENERIC_COMPILE_FLAGS})
+set_target_properties(razer PROPERTIES SOVERSION 1)
+
 
 add_definitions("-Du_int8_t=uint8_t -Du_int16_t=uint16_t -Du_int32_t=uint32_t")
 
