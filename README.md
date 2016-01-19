@@ -10,6 +10,11 @@ This is a configuration utility for Razer devices on Linux systems.
 ******************************************
 ```
 
+Supported devices
+-----------------
+
+Device support table at [bues.ch/cms/hacking/razercfg.html#device_support](http://bues.ch/cms/hacking/razercfg.html#device_support)
+
 Dependencies
 ------------
 
