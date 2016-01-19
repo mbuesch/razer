@@ -6,7 +6,7 @@ This is a configuration utility for Razer devices on Linux systems.
 ```
 ******************************************
 *  Razer device configuration tool       *
-* Copyright (c) 2007-2014 Michael Buesch *
+* Copyright (c) 2007-2015 Michael Buesch *
 ******************************************
 ```
 
