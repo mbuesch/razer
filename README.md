@@ -61,7 +61,7 @@ the following command as root:
 make install
 ```
 
-If you use **systemd**:
+### If you use **systemd**:
 
 The `make install` step installed the razerd.service file. Reboot or run the
 following command as root to start the razerd daemon:
@@ -70,7 +70,7 @@ following command as root to start the razerd daemon:
 systemctl start razerd
 ```
 
-If you do _NOT_ use systemd:
+### If you do **not** use systemd:
 
 To automatically start the required system daemon `razerd` at bootup time, you
 need to install the init-script. This software package includes a generic
@@ -85,7 +85,7 @@ ln -s /etc/init.d/razerd /etc/rc0.d/K01razerd
 ln -s /etc/init.d/razerd /etc/rc6.d/K01razerd
 ```
 
-If you use **udev**:
+### If you use **udev**:
 
 The `make install` step installed the udev script to
 `$(pkg-config --variable=udevdir udev)/rules.d/80-razer.rules`.
