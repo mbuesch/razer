@@ -3,13 +3,6 @@ Razer device configuration tool
 
 This is a configuration utility for Razer devices on Linux systems.
 
-```
-******************************************
-*  Razer device configuration tool       *
-* Copyright (c) 2007-2015 Michael Buesch *
-******************************************
-```
-
 Supported devices
 -----------------
 
