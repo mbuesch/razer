@@ -208,5 +208,5 @@ concurrency.
 
 License
 -------
-Copyright (c) 2007-2015 Michael Buesch
+Copyright (c) 2007-2015 Michael Buesch  
 License at COPYING file.
