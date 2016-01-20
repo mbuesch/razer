@@ -77,6 +77,7 @@ uninstall_global()
 		 /etc/systemd/system/razerd.service\
 		 "$(pkg-config --variable=systemdsystemunitdir systemd)/razerd.service"\
 		 /lib/systemd/system/razerd.service\
+		 /usr/share/applications/razercfg.desktop\
 		 /usr/lib/systemd/system/razerd.service; do
 
 		local path="$f"

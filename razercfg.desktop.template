@@ -2,5 +2,6 @@
 Type=Application
 Categories=Application;System;
 Name=Razer Configuration
+Icon=@CMAKE_INSTALL_PREFIX@/share/icons/razercfg-icon.png
 Exec=@CMAKE_INSTALL_PREFIX@/bin/qrazercfg
 
