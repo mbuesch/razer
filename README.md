@@ -205,3 +205,8 @@ the devices is through pyrazer).
 Applications should never poke with lowlevel librazer directly, because there
 will be no instance that keeps track of the device state and permissions and
 concurrency.
+
+License
+-------
+Copyright (c) 2007-2015 Michael Buesch
+License at COPYING file.
