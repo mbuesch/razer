@@ -2,7 +2,7 @@
 #
 #   razercfg uninstaller
 #
-#   Copyright (C) 2014 Michael Buesch <m@bues.ch>
+#   Copyright (C) 2014-2016 Michael Buesch <m@bues.ch>
 #
 #   This program is free software; you can redistribute it and/or
 #   modify it under the terms of the GNU General Public License
@@ -47,18 +47,16 @@ uninstall_prefix()
 	for f in /bin/pyrazer.py /bin/pyrazer.pyc /bin/pyrazer.pyo\
 		 /bin/razercfg /bin/qrazercfg /bin/razer-gamewrapper\
 		 /sbin/razerd /bin/razerd\
-		 /share/applications/razercfg.desktop\
-		 /lib/librazer.so; do
+		 /share/applications/razercfg.desktop; do
 
 		local path="${prefix}${f}"
 		[ -e "$path" -o -h "$path" ] || continue
 		uninstall "$path"
 	done
 
-	for f in "$prefix"/lib/python*/site-packages/pyrazer\
-		 "$prefix"/lib/python*/dist-packages/pyrazer\
-		 "$prefix"/lib/python*/site-packages/razercfg-*.egg-info\
-		 "$prefix"/lib/python*/dist-packages/razercfg-*.egg-info; do
+	for f in "$prefix"/lib/python*/*-packages/pyrazer\
+		 "$prefix"/lib/python*/*-packages/razercfg-*.egg-info\
+		 "$prefix"/lib/librazer.so*; do
 
 		local path="$f"
 		[ -e "$path" -o -h "$path" ] || continue
