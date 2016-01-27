@@ -10,14 +10,14 @@ from pyrazer import *
 class RazerApplet(QSystemTrayIcon):
     def __init__(self, razer):
         QSystemTrayIcon.__init__(self)
-
+        self.setIcon(QIcon.fromTheme("razercfg"))
         self.razer = razer
         self.menu = QMenu()
-
-        self.setIcon(QIcon.fromTheme("razercfg"))
-
         self.buildMenu()
 
+    def show(self):
+        super().show()
+        QTimer.singleShot(100, self.buildMenu)
 
     def buildMenu(self):
         # clear the menu
@@ -40,7 +40,6 @@ class RazerApplet(QSystemTrayIcon):
 
         # add buttons
         self.menu.addSeparator()
-        self.menu.addAction("Update Devices", self.buildMenu)
         self.menu.addAction("Exit", sys.exit)
 
         # set menu
@@ -67,6 +66,10 @@ class RazerApplet(QSystemTrayIcon):
 def main():
     # init qt application
     app = QApplication(sys.argv)
+    # check if systray is available at freedesktop
+    if not QSystemTrayIcon.isSystemTrayAvailable():
+        print("No system tray available")
+        sys.exit(1)
     # init pyrazer
     try:
         razer = Razer()
@@ -80,4 +83,4 @@ def main():
     return app.exec_()
 
 if __name__ == "__main__":
-    exit( main())
+    sys.exit( main())
