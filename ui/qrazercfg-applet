@@ -5,82 +5,29 @@ from PySide.QtCore import *
 from PySide.QtGui import *
 from functools import partial
 
-from pyrazer import *
-
-class RazerApplet(QSystemTrayIcon):
-    def __init__(self, razer):
-        QSystemTrayIcon.__init__(self)
-        self.setIcon(QIcon.fromTheme("razercfg"))
-        self.razer = razer
-        self.menu = QMenu()
-        self.buildMenu()
-
-    def show(self):
-        super().show()
-        QTimer.singleShot(100, self.buildMenu)
-
-    def buildMenu(self):
-        # clear the menu
-        self.menu.clear()
-
-        # header
-        header = self.menu.addAction("Razer Devices")
-        header.setEnabled(False)
-
-        # add mices and profiles to menu
-        mice = self.razer.getMice()
-        for mouse in mice:
-            mouse_id = RazerDevId(mouse)
-            mouse_menu = self.menu.addMenu(mouse_id.getDevName())
-            self.getMouseProfiles(mouse, mouse_menu)
-
-        if not mice:
-            nothing_found = self.menu.addAction("No devices found...")
-            nothing_found.setEnabled(False)
-
-        # add buttons
-        self.menu.addSeparator()
-        self.menu.addAction("Exit", sys.exit)
-
-        # set menu
-        self.setContextMenu(self.menu)
-
-    def selectProfile(self, mouse, profileId):
-        self.razer.setActiveProfile(mouse, profileId)
-
-    def getMouseProfiles(self, mouse, mouse_menu):
-        mouse_menu.clear()
-        profileIds = self.razer.getProfiles(mouse)
-        activeProfileId = self.razer.getActiveProfile(mouse)
-        group = QActionGroup(self)
-        for profileId in profileIds:
-            name = self.razer.getProfileName(mouse, profileId)
-            action = QAction(name, mouse_menu)
-            action.setCheckable(True)
-            action.triggered.connect( partial(self.selectProfile, mouse, profileId))
-            group.addAction(action)
-            mouse_menu.addAction(action)
-            if profileId == activeProfileId:
-                action.setChecked(True)
+import pyrazer
+from pyrazer import ui
 
 def main():
-    # init qt application
-    app = QApplication(sys.argv)
-    # check if systray is available at freedesktop
-    if not QSystemTrayIcon.isSystemTrayAvailable():
-        print("No system tray available")
-        sys.exit(1)
-    # init pyrazer
-    try:
-        razer = Razer()
-    except RazerEx as e:
-        print(e)
-        sys.exit(1)
-    # init and show applet
-    applet = RazerApplet(razer);
-    applet.show()
-    # exec the application
-    return app.exec_()
+	try:
+		ui.razer = pyrazer.Razer(enableNotifications=True)
+	except pyrazer.RazerEx as e:
+		print(e)
+		sys.exit(1)
+
+	# init qt application
+	app = QApplication(sys.argv)
+	# check if systray is available at freedesktop
+	if not QSystemTrayIcon.isSystemTrayAvailable():
+		print("No system tray available")
+		sys.exit(1)
+
+	# init and show applet
+	applet = ui.RazerApplet();
+	applet.show()
+
+	# exec the application
+	return app.exec_()
 
 if __name__ == "__main__":
-    sys.exit( main())
+	sys.exit( main())
