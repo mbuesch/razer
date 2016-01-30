@@ -21,9 +21,6 @@ from PySide.QtGui import *
 import pyrazer
 from pyrazer import ui
 
-def exit(exitcode):
-	sys.exit(exitcode)
-
 def main():
 	try:
 		ui.razer = pyrazer.Razer(enableNotifications=True)
@@ -38,4 +35,4 @@ def main():
 	return app.exec_()
 
 if __name__ == "__main__":
-	exit(main())
+	sys.exit(main())

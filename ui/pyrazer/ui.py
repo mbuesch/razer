@@ -683,26 +683,71 @@ class MainWindow(QMainWindow):
 						"Copyright (c) 2007-2014 Michael Buesch"
 						% RAZER_VERSION))
 
+# wrapper class for mainwindow
+# if you click X in the mainwidow the application doesnt exit
+class AppletMainWindow(MainWindow):
+	def __init__(self, parent=None):
+		super().__init__(parent)
+		self.mw = self.mousewidget
+
+	def update(self):
+		self.mousewidget.reloadProfiles()
+
+	def closeEvent(self, event):
+		event.ignore()
+		self.hide()
+
+	def pokeNotificationTimer(self):
+		pass
+
+	def pollNotifications(self):
+		pass
+
 class RazerApplet(QSystemTrayIcon):
 	def __init__(self):
 		QSystemTrayIcon.__init__(self)
 		self.setIcon(QIcon.fromTheme("razercfg"))
 		self.menu = QMenu()
-		self.buildMenu()
+		self.mainwnd = AppletMainWindow()
 
-	def show(self):
-		super().show()
-		QTimer.singleShot(100, self.buildMenu)
+		self.buildMenu()
+		self.setContextMenu(self.menu)
+
+
+		# QTimer.singleShot(10000, self.buildMenu)
+
+		# timer = QTimer(self)
+		# QObject.connect(timer, SIGNAL("timeout()"), self.hello)
+		# timer.start(1000)
+
+		self.poke()
+
+		# QTimer.singleShot(5000, self.menu.clear)
+
+	def poke(self):
+		QTimer.singleShot(2000, self.update)
+
+	def update(self):
+		n = razer.pollNotifications()
+		# print("polled")
+		if n:
+			print("Notification:", n)
+			self.mainwnd.scan()
+			self.buildMenu()
+		self.poke()
 
 	def buildMenu(self):
 		# clear the menu
 		self.menu.clear()
+
+		print("build the menu")
 
 		# header
 		header = self.menu.addAction("Razer Devices")
 		header.setEnabled(False)
 
 		# add mices and profiles to menu
+		razer.rescanMice()
 		mice = razer.getMice()
 		for mouse in mice:
 			mouse_id = RazerDevId(mouse)
@@ -715,15 +760,15 @@ class RazerApplet(QSystemTrayIcon):
 
 		# add buttons
 		self.menu.addSeparator()
-		mainwnd = MainWindow()
+		mainwnd = self.mainwnd
 		self.menu.addAction("Main Window", mainwnd.show)
 		self.menu.addAction("Exit", sys.exit)
 
 		# set menu
-		self.setContextMenu(self.menu)
 
 	def selectProfile(self, mouse, profileId):
 		razer.setActiveProfile(mouse, profileId)
+		self.mainwnd.update()
 
 	def getMouseProfiles(self, mouse, mouse_menu):
 		mouse_menu.clear()
