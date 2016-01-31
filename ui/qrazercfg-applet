@@ -1,9 +1,22 @@
 #!/usr/bin/env python3
+#
+#   Razer device QT configuration tool
+#
+#   Copyright (C) 2007-2014 Michael Buesch <m@bues.ch>
+#
+#   This program is free software; you can redistribute it and/or
+#   modify it under the terms of the GNU General Public License
+#   as published by the Free Software Foundation; either version 2
+#   of the License, or (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
 
 import sys
 from PySide.QtCore import *
 from PySide.QtGui import *
-from functools import partial
 
 import pyrazer
 from pyrazer import ui
@@ -15,18 +28,16 @@ def main():
 		print(e)
 		sys.exit(1)
 
-	# init qt application
 	app = QApplication(sys.argv)
+
 	# check if systray is available at freedesktop
 	if not QSystemTrayIcon.isSystemTrayAvailable():
 		print("No system tray available")
 		sys.exit(1)
 
-	# init and show applet
 	applet = ui.RazerApplet();
 	applet.show()
 
-	# exec the application
 	return app.exec_()
 
 if __name__ == "__main__":

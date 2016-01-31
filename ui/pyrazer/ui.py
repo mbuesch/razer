@@ -683,12 +683,23 @@ class MainWindow(QMainWindow):
 						"Copyright (c) 2007-2014 Michael Buesch"
 						% RAZER_VERSION))
 
-# wrapper class for mainwindow
-# if you click X in the mainwidow the application doesnt exit
+#
+# applet
+#
+
+class AppletMouseWidget(MouseWidget):
+	# def __init__(self, parent=None):
+	# 	super().__init__(parent)
+
+	def reloadProfiles(self):
+		super().reloadProfiles()
+		# update the applets menu
+		parent.parent.buildMenu()
+
 class AppletMainWindow(MainWindow):
 	def __init__(self, parent=None):
 		super().__init__(parent)
-		self.mw = self.mousewidget
+		# self.mousewidget = AppletMouseWidget(self)
 
 	def update(self):
 		self.mousewidget.reloadProfiles()
@@ -706,41 +717,38 @@ class AppletMainWindow(MainWindow):
 class RazerApplet(QSystemTrayIcon):
 	def __init__(self):
 		QSystemTrayIcon.__init__(self)
-		self.setIcon(QIcon.fromTheme("razercfg"))
+
+		icon = QIcon()
+		icon.addFile('razercfg.png', QSize(16,16))
+		icon.addFile('razercfg.png', QSize(24,24))
+		icon.addFile('razercfg.png', QSize(48,48))
+
+		self.setIcon(icon)
+		#self.setIcon(QIcon.fromTheme("razercfg-xxx.png", QIcon(":/razercfg.png")))
+
 		self.menu = QMenu()
 		self.mainwnd = AppletMainWindow()
 
 		self.buildMenu()
 		self.setContextMenu(self.menu)
 
-
-		# QTimer.singleShot(10000, self.buildMenu)
-
-		# timer = QTimer(self)
-		# QObject.connect(timer, SIGNAL("timeout()"), self.hello)
-		# timer.start(1000)
-
+		# set timer for mice update
 		self.poke()
 
-		# QTimer.singleShot(5000, self.menu.clear)
-
 	def poke(self):
-		QTimer.singleShot(2000, self.update)
+		t = 2000 if self.mainwnd.isHidden() else 300
+		QTimer.singleShot(t, self.update)
 
 	def update(self):
-		n = razer.pollNotifications()
-		# print("polled")
-		if n:
-			print("Notification:", n)
+		if razer.pollNotifications():
 			self.mainwnd.scan()
 			self.buildMenu()
+		# continue timer
 		self.poke()
 
 	def buildMenu(self):
 		# clear the menu
 		self.menu.clear()
-
-		print("build the menu")
 
 		# header
 		header = self.menu.addAction("Razer Devices")
