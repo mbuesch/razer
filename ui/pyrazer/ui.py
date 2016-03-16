@@ -688,9 +688,6 @@ class MainWindow(QMainWindow):
 #
 
 class AppletMouseWidget(MouseWidget):
-	# def __init__(self, parent=None):
-	# 	super().__init__(parent)
-
 	def reloadProfiles(self):
 		super().reloadProfiles()
 		# update the applets menu
@@ -699,7 +696,6 @@ class AppletMouseWidget(MouseWidget):
 class AppletMainWindow(MainWindow):
 	def __init__(self, parent=None):
 		super().__init__(parent)
-		# self.mousewidget = AppletMouseWidget(self)
 
 	def update(self):
 		self.mousewidget.reloadProfiles()
@@ -724,12 +720,13 @@ class RazerApplet(QSystemTrayIcon):
 		icon.addFile('razercfg.png', QSize(48,48))
 
 		self.setIcon(icon)
-		#self.setIcon(QIcon.fromTheme("razercfg-xxx.png", QIcon(":/razercfg.png")))
 
 		self.menu = QMenu()
 		self.mainwnd = AppletMainWindow()
 
+		self.mice = razer.getMice();
 		self.buildMenu()
+
 		self.setContextMenu(self.menu)
 
 		# set timer for mice update
@@ -740,29 +737,33 @@ class RazerApplet(QSystemTrayIcon):
 		QTimer.singleShot(t, self.update)
 
 	def update(self):
-		if razer.pollNotifications():
+
+		mice = razer.getMice()
+
+		if razer.pollNotifications() and self.mice != mice:
+			self.mice = mice
 			self.mainwnd.scan()
 			self.buildMenu()
+
 		# continue timer
 		self.poke()
 
 	def buildMenu(self):
 		# clear the menu
 		self.menu.clear()
+		print("build menu")
 
 		# header
 		header = self.menu.addAction("Razer Devices")
 		header.setEnabled(False)
 
 		# add mices and profiles to menu
-		razer.rescanMice()
-		mice = razer.getMice()
-		for mouse in mice:
+		for mouse in self.mice:
 			mouse_id = RazerDevId(mouse)
 			mouse_menu = self.menu.addMenu(mouse_id.getDevName())
 			self.getMouseProfiles(mouse, mouse_menu)
 
-		if not mice:
+		if not self.mice:
 			nothing_found = self.menu.addAction("No devices found...")
 			nothing_found.setEnabled(False)
 
@@ -771,8 +772,6 @@ class RazerApplet(QSystemTrayIcon):
 		mainwnd = self.mainwnd
 		self.menu.addAction("Main Window", mainwnd.show)
 		self.menu.addAction("Exit", sys.exit)
-
-		# set menu
 
 	def selectProfile(self, mouse, profileId):
 		razer.setActiveProfile(mouse, profileId)
