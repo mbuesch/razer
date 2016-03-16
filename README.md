@@ -54,6 +54,13 @@ the following command as root:
 make install
 ```
 
+Be aware that `make install` installs the shared library `librazer.so` to `$PREFIX/lib`.
+The default `$PREFIX` is `/usr/local/`, but the install prefix can also be changed via `-DCMAKE_INSTALL_PREFIX='<somewhere>'`.
+You have to make sure that `librazer.so` in `$PREFIX/lib/` can be found by the dynamic linker `ld.so`.
+Your operating system most likely already has support for libraries in `/usr/local/lib`. So on most systems you don't have to do anything.
+If this is not the case, or you installed razercfg somewhere else, a new library search path can be added via `/etc/ld.so.conf` or `/etc/ld.so.conf.d/`.
+See your operating system manual for further information.
+
 ### If you use **systemd**:
 
 The `make install` step installed the razerd.service file. Reboot or run the
