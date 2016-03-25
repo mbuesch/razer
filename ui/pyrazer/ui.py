@@ -682,7 +682,7 @@ class MainWindow(QMainWindow):
 		QMessageBox.information(self, self.tr("About"),
 					self.tr("Razer device configuration tool\n"
 						"Version %s\n"
-						"Copyright (c) 2007-2014 Michael Buesch"
+						"Copyright (c) 2007-2016 Michael Buesch"
 						% RAZER_VERSION))
 
 	def showEvent(self, ev):
