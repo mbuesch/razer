@@ -750,7 +750,6 @@ class RazerApplet(QSystemTrayIcon):
 	def buildMenu(self):
 		# clear the menu
 		self.menu.clear()
-		print("build menu")
 
 		# header
 		header = self.menu.addAction("Razer Devices")
