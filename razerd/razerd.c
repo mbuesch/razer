@@ -2,7 +2,7 @@
  *   Razer daemon
  *   Daemon to keep track of Razer device state.
  *
- *   Copyright (C) 2008-2011 Michael Buesch <m@bues.ch>
+ *   Copyright (C) 2008-2016 Michael Buesch <m@bues.ch>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -2040,10 +2040,12 @@ static void event_handler(enum razer_event event,
 {
 	switch (event) {
 	case RAZER_EV_MOUSE_ADD:
+		logdebug("Broadcasting mouse-add event\n");
 		broadcast_notification(NOTIFY_ID_NEWMOUSE,
 				       REPLY_SIZE(notify_newmouse));
 		break;
 	case RAZER_EV_MOUSE_REMOVE:
+		logdebug("Broadcasting mouse-remove event\n");
 		broadcast_notification(NOTIFY_ID_DELMOUSE,
 				       REPLY_SIZE(notify_delmouse));
 		break;
