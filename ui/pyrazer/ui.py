@@ -714,8 +714,16 @@ class RazerApplet(QSystemTrayIcon):
 
 		self.setContextMenu(self.menu)
 
+		self.activated.connect(self.__handleActivate)
+
 		# set timer for mice update
 		self.poke()
+
+	def __handleActivate(self, reason):
+		if reason in {QSystemTrayIcon.Trigger,
+			      QSystemTrayIcon.DoubleClick,
+			      QSystemTrayIcon.MiddleClick}:
+			self.contextMenu().popup(QCursor.pos())
 
 	def poke(self):
 		#TODO completely stop the update, if it is hidden. Re-enable update on show event.
