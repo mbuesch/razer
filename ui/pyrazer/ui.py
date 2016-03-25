@@ -214,7 +214,7 @@ class LedsWidget(QGroupBox):
 		self.setEnabled(True)
 		self.show()
 
-	def update(self, profileId=Razer.PROFILE_INVALID):
+	def updateContent(self, profileId=Razer.PROFILE_INVALID):
 		for led in razer.getLeds(self.mouseWidget.mouse, profileId):
 			self.add(led)
 			self.show()
@@ -293,7 +293,7 @@ class MouseProfileWidget(QWidget):
 
 		# Frequency selection (if any)
 		if self.freqSel:
-			self.freqSel.update()
+			self.freqSel.updateContent()
 
 		# Resolution selection
 		for resSel in self.resSel:
@@ -331,11 +331,11 @@ class MouseProfileWidget(QWidget):
 
 		# Per-profile DPI mappings (if any)
 		self.dpimappings.clear()
-		self.dpimappings.update(self.profileId)
+		self.dpimappings.updateContent(self.profileId)
 
 		# Per-profile LEDs (if any)
 		self.leds.clear()
-		self.leds.update(self.profileId)
+		self.leds.updateContent(self.profileId)
 
 		self.mouseWidget.recurseProtect -= 1
 
@@ -474,7 +474,7 @@ class MouseDpiMappingsWidget(QGroupBox):
 			self.setEnabled(True)
 			self.show()
 
-	def update(self, profileId=Razer.PROFILE_INVALID):
+	def updateContent(self, profileId=Razer.PROFILE_INVALID):
 		for dpimapping in razer.getSupportedDpiMappings(self.mouseWidget.mouse):
 			if (profileId == Razer.PROFILE_INVALID and dpimapping.profileMask == 0) or\
 			   (profileId != Razer.PROFILE_INVALID and dpimapping.profileMask & (1 << profileId)):
@@ -502,7 +502,7 @@ class MouseScanFreqWidget(QWidget):
 		freq = self.freqSel.itemData(index)
 		razer.setFrequency(self.mouseWidget.mouse, self.profileId, freq)
 
-	def update(self):
+	def updateContent(self):
 		self.mouseWidget.recurseProtect += 1
 
 		self.freqSel.clear()
@@ -548,7 +548,7 @@ class MouseWidget(QWidget):
 		self.fwVer = QLabel(self)
 		self.layout().addWidget(self.fwVer)
 
-	def update(self, mice):
+	def updateContent(self, mice):
 		self.mice = mice
 		self.mousesel.clear()
 		for mouse in mice:
@@ -585,16 +585,16 @@ class MouseWidget(QWidget):
 
 		# Update global frequency selection (if any)
 		if minfo & Razer.MOUSEINFOFLG_GLOBAL_FREQ:
-			self.freqSel.update()
+			self.freqSel.updateContent()
 			self.freqSel.show()
 		else:
 			self.freqSel.hide()
 
 		# Update global DPI mappings (if any)
-		self.dpimappings.update()
+		self.dpimappings.updateContent()
 
 		# Update global LEDs (if any)
-		self.leds.update()
+		self.leds.updateContent()
 
 		ver = razer.getFwVer(self.mouse)
 		if (ver[0] == 0xFF and ver[1] == 0xFF) or\
@@ -670,7 +670,7 @@ class MainWindow(QMainWindow):
 			elif (len(mice) > 1):
 				self.statusBar().showMessage(self.tr("Found %d Razer mice" % len(mice)))
 		self.mice = mice
-		self.mousewidget.update(mice)
+		self.mousewidget.updateContent(mice)
 
 	def reconfig(self):
 		razer.rescanDevices()
@@ -697,7 +697,7 @@ class AppletMainWindow(MainWindow):
 	def __init__(self, parent=None):
 		super().__init__(parent)
 
-	def update(self):
+	def updateContent(self):
 		self.mousewidget.reloadProfiles()
 
 	def closeEvent(self, event):
@@ -734,10 +734,9 @@ class RazerApplet(QSystemTrayIcon):
 
 	def poke(self):
 		t = 2000 if self.mainwnd.isHidden() else 300
-		QTimer.singleShot(t, self.update)
+		QTimer.singleShot(t, self.updateContent)
 
-	def update(self):
-
+	def updateContent(self):
 		mice = razer.getMice()
 
 		if razer.pollNotifications() and self.mice != mice:
@@ -775,7 +774,7 @@ class RazerApplet(QSystemTrayIcon):
 
 	def selectProfile(self, mouse, profileId):
 		razer.setActiveProfile(mouse, profileId)
-		self.mainwnd.update()
+		self.mainwnd.updateContent()
 
 	def getMouseProfiles(self, mouse, mouse_menu):
 		mouse_menu.clear()
