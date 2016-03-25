@@ -624,7 +624,7 @@ class StatusBar(QStatusBar):
 		QStatusBar.showMessage(self, msg, 10000)
 
 class MainWindow(QMainWindow):
-	def __init__(self, parent=None):
+	def __init__(self, parent = None, enableNotificationPolling = True):
 		QMainWindow.__init__(self, parent)
 		self.setWindowTitle(self.tr("Razer device configuration"))
 
@@ -649,7 +649,8 @@ class MainWindow(QMainWindow):
 
 		self.mice = []
 		self.scan()
-		self.pokeNotificationTimer()
+		if enableNotificationPolling:
+			self.pokeNotificationTimer()
 
 	def pokeNotificationTimer(self):
 		QTimer.singleShot(300, self.pollNotifications)
@@ -685,7 +686,7 @@ class MainWindow(QMainWindow):
 
 class AppletMainWindow(MainWindow):
 	def __init__(self, parent=None):
-		super().__init__(parent)
+		super().__init__(parent, enableNotificationPolling = False)
 
 	def updateContent(self):
 		self.mousewidget.reloadProfiles()
@@ -693,12 +694,6 @@ class AppletMainWindow(MainWindow):
 	def closeEvent(self, event):
 		event.ignore()
 		self.hide()
-
-	def pokeNotificationTimer(self):
-		pass
-
-	def pollNotifications(self):
-		pass
 
 class RazerApplet(QSystemTrayIcon):
 	def __init__(self):
@@ -723,6 +718,7 @@ class RazerApplet(QSystemTrayIcon):
 		self.poke()
 
 	def poke(self):
+		#TODO completely stop the update, if it is hidden. Re-enable update on show event.
 		t = 2000 if self.mainwnd.isHidden() else 300
 		QTimer.singleShot(t, self.updateContent)
 
@@ -741,25 +737,21 @@ class RazerApplet(QSystemTrayIcon):
 		# clear the menu
 		self.menu.clear()
 
-		# header
-		header = self.menu.addAction("Razer Devices")
-		header.setEnabled(False)
-
 		# add mices and profiles to menu
 		for mouse in self.mice:
 			mouse_id = RazerDevId(mouse)
-			mouse_menu = self.menu.addMenu(mouse_id.getDevName())
+			mouse_menu = self.menu.addMenu("&" + mouse_id.getDevName() + " mouse")
 			self.getMouseProfiles(mouse, mouse_menu)
 
 		if not self.mice:
-			nothing_found = self.menu.addAction("No devices found...")
-			nothing_found.setEnabled(False)
+			act = self.menu.addAction("No Razer devices found")
+			act.setEnabled(False)
 
 		# add buttons
 		self.menu.addSeparator()
 		mainwnd = self.mainwnd
-		self.menu.addAction("Main Window", mainwnd.show)
-		self.menu.addAction("Exit", sys.exit)
+		self.menu.addAction("&Open main window...", mainwnd.show)
+		self.menu.addAction("&Exit", sys.exit)
 
 	def selectProfile(self, mouse, profileId):
 		razer.setActiveProfile(mouse, profileId)
