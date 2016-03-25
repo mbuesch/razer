@@ -1,6 +1,6 @@
 #   Razer device QT configuration tool
 #
-#   Copyright (C) 2007-2014 Michael Buesch <m@bues.ch>
+#   Copyright (C) 2007-2016 Michael Buesch <m@bues.ch>
 #
 #   This program is free software; you can redistribute it and/or
 #   modify it under the terms of the GNU General Public License
@@ -624,6 +624,9 @@ class StatusBar(QStatusBar):
 		QStatusBar.showMessage(self, msg, 10000)
 
 class MainWindow(QMainWindow):
+	shown = Signal(QWidget)
+	hidden = Signal(QWidget)
+
 	def __init__(self, parent = None, enableNotificationPolling = True):
 		QMainWindow.__init__(self, parent)
 		self.setWindowTitle(self.tr("Razer device configuration"))
@@ -650,16 +653,14 @@ class MainWindow(QMainWindow):
 		self.mice = []
 		self.scan()
 		if enableNotificationPolling:
-			self.pokeNotificationTimer()
-
-	def pokeNotificationTimer(self):
-		QTimer.singleShot(300, self.pollNotifications)
+			self.__notifyPollTimer = QTimer(self)
+			self.__notifyPollTimer.timeout.connect(self.pollNotifications)
+			self.__notifyPollTimer.start(300)
 
 	def pollNotifications(self):
 		n = razer.pollNotifications()
 		if n:
 			self.scan()
-		self.pokeNotificationTimer()
 
 	# Rescan for new devices
 	def scan(self):
@@ -684,6 +685,14 @@ class MainWindow(QMainWindow):
 						"Copyright (c) 2007-2014 Michael Buesch"
 						% RAZER_VERSION))
 
+	def showEvent(self, ev):
+		super(MainWindow, self).showEvent(ev)
+		self.shown.emit(self)
+
+	def hideEvent(self, ev):
+		super(MainWindow, self).hideEvent(ev)
+		self.hidden.emit(self)
+
 class AppletMainWindow(MainWindow):
 	def __init__(self, parent=None):
 		super().__init__(parent, enableNotificationPolling = False)
@@ -699,6 +708,9 @@ class RazerApplet(QSystemTrayIcon):
 	def __init__(self):
 		QSystemTrayIcon.__init__(self)
 
+		self.__contextMenuIsShown = False
+		self.__mainwndIsShown = False
+
 		icon = QIcon()
 		icon.addFile('razercfg.png', QSize(16,16))
 		icon.addFile('razercfg.png', QSize(24,24))
@@ -709,15 +721,22 @@ class RazerApplet(QSystemTrayIcon):
 		self.menu = QMenu()
 		self.mainwnd = AppletMainWindow()
 
+		self.__pollTimer = QTimer(self)
+		self.__pollTimer.setInterval(300)
+		self.__pollTimer.stop()
+
+		self.mainwnd.scan()
 		self.mice = razer.getMice();
 		self.buildMenu()
 
 		self.setContextMenu(self.menu)
 
+		self.__pollTimer.timeout.connect(self.updateContent)
+		self.contextMenu().aboutToShow.connect(self.__contextAboutToShow)
+		self.contextMenu().aboutToHide.connect(self.__contextAboutToHide)
 		self.activated.connect(self.__handleActivate)
-
-		# set timer for mice update
-		self.poke()
+		self.mainwnd.shown.connect(self.__mainwndShown)
+		self.mainwnd.hidden.connect(self.__mainwndHidden)
 
 	def __handleActivate(self, reason):
 		if reason in {QSystemTrayIcon.Trigger,
@@ -725,21 +744,39 @@ class RazerApplet(QSystemTrayIcon):
 			      QSystemTrayIcon.MiddleClick}:
 			self.contextMenu().popup(QCursor.pos())
 
-	def poke(self):
-		#TODO completely stop the update, if it is hidden. Re-enable update on show event.
-		t = 2000 if self.mainwnd.isHidden() else 300
-		QTimer.singleShot(t, self.updateContent)
+	def __contextAboutToShow(self):
+		self.__contextMenuIsShown = True
+		self.__setPolling()
+		self.updateContent()
+
+	def __contextAboutToHide(self):
+		self.__contextMenuIsShown = False
+		self.__setPolling()
+
+	def __mainwndShown(self, widget):
+		self.__mainwndIsShown = True
+		self.__setPolling()
+		self.updateContent()
+
+	def __mainwndHidden(self, widget):
+		self.__mainwndIsShown = False
+		self.__setPolling()
+
+	def __setPolling(self):
+		if self.__contextMenuIsShown or self.__mainwndIsShown:
+			if not self.__pollTimer.isActive():
+				self.__pollTimer.start()
+		else:
+			if self.__pollTimer.isActive():
+				self.__pollTimer.stop()
 
 	def updateContent(self):
-		mice = razer.getMice()
-
-		if razer.pollNotifications() and self.mice != mice:
-			self.mice = mice
+		if razer.pollNotifications():
 			self.mainwnd.scan()
-			self.buildMenu()
-
-		# continue timer
-		self.poke()
+			mice = razer.getMice()
+			if mice != self.mice:
+				self.mice = mice
+				self.buildMenu()
 
 	def buildMenu(self):
 		# clear the menu
@@ -757,8 +794,7 @@ class RazerApplet(QSystemTrayIcon):
 
 		# add buttons
 		self.menu.addSeparator()
-		mainwnd = self.mainwnd
-		self.menu.addAction("&Open main window...", mainwnd.show)
+		self.menu.addAction("&Open main window...", self.mainwnd.show)
 		self.menu.addAction("&Exit", sys.exit)
 
 	def selectProfile(self, mouse, profileId):
