@@ -683,16 +683,6 @@ class MainWindow(QMainWindow):
 						"Copyright (c) 2007-2014 Michael Buesch"
 						% RAZER_VERSION))
 
-#
-# applet
-#
-
-class AppletMouseWidget(MouseWidget):
-	def reloadProfiles(self):
-		super().reloadProfiles()
-		# update the applets menu
-		parent.parent.buildMenu()
-
 class AppletMainWindow(MainWindow):
 	def __init__(self, parent=None):
 		super().__init__(parent)
