@@ -29,10 +29,16 @@ def main():
 		sys.exit(1)
 
 	app = QApplication(sys.argv)
-	mainwnd = ui.MainWindow()
-	mainwnd.show()
+
+	# check if systray is available at freedesktop
+	if not QSystemTrayIcon.isSystemTrayAvailable():
+		print("No system tray available")
+		sys.exit(1)
+
+	applet = ui.RazerApplet();
+	applet.show()
 
 	return app.exec_()
 
 if __name__ == "__main__":
-	sys.exit(main())
+	sys.exit( main())
