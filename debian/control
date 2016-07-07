@@ -25,3 +25,9 @@ Description: Graphical Razer device configuration tool
  Python- and QT-powered configuration utility for the configuration of Razer
  devices on Linux systems.
 
+Package: qrazercfg-applet
+Architecture: any
+Depends: ${misc:Depends}, python3-pyside, razercfg
+Description: Graphical Razer device configuration tool - applet
+ Python- and QT-powered configuration utility for the configuration of Razer
+ devices on Linux systems.
