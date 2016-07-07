@@ -45,7 +45,10 @@ uninstall_prefix()
 	local prefix="$1"
 
 	for f in /bin/pyrazer.py /bin/pyrazer.pyc /bin/pyrazer.pyo\
-		 /bin/razercfg /bin/qrazercfg /bin/razer-gamewrapper\
+		 /bin/razercfg\
+		 /bin/qrazercfg\
+		 /bin/qrazercfg-applet\
+		 /bin/razer-gamewrapper\
 		 /sbin/razerd /bin/razerd\
 		 /share/applications/razercfg.desktop; do
 

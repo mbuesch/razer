@@ -9,8 +9,9 @@ setup(	name		= "razercfg",
 	license		= "GNU General Public License v2 or later",
 	author		= "Michael Buesch",
 	author_email	= "m@bues.ch",
-	url		= "http://bues.ch/cms/hacking/razercfg.html",
+	url		= "https://bues.ch/h/razercfg",
 	packages	= [ "pyrazer", ],
 	scripts		= [ "razercfg",
-			    "qrazercfg", ]
+			    "qrazercfg",
+			    "qrazercfg-applet", ]
 )
