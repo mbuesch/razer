@@ -16,7 +16,7 @@ add_definitions("-DRAZERCFG_BUILD")
 add_definitions("-D_FORTIFY_SOURCE=2")
 
 set(WARNING_COMPILE_FLAGS "-Wall -Wformat -Wformat-security -Wextra -Wno-unused-parameter -Wsuggest-attribute=noreturn -Wundef -Wpointer-arith -Wcast-qual -Wlogical-op -Wshadow")
-set(GENERIC_COMPILE_FLAGS "-O2 -std=c11 -fstack-protector ${WARNING_COMPILE_FLAGS}")
+set(GENERIC_COMPILE_FLAGS "-O2 -std=c99 -fstack-protector ${WARNING_COMPILE_FLAGS}")
 
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
 
