@@ -4,7 +4,7 @@
 #
 #   This library connects to the lowlevel 'razerd' system daemon.
 #
-#   Copyright (C) 2008-2014 Michael Buesch <m@bues.ch>
+#   Copyright (C) 2008-2016 Michael Buesch <m@bues.ch>
 #
 #   This program is free software; you can redistribute it and/or
 #   modify it under the terms of the GNU General Public License
@@ -28,7 +28,7 @@ import select
 import hashlib
 import struct
 
-RAZER_VERSION	= "0.33"
+RAZER_VERSION	= "0.34"
 
 
 class RazerEx(Exception):
