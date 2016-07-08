@@ -27,7 +27,7 @@ def main():
 		ui.razer = pyrazer.Razer(enableNotifications=True)
 	except pyrazer.RazerEx as e:
 		print(e)
-		sys.exit(1)
+		return 1
 
 	app = QApplication(sys.argv)
 	try:

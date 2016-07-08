@@ -27,14 +27,14 @@ def main():
 		ui.razer = pyrazer.Razer(enableNotifications=True)
 	except pyrazer.RazerEx as e:
 		print(e)
-		sys.exit(1)
+		return 1
 
 	app = QApplication(sys.argv)
 	try:
 		# check if systray is available at freedesktop
 		if not QSystemTrayIcon.isSystemTrayAvailable():
 			print("No system tray available")
-			sys.exit(1)
+			return 1
 		applet = ui.RazerApplet()
 		applet.show()
 		return app.exec_()
@@ -47,4 +47,4 @@ def main():
 		raise e
 
 if __name__ == "__main__":
-	sys.exit( main())
+	sys.exit(main())
