@@ -741,7 +741,7 @@ static int send_u32(struct client *client, uint32_t v)
 static int send_string(struct client *client, const char *str)
 {
 	struct reply *r;
-	size_t len = strlen(str);
+	size_t i, len = strlen(str);
 	int err;
 
 	r = malloc(len + REPLY_SIZE(string));
@@ -753,7 +753,12 @@ static int send_string(struct client *client, const char *str)
 	r->hdr.id = REPLY_ID_STR;
 	r->string.encoding = STRING_ENC_ASCII;
 	r->string.len = cpu_to_be16(len);
-	memcpy(r->string.str, str, len);
+	for (i = 0; i < len; i++) {
+		if ((unsigned char)str[i] <= 0x7Fu)
+			r->string.str[i] = str[i];
+		else
+			r->string.str[i] = '?'; /* Non-ASCII char. */
+	}
 	err = send_reply(client, r, REPLY_SIZE(string) + len);
 
 	free(r);
