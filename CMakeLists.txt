@@ -66,7 +66,7 @@ if(SYSTEMD_UNIT_DIR)
 					WORLD_READ)
 	install_exec_cmd("systemctl --system daemon-reload"
 			 "If you use systemd, please reload systemd manually or reboot the system")
-	install_exec_cmd("systemctl --system enable razerd.service"
+	install_exec_cmd("systemctl --system --force enable razerd.service"
 			 "If you use systemd, enable razerd.service manually")
 endif(SYSTEMD_UNIT_DIR)
 
