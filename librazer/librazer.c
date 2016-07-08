@@ -1190,6 +1190,7 @@ void razer_generic_usb_gen_idstr(struct libusb_device *udev,
 	}
 
 	if (serial && strlen(serial)) {
+		/* Enforce ASCII characters. */
 		for (i = 0; i < ARRAY_SIZE(serial_buf) - 1; i++) {
 			c = serial[i];
 			if (c == '\0')
@@ -1197,11 +1198,12 @@ void razer_generic_usb_gen_idstr(struct libusb_device *udev,
 			if ((unsigned char)c <= 0x7Fu)
 				serial_buf[i] = c;
 			else
-				serial_buf[i] = '?'; /* Non-ASCII character */
+				serial_buf[i] = '?'; /* Non-ASCII char. */
 		}
 		serial_buf[i] = '\0';
 		serial = serial_buf;
 	} else {
+		serial_buf[0] = '\0';
 		serial_index = devdesc.iSerialNumber;
 		err = -EINVAL;
 		if (serial_index) {
@@ -1216,6 +1218,13 @@ void razer_generic_usb_gen_idstr(struct libusb_device *udev,
 					(unsigned char *)serial_buf, sizeof(serial_buf));
 				if (!h)
 					razer_generic_usb_release(&usbctx);
+				/* Enforce ASCII characters. */
+				for (i = 0; i < ARRAY_SIZE(serial_buf); i++) {
+					if (serial_buf[i] == '\0')
+						break;
+					if ((unsigned char)serial_buf[i] > 0x7Fu)
+						serial_buf[i] = '?'; /* Non-ASCII char. */
+				}
 			}
 		}
 		if (err <= 0)
