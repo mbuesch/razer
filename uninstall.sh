@@ -59,7 +59,8 @@ uninstall_prefix()
 
 	for f in "$prefix"/lib/python*/*-packages/pyrazer\
 		 "$prefix"/lib/python*/*-packages/razercfg-*.egg-info\
-		 "$prefix"/lib/librazer.so*; do
+		 "$prefix"/lib/librazer.so*\
+		 "$prefix"/share/icons/hicolor/scalable/apps/razercfg*.svg; do
 
 		local path="$f"
 		[ -e "$path" -o -h "$path" ] || continue
@@ -97,11 +98,18 @@ help()
 	echo "  ./uninstall.sh /usr/local"
 }
 
-[ $# -eq 1 ] || {
+if [ $# -eq 0 ]; then
+	PREFIX="/usr/local"
+elif [ $# -eq 1 ]; then
+	if [ "$1" = "-h" -o "$1" = "--help" ]; then
+		help
+		exit 0
+	fi
+	PREFIX="$1"
+else
 	help
 	exit 1
-}
-PREFIX="$1"
+fi
 
 uninstall_prefix "$PREFIX"
 uninstall_global

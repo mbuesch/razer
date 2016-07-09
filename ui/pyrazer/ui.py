@@ -711,11 +711,12 @@ class RazerApplet(QSystemTrayIcon):
 		self.__contextMenuIsShown = False
 		self.__mainwndIsShown = False
 
-		icon = QIcon()
-		icon.addFile('razercfg.png', QSize(16,16))
-		icon.addFile('razercfg.png', QSize(24,24))
-		icon.addFile('razercfg.png', QSize(48,48))
-
+		icon = QIcon.fromTheme("razercfg")
+		if icon.isNull():
+			for prefix in ("/usr/local", "/usr"):
+				icon.addFile(prefix + "/share/icons/hicolor/" +\
+					     "scalable/apps/razercfg.svg")
+			icon.addFile("razercfg.svg")
 		self.setIcon(icon)
 
 		self.menu = QMenu()

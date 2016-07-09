@@ -78,5 +78,24 @@ install(FILES ${CMAKE_BINARY_DIR}/razercfg.desktop
 		    GROUP_READ
 		    WORLD_READ)
 
+install(FILES ${CMAKE_SOURCE_DIR}/icons/razercfg-icon.svg
+	DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/scalable/apps/
+	RENAME razercfg.svg
+	PERMISSIONS OWNER_READ OWNER_WRITE
+		    GROUP_READ
+		    WORLD_READ)
+
+install(FILES ${CMAKE_SOURCE_DIR}/icons/razercfg-alt.svg
+	DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/scalable/apps/
+	PERMISSIONS OWNER_READ OWNER_WRITE
+		    GROUP_READ
+		    WORLD_READ)
+
+install(FILES ${CMAKE_SOURCE_DIR}/icons/razercfg-snake.svg
+	DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/scalable/apps/
+	PERMISSIONS OWNER_READ OWNER_WRITE
+		    GROUP_READ
+		    WORLD_READ)
+
 add_subdirectory(razerd)
 add_subdirectory(ui)
