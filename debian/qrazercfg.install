@@ -1,2 +1,3 @@
-usr/bin/qrazercfg usr/bin
-usr/share/applications/razercfg.desktop /usr/share/applications
+usr/bin/qrazercfg usr/bin/
+usr/share/applications/razercfg.desktop usr/share/applications/
+usr/share/icons/hicolor/scalable/apps/*.svg usr/share/icons/hicolor/scalable/apps/
