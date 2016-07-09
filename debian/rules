@@ -3,6 +3,8 @@
 export LC_ALL=C.UTF-8
 export DH_VERBOSE=1
 
+export CFLAGS= CPPFLAGS= CXXFLAGS= LDFLAGS=
+
 override_dh_auto_configure:
 	cmake -DCMAKE_INSTALL_PREFIX=/usr .
 
