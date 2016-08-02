@@ -126,6 +126,14 @@ int razer_string_to_mode(const char *string, enum razer_led_mode *mode)
 		*mode = RAZER_LED_MODE_BREATHING;
 		return 0;
 	}
+	if (strcasecmp(string, "wave") == 0) {
+		*mode = RAZER_LED_MODE_WAVE;
+		return 0;
+	}
+	if (strcasecmp(string, "reaction") == 0) {
+		*mode = RAZER_LED_MODE_REACTION;
+		return 0;
+	}
 
 	return -EINVAL;
 }

@@ -18,7 +18,8 @@ add_library(razer SHARED
 	    hw_lachesis5k6.c
 	    hw_naga.c
 	    hw_imperator.c
-	    hw_taipan.c)
+	    hw_taipan.c
+	    hw_mamba_tournament_edition.c)
 
 set_target_properties(razer PROPERTIES COMPILE_FLAGS ${GENERIC_COMPILE_FLAGS}
 				       SOVERSION 1)

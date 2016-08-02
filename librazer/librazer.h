@@ -84,7 +84,9 @@ enum razer_led_state {
 enum razer_led_mode {
 	RAZER_LED_MODE_STATIC    = 0,
 	RAZER_LED_MODE_SPECTRUM  = 1,
-	RAZER_LED_MODE_BREATHING = 2
+	RAZER_LED_MODE_BREATHING = 2,
+	RAZER_LED_MODE_WAVE      = 3,
+	RAZER_LED_MODE_REACTION  = 4,
 };
 
 /** struct razer_rgb_color - An RGB color
@@ -197,6 +199,7 @@ enum razer_mouse_res {
   * @RAZER_MOUSETYPE_BOOMSLANGCE: A "Boomslang Collector's Edition" mouse
   * @RAZER_MOUSETYPE_IMPERATOR: An "Imperator" mouse
   * @RAZER_MOUSETYPE_TAIPAN: A "Taipan" mouse
+  * @RAZER_MOUSETYPE_MAMBA_TE: A "Mamba Tournament Edition" mouse
   */
 
 enum razer_mouse_type {
@@ -208,6 +211,7 @@ enum razer_mouse_type {
 	RAZER_MOUSETYPE_BOOMSLANGCE,
 	RAZER_MOUSETYPE_IMPERATOR,
 	RAZER_MOUSETYPE_TAIPAN,
+	RAZER_MOUSETYPE_MAMBA_TE,
 };
 
 /** struct razer_button_function - A logical button function
