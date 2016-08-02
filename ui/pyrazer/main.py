@@ -139,7 +139,8 @@ class RazerLEDMode(object):
 	LED_MODE_STATIC				= 0
 	LED_MODE_SPECTRUM			= 1
 	LED_MODE_BREATHING			= 2
-
+	LED_MODE_WAVE               = 3 
+	LED_MODE_REACTION           = 4
 	def __init__(self, val):
 		self.val = val
 
@@ -147,13 +148,15 @@ class RazerLEDMode(object):
 		return {
 			self.LED_MODE_STATIC:    'static',
 			self.LED_MODE_SPECTRUM:  'spectrum',
-			self.LED_MODE_BREATHING: 'breathing'
+			self.LED_MODE_BREATHING: 'breathing',
+			self.LED_MODE_WAVE:      'wave',
+			self.LED_MODE_REACTION:  'reaction'
 		}[self.val]
 
 	@classmethod
 	def listFromSupportedModes(cls, mask):
 		modes = []
-		for mode in (cls.LED_MODE_STATIC, cls.LED_MODE_SPECTRUM, cls.LED_MODE_BREATHING):
+		for mode in (cls.LED_MODE_STATIC, cls.LED_MODE_SPECTRUM, cls.LED_MODE_BREATHING, cls.LED_MODE_WAVE, cls.LED_MODE_REACTION):
 			if mask & (1 << mode):
 				modes.append(cls(mode))
 
@@ -164,7 +167,10 @@ class RazerLEDMode(object):
 		return {
 			'static':    cls(cls.LED_MODE_STATIC),
 			'spectrum':  cls(cls.LED_MODE_SPECTRUM),
-			'breathing': cls(cls.LED_MODE_BREATHING)
+			'breathing': cls(cls.LED_MODE_BREATHING),
+			'wave':      cls(cls.LED_MODE_WAVE),
+			'reaction':  cls(cls.LED_MODE_REACTION)
+			
 		}[string]
 
 
