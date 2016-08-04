@@ -1,26 +1,28 @@
 Razer device configuration tool
 ===============================
 
+[https://bues.ch/h/razercfg](https://bues.ch/h/razercfg)
+
 This is a configuration utility for Razer devices on Linux systems.
 
 Supported devices
 -----------------
 
-Device support table at [bues.ch/cms/hacking/razercfg.html#device_support](http://bues.ch/cms/hacking/razercfg.html#device_support)
+Device support table at [https://bues.ch/h/razercfg#device_support](https://bues.ch/h/razercfg#device_support)
 
 Dependencies
 ------------
 
-* Python 3.x: [python.org](https://www.python.org/)  
+* Python 3.x: [https://www.python.org/](https://www.python.org/)  
   Debian Linux: `apt-get install python3`
 
-* libusb 1.0: [libusb.org](http://libusb.org/)   
+* libusb 1.0: [http://libusb.org/](http://libusb.org/)   
 Debian Linux: `apt-get install libusb-1.0-0-dev`
 
-* PySide (for the graphical qrazercfg tool only): [qt-project.org/wiki/PySide](https://qt-project.org/wiki/PySide)  
+* PySide (for the graphical qrazercfg tool only): [https://wiki.qt.io/PySide](https://wiki.qt.io/PySide)  
 Debian Linux: `apt-get install python3-pyside`
 
-* cmake 2.4 or later (for building only): [cmake.org](http://www.cmake.org/)  
+* cmake 2.4 or later (for building only): [https://cmake.org/](https://cmake.org/)  
 Debian Linux: `apt-get install cmake`
 
 Note that almost all distributions ship prebuilt packages of the
@@ -37,10 +39,10 @@ Building
 First invoke `cmake` to build the makefiles.
 Then invoke `make` to build the binaries:
 
-```
+<pre>
 cmake .
 make
-```
+</pre>
 
 (Note the required space and dot after the cmake command)
 
@@ -50,9 +52,9 @@ Installing
 First you need to install the tool libraries and binaries. Do this by executing
 the following command as root:
 
-```
+<pre>
 make install
-```
+</pre>
 
 Be aware that `make install` installs the shared library `librazer.so` to `$PREFIX/lib`.
 The default `$PREFIX` is `/usr/local/`, but the install prefix can also be changed via `-DCMAKE_INSTALL_PREFIX='<somewhere>'`.
@@ -66,9 +68,9 @@ See your operating system manual for further information.
 The `make install` step installed the razerd.service file. Reboot or run the
 following command as root to start the razerd daemon:
 
-```
+<pre>
 systemctl start razerd
-```
+</pre>
 
 ### If you do **not** use systemd:
 
@@ -77,18 +79,20 @@ need to install the init-script. This software package includes a generic
 example script, that should work out-of-the-box on many Linux distributions. To
 install it, invoke the following commands as root:
 
-```
+<pre>
 cp ./razerd.initscript /etc/init.d/razerd
 ln -s /etc/init.d/razerd /etc/rc2.d/S99razerd
 ln -s /etc/init.d/razerd /etc/rc5.d/S99razerd
 ln -s /etc/init.d/razerd /etc/rc0.d/K01razerd
 ln -s /etc/init.d/razerd /etc/rc6.d/K01razerd
-```
+</pre>
 
 ### If you use **udev**:
 
 The `make install` step installed the udev script to
-`$(pkg-config --variable=udevdir udev)/rules.d/80-razer.rules`.
+<pre>
+$(pkg-config --variable=udevdir udev)/rules.d/80-razer.rules
+</pre>
 This should work on most distributions.
 
 If udev notification does not work, try to reboot the system.
@@ -116,23 +120,23 @@ to pick up the mouse again after a configuration event from razerd.
 
 Example xorg.conf snippet:
 
-```
+<pre>
 Section "InputDevice"
     Identifier	"Mouse"
     Driver	"mouse"
     Option	"Device" "/dev/input/mice"
 EndSection
-```
+</pre>
 
-Alternatively, do not specify a "Device" at all. X will autodetect the device
+Alternatively, do not specify a `"Device"` at all. X will autodetect the device
 then:
 
-```
+<pre>
 Section "InputDevice"
     Identifier	"Mouse"
     Driver	"mouse"
 EndSection
-```
+</pre>
 
 In any case, do _NOT_ use: `Option "Device" "/dev/input/mouseX"`
 
@@ -157,16 +161,16 @@ razercfg from the system. It must be called with the install prefix as its first
 argument. That usually is `/usr/local`, unless specified otherwise in cmake. A
 call to uninstall.sh might look like this:
 
-```
+<pre>
 ./uninstall.sh /usr/local
-```
+</pre>
 
 Architecture
 ------------
 
 The architecture layout of the razer tools looks like this:
 
-```
+<pre>
  -------------------
 | hardware driver 0 |--v
  -------------------   |
@@ -203,7 +207,7 @@ The architecture layout of the razer tools looks like this:
                             --------------------------          |
                           | Other Python applications |---------^
                            ---------------------------
-```
+</pre>
 
 So in general, your application wants to access the razer devices through
 pyrazer or (if it's not a python app) through librazerd.
@@ -215,5 +219,7 @@ concurrency.
 
 License
 -------
-Copyright (c) 2007-2015 Michael Buesch  
-License at COPYING file.
+
+Copyright (c) 2007-2016 Michael Büsch, et al.
+
+See the COPYING file for license information.
