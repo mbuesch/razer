@@ -5,7 +5,7 @@
  *   Important notice:
  *   This hardware driver is based on reverse engineering only.
  *
- *   Copyright (C) 2009-2011 Michael Buesch <m@bues.ch>
+ *   Copyright (C) 2009-2016 Michael Buesch <m@bues.ch>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -292,8 +292,9 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 	if (err)
 		return err;
 	if (value < 1 || value > COPPERHEAD_NR_PROFILES) {
-		razer_error("hw_copperhead: Got invalid profile number\n");
-		return -EIO;
+		razer_error("hw_copperhead: Got invalid profile number: %u\n",
+			    (unsigned int)value);
+		value = 1;
 	}
 	priv->cur_profile = &priv->profiles[value - 1];
 
@@ -316,11 +317,12 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 			return err;
 		if (razer_xor16_checksum(&profcfg, sizeof(profcfg))) {
 			razer_error("hw_copperhead: Read profile data checksum mismatch\n");
-			return -EIO;
+			continue;
 		}
 		if (le16_to_cpu(profcfg.reply_profilenr) != i + 1) {
-			razer_error("hw_copperhead: Got invalid profile nr in profile config\n");
-			return -EIO;
+			razer_error("hw_copperhead: Got invalid profile nr in "
+				    "profile config: %u\n",
+				    (unsigned int)le16_to_cpu(profcfg.reply_profilenr));
 		}
 		switch (profcfg.dpisel) {
 		case 4:
@@ -345,10 +347,10 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 			break;
 		default:
 			razer_error("hw_copperhead: Got invalid DPI mapping selection\n");
-			return -EIO;
+			break;
 		}
 		if (!priv->cur_dpimapping[i]) {
-			razer_error("hw_copperhead: Internal error: Did not find dpimapping\n");
+			razer_error("hw_copperhead: Internal error: No dpimapping\n");
 			return -ENODEV;
 		}
 		switch (profcfg.freq) {
@@ -363,13 +365,13 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 			break;
 		default:
 			razer_error("hw_copperhead: Got invalid frequency selection\n");
-			return -EIO;
+			break;
 		}
 		err = razer_parse_buttonmap(profcfg.buttonmap, sizeof(profcfg.buttonmap),
 					    priv->buttons[i].mapping,
 					    ARRAY_SIZE(priv->buttons[i].mapping), 46);
 		if (err)
-			return err;
+			razer_error("hw_copperhead: Failed to parse button map\n");
 	}
 
 	return 0;
@@ -639,6 +641,12 @@ int razer_copperhead_init(struct razer_mouse *m,
 		priv->profiles[i].get_button_function = copperhead_get_button_function;
 		priv->profiles[i].set_button_function = copperhead_set_button_function;
 		priv->profiles[i].mouse = m;
+
+		priv->cur_dpimapping[i] = razer_mouse_get_dpimapping_by_res(
+				priv->dpimappings, ARRAY_SIZE(priv->dpimappings),
+				RAZER_DIM_0, RAZER_MOUSE_RES_400DPI);
+
+		priv->cur_freq[i] = RAZER_MOUSE_FREQ_125HZ;
 	}
 
 	err = m->claim(m);
