@@ -292,8 +292,9 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 	if (err)
 		return err;
 	if (value < 1 || value > COPPERHEAD_NR_PROFILES) {
-		razer_error("hw_copperhead: Got invalid profile number\n");
-		return -EIO;
+		razer_error("hw_copperhead: Got invalid profile number: %u\n",
+			    (unsigned int)value);
+		value = 1;
 	}
 	priv->cur_profile = &priv->profiles[value - 1];
 
@@ -319,8 +320,9 @@ static int copperhead_read_config_from_hw(struct copperhead_private *priv)
 			return -EIO;
 		}
 		if (le16_to_cpu(profcfg.reply_profilenr) != i + 1) {
-			razer_error("hw_copperhead: Got invalid profile nr in profile config\n");
-			return -EIO;
+			razer_error("hw_copperhead: Got invalid profile nr in "
+				    "profile config: %u\n",
+				    (unsigned int)le16_to_cpu(profcfg.reply_profilenr));
 		}
 		switch (profcfg.dpisel) {
 		case 4:
