@@ -422,7 +422,7 @@ static bool mouse_apply_one_config(struct config_file *f,
 {
 	struct razer_mouse *m = context;
 	struct razer_mouse_profile *prof;
-	bool *error = data;
+	bool *error_status = data;
 	int err, nr;
 	static const size_t tmplen = 128;
 	char a[tmplen], b[tmplen], c[tmplen];
@@ -474,7 +474,7 @@ static bool mouse_apply_one_config(struct config_file *f,
 				goto error;
 			goto ok;
 		}
-		goto error;
+		goto invalid; /* res is invalid. Ignore it. */
 	} else if (strcasecmp(item, "freq") == 0) {
 		int profile, freq, i;
 		enum razer_mouse_freq *freqs;
@@ -496,6 +496,8 @@ static bool mouse_apply_one_config(struct config_file *f,
 		for (i = 0; i < nr; i++) {
 			if (freqs[i] != (enum razer_mouse_freq)freq)
 				continue;
+			if (!prof->set_freq)
+				goto invalid;
 			err = prof->set_freq(prof, freqs[i]);
 			razer_free_freq_list(freqs, nr);
 			if (err)
@@ -701,18 +703,18 @@ static bool mouse_apply_one_config(struct config_file *f,
 ok:
 	return 1;
 error:
-	*error = 1;
+	*error_status = 1;
 invalid:
 	razer_error("Config section \"%s\" item \"%s\" "
 		"invalid.\n", section, item);
-	return *error ? 0 : 1;
+	return *error_status ? 0 : 1;
 }
 
 static void mouse_apply_initial_config(struct razer_mouse *m)
 {
 	const char *section = NULL;
 	int err;
-	bool error = 0;
+	bool error_status = 0;
 
 	config_for_each_section(razer_config_file,
 				m, &section,
@@ -733,11 +735,11 @@ static void mouse_apply_initial_config(struct razer_mouse *m)
 		return;
 	}
 	config_for_each_item(razer_config_file,
-			     m, &error,
+			     m, &error_status,
 			     section,
 			     mouse_apply_one_config);
 	m->release(m);
-	if (error) {
+	if (error_status) {
 		razer_error("Failed to apply initial config "
 			"to \"%s\"\n", m->idstr);
 	}
