@@ -437,8 +437,9 @@ static int synapse_read_config_from_hw(struct razer_synapse *s)
 	if (err)
 		return err;
 	if (globconfig.profile < 1 || globconfig.profile > SYNAPSE_NR_PROFILES) {
-		razer_error("synapse: Got invalid profile number\n");
-		return -EIO;
+		razer_error("synapse: Got invalid profile number: %u\n",
+			    (unsigned int)globconfig.profile);
+		globconfig.profile = 1;
 	}
 	s->cur_profile = &s->profiles[globconfig.profile - 1];
 	switch (globconfig.freq) {
@@ -455,7 +456,7 @@ static int synapse_read_config_from_hw(struct razer_synapse *s)
 		razer_error("synapse: "
 			"Read invalid frequency value from device (%u)\n",
 			globconfig.freq);
-		return -EIO;
+		s->cur_freq = RAZER_MOUSE_FREQ_125HZ;
 	}
 
 	/* Get the profile names */
@@ -484,24 +485,25 @@ static int synapse_read_config_from_hw(struct razer_synapse *s)
 		if (hwconfig.profile != i + 1) {
 			razer_error("synapse: Failed to read hw config (%u vs %u)\n",
 				    hwconfig.profile, i + 1);
-			return -EIO;
+			hwconfig.profile = i + 1;
 		}
 		for (j = 0; j < SYNAPSE_NR_LEDS; j++)
 			s->led_states[i][j] = !!(hwconfig.leds & (1 << j));
-		if (hwconfig.dpisel < 1 || hwconfig.dpisel > SYNAPSE_NR_DPIMAPPINGS ||
-		    hwconfig.dpisel > hwconfig.nr_dpimappings) {
-			razer_error("synapse: Got invalid DPI selection: %u\n",
-				    hwconfig.dpisel);
-			return -EIO;
-		}
-		s->cur_dpimapping[i] = &s->dpimappings[i][hwconfig.dpisel - 1];
 
 		if (hwconfig.nr_dpimappings < 1 ||
 		    hwconfig.nr_dpimappings > SYNAPSE_NR_DPIMAPPINGS) {
 			razer_error("synapse: Got invalid nr_dpimappings: %u\n",
 				    hwconfig.nr_dpimappings);
-			return -EIO;
+			hwconfig.nr_dpimappings = SYNAPSE_NR_DPIMAPPINGS;
 		}
+		if (hwconfig.dpisel < 1 || hwconfig.dpisel > SYNAPSE_NR_DPIMAPPINGS ||
+		    hwconfig.dpisel > hwconfig.nr_dpimappings) {
+			razer_error("synapse: Got invalid DPI selection: %u\n",
+				    hwconfig.dpisel);
+			hwconfig.dpisel = 1;
+		}
+		s->cur_dpimapping[i] = &s->dpimappings[i][hwconfig.dpisel - 1];
+
 		for (j = 0; j < SYNAPSE_NR_DPIMAPPINGS; j++) {
 			if (j + 1 > hwconfig.nr_dpimappings) {
 				res_x = RAZER_MOUSE_RES_5600DPI;
