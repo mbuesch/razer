@@ -771,6 +771,7 @@ static int send_utf16_string(struct client *client, const razer_utf16_t *str)
 	struct reply *r;
 	size_t i, len = razer_utf16_strlen(str);
 	int err;
+	uint16_t value;
 
 	r = malloc(len * 2 + REPLY_SIZE(string));
 	if (!r) {
@@ -781,8 +782,10 @@ static int send_utf16_string(struct client *client, const razer_utf16_t *str)
 	r->hdr.id = REPLY_ID_STR;
 	r->string.encoding = STRING_ENC_UTF16BE;
 	r->string.len = cpu_to_be16(len);
-	for (i = 0; i < len; i++)
-		((uint16_t *)r->string.str)[i] = cpu_to_be16(str[i]);
+	for (i = 0; i < len; i++) {
+		value = cpu_to_be16(str[i]);
+		memcpy(&((uint16_t *)r->string.str)[i], &value, sizeof(value));
+	}
 	err = send_reply(client, r, REPLY_SIZE(string) + len * 2);
 
 	free(r);
@@ -1525,6 +1528,7 @@ static void command_setprofname(struct client *client, const struct command *cmd
 	razer_utf16_t namebuf[sizeof(cmd->setprofname.utf16be_name) / 2 + 1] = { };
 	unsigned int i;
 	uint32_t errorcode = ERR_NONE;
+	uint16_t value;
 
 	if (len < CMD_SIZE(setprofname)) {
 		errorcode = ERR_CMDSIZE;
@@ -1544,8 +1548,10 @@ static void command_setprofname(struct client *client, const struct command *cmd
 		errorcode = ERR_NOTSUPP;
 		goto error;
 	}
-	for (i = 0; i < ARRAY_SIZE(namebuf) - 1; i++)
-		namebuf[i] = be16_to_cpu(((const uint16_t *)cmd->setprofname.utf16be_name)[i]);
+	for (i = 0; i < ARRAY_SIZE(namebuf) - 1; i++) {
+		memcpy(&value, &((const uint16_t *)cmd->setprofname.utf16be_name)[i], sizeof(value));
+		namebuf[i] = be16_to_cpu(value);
+	}
 	if (profile->set_name(profile, namebuf)) {
 		errorcode = ERR_FAIL;
 		goto error;
