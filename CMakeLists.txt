@@ -38,8 +38,10 @@ if(UDEV_DIR)
 		PERMISSIONS OWNER_READ OWNER_WRITE
 			    GROUP_READ
 			    WORLD_READ)
-	install_exec_cmd("udevadm control --reload-rules"
-			 "Please reload udev manually or reboot the system")
+	if (NOT DEFINED ENV{RPM_BUILD_ROOT})
+		install_exec_cmd("udevadm control --reload-rules"
+				 "Please reload udev manually or reboot the system")
+	endif (NOT DEFINED ENV{RPM_BUILD_ROOT})
 endif(UDEV_DIR)
 
 configure_file("pm-hook.sh.template" "pm-hook.sh" @ONLY)
@@ -64,10 +66,12 @@ if(SYSTEMD_UNIT_DIR)
 		PERMISSIONS OWNER_READ OWNER_WRITE
 					GROUP_READ
 					WORLD_READ)
-	install_exec_cmd("systemctl --system daemon-reload"
-			 "If you use systemd, please reload systemd manually or reboot the system")
-	install_exec_cmd("systemctl --system --force enable razerd.service"
-			 "If you use systemd, enable razerd.service manually")
+	if (NOT DEFINED ENV{RPM_BUILD_ROOT})
+		install_exec_cmd("systemctl --system daemon-reload"
+				 "If you use systemd, please reload systemd manually or reboot the system")
+		install_exec_cmd("systemctl --system --force enable razerd.service"
+				 "If you use systemd, enable razerd.service manually")
+	endif (NOT DEFINED ENV{RPM_BUILD_ROOT})
 endif(SYSTEMD_UNIT_DIR)
 
 configure_file("razercfg.desktop.template" "razercfg.desktop")
