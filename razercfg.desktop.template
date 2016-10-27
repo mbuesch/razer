@@ -3,4 +3,4 @@ Type=Application
 Categories=Application;System;
 Name=Razer Configuration
 Exec=@CMAKE_INSTALL_PREFIX@/bin/qrazercfg
-
+Icon=@CMAKE_INSTALL_PREFIX@/share/icons/hicolor/scalable/apps/razercfg-snake.svg
