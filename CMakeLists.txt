@@ -26,11 +26,6 @@ add_subdirectory(librazer)
 
 configure_file("udev.rules.template" "udev.rules")
 
-execute_process(COMMAND pkg-config --variable=udevdir udev
-  OUTPUT_VARIABLE UDEV_DIR
-  ERROR_QUIET
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-
 if(UDEV_DIR)
 	install(FILES ${CMAKE_BINARY_DIR}/udev.rules
 		DESTINATION ${UDEV_DIR}/rules.d
@@ -38,10 +33,6 @@ if(UDEV_DIR)
 		PERMISSIONS OWNER_READ OWNER_WRITE
 			    GROUP_READ
 			    WORLD_READ)
-	if (NOT DEFINED ENV{RPM_BUILD_ROOT} AND NOT DEFINED ENV{RAZERCFG_PKG_BUILD})
-		install_exec_cmd("udevadm control --reload-rules"
-				 "Please reload udev manually or reboot the system")
-	endif (NOT DEFINED ENV{RPM_BUILD_ROOT} AND NOT DEFINED ENV{RAZERCFG_PKG_BUILD})
 endif(UDEV_DIR)
 
 configure_file("pm-hook.sh.template" "pm-hook.sh" @ONLY)
@@ -55,23 +46,12 @@ install(FILES ${CMAKE_BINARY_DIR}/pm-hook.sh
 
 configure_file("razerd.service.template" "razerd.service")
 
-execute_process(COMMAND pkg-config --variable=systemdsystemunitdir systemd
-  OUTPUT_VARIABLE SYSTEMD_UNIT_DIR
-  ERROR_QUIET
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-
 if(SYSTEMD_UNIT_DIR)
 	install(FILES ${CMAKE_BINARY_DIR}/razerd.service
 		DESTINATION ${SYSTEMD_UNIT_DIR}
 		PERMISSIONS OWNER_READ OWNER_WRITE
 					GROUP_READ
 					WORLD_READ)
-	if (NOT DEFINED ENV{RPM_BUILD_ROOT} AND NOT DEFINED ENV{RAZERCFG_PKG_BUILD})
-		install_exec_cmd("systemctl --system daemon-reload"
-				 "If you use systemd, please reload systemd manually or reboot the system")
-		install_exec_cmd("systemctl --system --force enable razerd.service"
-				 "If you use systemd, enable razerd.service manually")
-	endif (NOT DEFINED ENV{RPM_BUILD_ROOT} AND NOT DEFINED ENV{RAZERCFG_PKG_BUILD})
 endif(SYSTEMD_UNIT_DIR)
 
 configure_file("razercfg.desktop.template" "razercfg.desktop")
