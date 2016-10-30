@@ -30,5 +30,7 @@ target_link_libraries(razer usb-1.0)
 
 install(TARGETS razer DESTINATION lib)
 
-install_exec_cmd("ldconfig"
-		 "Your system will probably be unable to locate librazer.so library")
+if (NOT DEFINED ENV{RPM_BUILD_ROOT} AND NOT DEFINED ENV{RAZERCFG_PKG_BUILD})
+	install_exec_cmd("ldconfig"
+			 "Your system will probably be unable to locate librazer.so library")
+endif (NOT DEFINED ENV{RPM_BUILD_ROOT} AND NOT DEFINED ENV{RAZERCFG_PKG_BUILD})
