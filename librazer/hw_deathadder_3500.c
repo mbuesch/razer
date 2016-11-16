@@ -5,6 +5,7 @@
  * This hardware driver is based on reverse engineering, only.
  *
  * Copyright (C) 2015 Konrad Zemek <konrad.zemek@gmail.com>
+ *               2016 Eugene Shershen <vamp.null@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free Software
