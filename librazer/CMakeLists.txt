@@ -12,6 +12,7 @@ add_library(razer SHARED
 	    hw_copperhead.c
 	    hw_deathadder.c
 	    hw_deathadder2013.c
+		hw_deathadder_3500.c
 	    hw_deathadder_chroma.c
 	    hw_krait.c
 	    hw_lachesis.c
