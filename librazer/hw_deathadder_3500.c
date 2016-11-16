@@ -575,9 +575,6 @@ deathadder_3500_led_change_color(struct razer_led *led,
 	if (!priv_led)
 		return -EINVAL;
 
-	if (priv_led->mode == DEATHADDER_3500_LED_MODE_SPECTRUM)
-		return -EINVAL;
-
 	priv_led->color = (struct deathadder_3500_rgb_color){
 	    .r = new_color->r, .g = new_color->g, .b = new_color->b};
 
@@ -626,8 +623,6 @@ deathadder_3500_translate_led_mode(enum deathadder_3500_led_mode mode)
 		return RAZER_LED_MODE_STATIC;
 	case DEATHADDER_3500_LED_MODE_BREATHING:
 		return RAZER_LED_MODE_BREATHING;
-	case DEATHADDER_3500_LED_MODE_SPECTRUM:
-		return RAZER_LED_MODE_SPECTRUM;
 	default:
 		return -EINVAL;
 	}
@@ -640,8 +635,6 @@ static int deathadder_3500_translate_razer_led_mode(enum razer_led_mode mode)
 		return DEATHADDER_3500_LED_MODE_STATIC;
 	case RAZER_LED_MODE_BREATHING:
 		return DEATHADDER_3500_LED_MODE_BREATHING;
-	case RAZER_LED_MODE_SPECTRUM:
-		return DEATHADDER_3500_LED_MODE_SPECTRUM;
 	default:
 		return -EINVAL;
 	}
@@ -773,13 +766,13 @@ int razer_deathadder_3500_init(struct razer_mouse *m,
 
 	drv_data->scroll_led = (struct deathadder_3500_led){
 	    .id = DEATHADDER_3500_LED_ID_SCROLL,
-	    .mode = DEATHADDER_3500_LED_MODE_SPECTRUM,
+	    .mode = DEATHADDER_3500_LED_MODE_STATIC,
 	    .state = DEATHADDER_3500_LED_STATE_ON,
 	    .color = {0x00, 0xFF, 0x00}};
 
 	drv_data->logo_led = (struct deathadder_3500_led){
 	    .id = DEATHADDER_3500_LED_ID_LOGO,
-	    .mode = DEATHADDER_3500_LED_MODE_SPECTRUM,
+	    .mode = DEATHADDER_3500_LED_MODE_STATIC,
 	    .state = DEATHADDER_3500_LED_STATE_ON,
 	    .color = {0x00, 0xFF, 0x00}};
 
