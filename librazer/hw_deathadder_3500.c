@@ -684,8 +684,7 @@ static int deathadder_3500_get_leds(struct razer_mouse *m,
 	}
 
 	supported_modes = (1 << RAZER_LED_MODE_BREATHING) |
-			  (1 << RAZER_LED_MODE_SPECTRUM) |
-			  (1 << RAZER_LED_MODE_STATIC);
+			          (1 << RAZER_LED_MODE_STATIC);
 
 	scroll_state =
 	    drv_data->scroll_led.state == DEATHADDER_3500_LED_STATE_OFF
