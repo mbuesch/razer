@@ -4,6 +4,10 @@ export LC_ALL=C.UTF-8
 export DH_VERBOSE=1
 export RAZERCFG_PKG_BUILD=1
 
+override_dh_clean:
+	dh_clean
+	rm -rf ui/build ui/pyrazer/__pycache__ ui/setup.py
+
 override_dh_install:
 	dh_install --fail-missing
 
