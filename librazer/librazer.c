@@ -31,6 +31,7 @@
 #include "hw_imperator.h"
 #include "hw_taipan.h"
 #include "hw_mamba_tournament_edition.h"
+#include "hw_diamondback_chroma.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -140,6 +141,12 @@ static const struct razer_mouse_base_ops razer_mamba_te_base_ops = {
 	.release		= razer_mamba_te_release,
 };
 
+static const struct razer_mouse_base_ops razer_diamondback_chroma_base_ops = {
+	.type			= RAZER_MOUSETYPE_DIAMONDBACK_CHROMA,
+	.init			= razer_diamondback_chroma_init,
+	.release		= razer_diamondback_chroma_release,
+};
+
 #define USBVENDOR_ANY	0xFFFF
 #define USBPRODUCT_ANY	0xFFFF
 
@@ -170,6 +177,7 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 	USB_MOUSE(0x1532, 0x0017, &razer_imperator_base_ops),
 	USB_MOUSE(0x1532, 0x0034, &razer_taipan_base_ops),
 	USB_MOUSE(0x1532, 0x0046, &razer_mamba_te_base_ops), /*mamba tournament edition*/
+	USB_MOUSE(0x1532, 0x004C, &razer_diamondback_chroma_base_ops),
 	{ 0, }, /* List end */
 };
 #undef USB_MOUSE
