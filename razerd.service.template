@@ -4,8 +4,7 @@ Requires=local-fs.target
 After=local-fs.target
 
 [Service]
-Type=forking
-ExecStart=@CMAKE_INSTALL_PREFIX@/bin/razerd -f -B -P /run/razerd/razerd.pid
+ExecStart=@CMAKE_INSTALL_PREFIX@/bin/razerd -f
 
 [Install]
 Alias=multi-user.target.wants/razerd.service
