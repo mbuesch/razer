@@ -9,6 +9,7 @@ Build-Depends: debhelper (>= 9),
  pkg-config,
  python3-dev,
  dh-python
+Standards-Version: 3.9.8
 
 Package: razercfg
 Architecture: any
