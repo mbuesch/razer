@@ -10,6 +10,9 @@ Build-Depends: debhelper (>= 9),
  python3-dev,
  dh-python
 Standards-Version: 3.9.8
+Vcs-Git: https://git.bues.ch/git/razer.git
+Vcs-Browser: https://git.bues.ch/git/razer.git
+Homepage: https://bues.ch/h/razercfg
 
 Package: razercfg
 Architecture: any
