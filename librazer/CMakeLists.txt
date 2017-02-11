@@ -1,6 +1,13 @@
 include("${razer_SOURCE_DIR}/scripts/cmake.global")
 
-add_library(razer SHARED
+option(LIBRAZER_SHARED "Build librazer as a shared library" ON)
+if (LIBRAZER_SHARED)
+	set(SHARED_OR_STATIC "SHARED")
+else (LIBRAZER_SHARED)
+	set(SHARED_OR_STATIC "STATIC")
+endif (LIBRAZER_SHARED)
+
+add_library(razer ${SHARED_OR_STATIC}
 	    buttonmapping.c
 	    profile_emulation.c
 	    librazer.c
