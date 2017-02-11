@@ -40,7 +40,8 @@ static enum razer_mouse_res diamondback_chroma_resolution_stages_list[] =
 	RAZER_MOUSE_RES_1800DPI,
 	RAZER_MOUSE_RES_3500DPI,
 	RAZER_MOUSE_RES_5600DPI,
-	RAZER_MOUSE_RES_10000DPI
+	RAZER_MOUSE_RES_10000DPI,
+	RAZER_MOUSE_RES_16000DPI
 };
 
 #define DIAMONDBACK_CHROMA_DEVICE_NAME	"Diamondback Chroma"
@@ -109,7 +110,7 @@ enum diamondback_chroma_request
 enum diamondback_chroma_constants
 {
 	DIAMONDBACK_CHROMA_MAX_FREQUENCY			= RAZER_MOUSE_FREQ_1000HZ,
-	DIAMONDBACK_CHROMA_MAX_RESOLUTION			= RAZER_MOUSE_RES_10000DPI,
+	DIAMONDBACK_CHROMA_MAX_RESOLUTION			= RAZER_MOUSE_RES_16000DPI,
 	DIAMONDBACK_CHROMA_RESOLUTION_STEP		= RAZER_MOUSE_RES_100DPI,
 
 	DIAMONDBACK_CHROMA_LED_NUM			= 1,
@@ -588,7 +589,7 @@ static int diamondback_chroma_change_dpimapping(struct razer_mouse_dpimapping *d
 	if (res == RAZER_MOUSE_RES_UNKNOWN)
 		res = RAZER_MOUSE_RES_1800DPI;
 
-	if (res < RAZER_MOUSE_RES_100DPI || res > RAZER_MOUSE_RES_10000DPI)
+	if (res < RAZER_MOUSE_RES_100DPI || res > RAZER_MOUSE_RES_16000DPI)
 		return -EINVAL;
 
 	d->res[dim] = res;
