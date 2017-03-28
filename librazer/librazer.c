@@ -40,6 +40,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 
 enum razer_devtype {
@@ -195,6 +197,10 @@ razer_logfunc_t razer_logfunc_info;
 razer_logfunc_t razer_logfunc_error;
 razer_logfunc_t razer_logfunc_debug;
 
+
+struct config_file* razer_get_config() {
+	return razer_config_file;
+}
 
 static inline bool razer_initialized(void)
 {
@@ -1488,6 +1494,60 @@ reclaim:
 	}
 out:
 	return errorcode;
+}
+
+int razer_save_config(struct config_file *conf, const char *path)
+{
+	struct stat statbuf;
+
+	if (!razer_initialized())
+		return -EINVAL;
+
+	if (!path)
+		path = RAZER_DEFAULT_CONFIG;
+
+	if (strlen(path)) {
+		int ret = stat(path, &statbuf);
+		if (ret)
+			return 1;
+
+		ssize_t fsize = statbuf.st_size;
+		/* Allocate extra memory to be sure */
+		if (fsize == 0)
+			fsize = 4096;
+		char *buf = zalloc(2 * fsize);
+
+		razer_debug("%s %d\n", path, (int) fsize);
+		for (struct config_section *s = conf->sections; s; s = s->next) {
+			WRITE_SECTION(buf, s);
+			razer_debug("\t%s\n", s->name);
+			for (struct config_item *i = s->items; i; i = i->next) {
+				razer_debug("\t\t%s: %s\n", i->name, i->value);
+				WRITE_ITEM(buf, i);
+			}
+			strcat(buf, "\n");
+		}
+		razer_debug("%s", buf);
+
+		FILE *out = fopen(path, "w");
+		if (out == NULL) {
+			razer_error("Opening file failed\n");
+			return 1;
+		}
+
+		int written = fprintf(out, "%s", buf);
+		if (written == 0)
+			razer_error("Writing to file failed\n");
+		else
+			razer_debug("Wrote %d bytes\n", written);
+
+		fclose(out);
+		free(buf);
+
+		/* Refresh at the end, a kind of test. */
+		razer_load_config(path);
+	}
+	return 0;
 }
 
 int razer_load_config(const char *path)

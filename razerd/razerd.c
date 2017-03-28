@@ -1203,6 +1203,7 @@ static void command_rescanmice(struct client *client, const struct command *cmd,
 static void command_reconfigmice(struct client *client, const struct command *cmd, unsigned int len)
 {
 	razer_reconfig_mice();
+	razer_save_config(razer_get_config(), cmdargs.configfile);
 }
 
 static void command_getmouseinfo(struct client *client, const struct command *cmd, unsigned int len)

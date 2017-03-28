@@ -33,6 +33,9 @@
 #define RAZER_LEDNAME_MAX_SIZE	64
 #define RAZER_DEFAULT_CONFIG	"/etc/razer.conf"
 
+#define WRITE_SECTION(x, s) {strcat(x, "["); strcat(x, s->name); strcat(x, "]\n");}
+#define WRITE_ITEM(x, i) {strcat(x, "        "); strcat(x, i->name); strcat(x, "="); strcat(x, i->value); strcat(x, "\n");}
+
 /* Opaque internal data structures */
 struct razer_usb_context;
 struct razer_mouse_base_ops;
@@ -40,6 +43,9 @@ struct razer_mouse_profile_emu;
 
 struct razer_mouse;
 
+struct config_item;
+struct config_section;
+struct config_file;
 
 /** razer_utf16_t - UTF-16 type */
 typedef uint16_t razer_utf16_t;
@@ -663,12 +669,25 @@ int razer_register_event_handler(razer_event_handler_t handler);
  */
 void razer_unregister_event_handler(razer_event_handler_t handler);
 
+/**
+ * razer_save_config - Save a configuration file.
+ * If path is NULL, the default config is updated.
+ * If path is an empty string, nothing is done
+ */
+int razer_save_config(struct config_file *conf, const char *path);
+
 /** razer_load_config - Load a configuration file.
  * If path is NULL, the default config is loaded.
  * If path is an empty string, the current config (if any) will be
  * discarded and no config will be loaded.
  */
 int razer_load_config(const char *path);
+
+/**
+ * razer_get_config - Get the config struct
+ */
+
+struct config_file* razer_get_config();
 
 typedef void (*razer_logfunc_t)(const char *fmt, ...);
 
