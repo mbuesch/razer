@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+
+import argparse
+from pyrazer import *
+
+razer = None
+
+# helpers
+def array_get(a, n, default=None):
+    try:
+        return a[n]
+    except IndexError:
+        return default
+
+def get_mouse(id):
+    mice = razer.getMice()
+    mouse = None
+
+    if ( id.isdigit() ):
+        try:
+            mouse = mice[int(id)]
+        except:
+            raise Exception('no mouse with id ' + id)
+
+    else:
+        try:
+            mouse = mice[mice.index(id)]
+        except:
+            raise Exception('no mouse with id ', id)
+
+    return mouse
+
+def get_profile(mouse, id):
+    if(id):
+        return razer.getProfiles(mouse)[int(id)]
+    return razer.getActiveProfile(mouse)
+
+def get_mapping(mouse, id):
+    if(id):
+        return razer.getSupportedDpiMappings(mouse)[int(id)]
+
+    active_profile = get_profile(mouse, None)
+    return razer.getSupportedDpiMappings(mouse)[active_profile]
+
+
+def arg_mice(args):
+    pretty_print(getMice())
+
+def arg_profiles(args):
+
+    mouse = get_mouse(args.mouse)
+
+    profiles = razer.getProfiles(mouse)
+    active_profile = razer.getActiveProfile(mouse)
+
+
+    if (args.set_active != None):
+        razer.setActiveProfile(mouse, args.set_active)
+
+    if (args.show_active):
+        print (active_profile, razer.getProfileName(mouse, active_profile))
+
+    if (args.show):
+        for p in profiles:
+            if active_profile == p:
+                print ('>', p, razer.getProfileName(mouse, p))
+            else:
+                print (p, razer.getProfileName(mouse, p))
+
+def arg_dpimapping(args):
+    mouse = get_mouse(args.mouse)
+    profile = get_profile(mouse, args.profile)
+
+    active_dpimapping = razer.getDpiMapping(mouse, profile)
+
+    if (args.set_active):
+        razer.setDpiMapping(mouse, profile, int(args.set_active), None)
+
+    if (args.show):
+        for m in razer.getSupportedDpiMappings(mouse):
+            active = "> " if active_dpimapping == m.id else ""
+            print (active+str(m.id), str(m.res[0])+'x'+str(m.res[1]))
+
+    if (args.show_active):
+        print(active_dpimapping)
+
+def arg_res(args):
+    mouse = get_mouse(args.mouse)
+    mapping = get_mapping(mouse, args.mapping)
+
+    active_profile = razer.getActiveProfile(mouse);
+    active_dpimapping = razer.getDpiMapping(mouse, active_profile)
+
+    supported_resolutions = razer.getSupportedRes(mouse)
+
+    if (args.set):
+        res = args.set.split('x')
+        x = int(array_get(res, 0))
+        y = int(array_get(res, 1, x))
+        if x in supported_resolutions and y in supported_resolutions:
+            razer.changeDpiMapping(mouse, mapping.id, 0, x);
+            razer.changeDpiMapping(mouse, mapping.id, 1, y);
+        else:
+            raise Exception('unsupported resolution')
+
+    if args.show:
+        res = razer.getSupportedDpiMappings(mouse)[active_dpimapping].res
+        print (str(res[0]) + "x" + str(res[1]))
+
+
+def arg_parser():
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(help='sub-command help')
+
+    mice = subparsers.add_parser('mice')
+    mice.set_defaults(func=arg_mice)
+
+    profiles = subparsers.add_parser('profiles')
+    profiles.add_argument('-m', '--mouse', required=True)
+    profiles.add_argument('-a', '--set_active', type=int, help='sets a profile id active')
+    profiles.add_argument('-S', '--show', action='store_true')
+    profiles.add_argument('-A', '--show-active', action='store_true')
+    profiles.set_defaults(func=arg_profiles)
+
+    dpimapping = subparsers.add_parser('dpimapping')
+    dpimapping.add_argument('-m', '--mouse', required=True)
+    dpimapping.add_argument('-p', '--profile', type=int, help='profile id, default: active profile')
+    dpimapping.add_argument('-a', '--set-active', type=int, help='sets a dpi mapping id active')
+    dpimapping.add_argument('-A', '--show-active', action='store_true')
+    dpimapping.add_argument('-S', '--show', action='store_true')
+    dpimapping.set_defaults(func=arg_dpimapping)
+
+    res = subparsers.add_parser('res')
+    res.add_argument('-m', '--mouse', required=True)
+    res.add_argument('-map', '--mapping', type=int, help='mapping id, default: active mapping')
+    res.add_argument('-s', '--set', help='set a resolution ex. 400x400')
+    res.add_argument('-S', '--show', action='store_true')
+    res.set_defaults(func=arg_res)
+
+    return parser
+
+def main():
+    global razer
+    razer = Razer()
+    parser = arg_parser()
+    args = parser.parse_args()
+    try:
+        args.func(args)
+    except Exception as e:
+        print('ERR:', e)
+
+if __name__ == '__main__':
+    main()
