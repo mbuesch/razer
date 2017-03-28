@@ -187,7 +187,13 @@ enum razer_mouse_res {
 	RAZER_MOUSE_RES_8200DPI		= 8200,
 	RAZER_MOUSE_RES_8800DPI		= 8800,
 	RAZER_MOUSE_RES_9400DPI		= 9400,
-	RAZER_MOUSE_RES_10000DPI	= 10000
+	RAZER_MOUSE_RES_10000DPI	= 10000,
+	RAZER_MOUSE_RES_11000DPI	= 11000,
+	RAZER_MOUSE_RES_12000DPI	= 12000,
+	RAZER_MOUSE_RES_13000DPI	= 13000,
+	RAZER_MOUSE_RES_14000DPI	= 14000,
+	RAZER_MOUSE_RES_15000DPI	= 15000,
+	RAZER_MOUSE_RES_16000DPI	= 16000,
 };
 
 /** enum razer_mouse_type
@@ -200,6 +206,7 @@ enum razer_mouse_res {
   * @RAZER_MOUSETYPE_IMPERATOR: An "Imperator" mouse
   * @RAZER_MOUSETYPE_TAIPAN: A "Taipan" mouse
   * @RAZER_MOUSETYPE_MAMBA_TE: A "Mamba Tournament Edition" mouse
+  * @RAZER_MOUSETYPE_DIAMONDBACK_CHROMA: A "Diamondback Chroma" mouse
   */
 
 enum razer_mouse_type {
@@ -212,6 +219,7 @@ enum razer_mouse_type {
 	RAZER_MOUSETYPE_IMPERATOR,
 	RAZER_MOUSETYPE_TAIPAN,
 	RAZER_MOUSETYPE_MAMBA_TE,
+	RAZER_MOUSETYPE_DIAMONDBACK_CHROMA,
 };
 
 /** struct razer_button_function - A logical button function
