@@ -195,7 +195,7 @@ struct diamondback_chroma_driver_data
 	struct razer_mouse_dpimapping dpimappings[DIAMONDBACK_CHROMA_DPIMAPPINGS_NUM];
 	struct razer_axis axes[DIAMONDBACK_CHROMA_AXES_NUM];
 	uint16_t fw_version;
-	char serial[DIAMONDBACK_CHROMA_REQUEST_SIZE_GET_SERIAL_NO];
+	char serial[DIAMONDBACK_CHROMA_REQUEST_SIZE_GET_SERIAL_NO + 1];
 };
 
 static uint8_t diamondback_chroma_checksum(struct diamondback_chroma_command *cmd)
@@ -364,6 +364,7 @@ static int diamondback_chroma_send_get_serial_no_command(struct razer_mouse *m)
 
 	strncpy(drv_data->serial, (const char *)cmd.bvalue,
 		DIAMONDBACK_CHROMA_REQUEST_SIZE_GET_SERIAL_NO);
+	drv_data->serial[DIAMONDBACK_CHROMA_REQUEST_SIZE_GET_SERIAL_NO] = '\0';
 
 	return 0;
 }

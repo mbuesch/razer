@@ -174,7 +174,7 @@ struct deathadder_chroma_driver_data
 	    dpimappings[DEATHADDER_CHROMA_DPIMAPPINGS_NUM];
 	struct razer_axis axes[DEATHADDER_CHROMA_AXES_NUM];
 	uint16_t fw_version;
-	char serial[DEATHADDER_CHROMA_REQUEST_SIZE_GET_SERIAL_NO];
+	char serial[DEATHADDER_CHROMA_REQUEST_SIZE_GET_SERIAL_NO + 1];
 };
 
 static uint8_t deathadder_chroma_checksum(struct deathadder_chroma_command *cmd)
@@ -342,6 +342,8 @@ static int deathadder_chroma_send_get_serial_no_command(struct razer_mouse *m)
 
 	strncpy(drv_data->serial, (const char *)cmd.bvalue,
 		DEATHADDER_CHROMA_REQUEST_SIZE_GET_SERIAL_NO);
+	drv_data->serial[DEATHADDER_CHROMA_REQUEST_SIZE_GET_SERIAL_NO] = '\0';
+
 	return 0;
 }
 

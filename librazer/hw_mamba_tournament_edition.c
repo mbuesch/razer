@@ -194,7 +194,7 @@ struct mamba_te_driver_data
 	struct razer_mouse_dpimapping dpimappings[MAMBA_TE_DPIMAPPINGS_NUM];
 	struct razer_axis axes[MAMBA_TE_AXES_NUM];
 	uint16_t fw_version;
-	char serial[MAMBA_TE_REQUEST_SIZE_GET_SERIAL_NO];
+	char serial[MAMBA_TE_REQUEST_SIZE_GET_SERIAL_NO + 1];
 };
 
 static uint8_t mamba_te_checksum(struct mamba_te_command *cmd)
@@ -363,6 +363,7 @@ static int mamba_te_send_get_serial_no_command(struct razer_mouse *m)
 
 	strncpy(drv_data->serial, (const char *)cmd.bvalue,
 		MAMBA_TE_REQUEST_SIZE_GET_SERIAL_NO);
+	drv_data->serial[MAMBA_TE_REQUEST_SIZE_GET_SERIAL_NO] = '\0';
 
 	return 0;
 }
