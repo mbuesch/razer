@@ -151,7 +151,7 @@ static int taipan_send_command(struct taipan_private *priv,
 static int taipan_read_fw_ver(struct taipan_private *priv)
 {
 	struct taipan_command cmd;
-	uint16_t ver;
+	uint16_t ver = 1;
 	int err;
 	unsigned int i;
 
@@ -159,8 +159,7 @@ static int taipan_read_fw_ver(struct taipan_private *priv)
 	 * valid version number */
 	for (i = 0; i < 5; i++) {
 		taipan_command_init(&cmd);
-		cmd.command = cpu_to_be16(0x0200);
-		cmd.request = cpu_to_be16(0x8100);
+		cmd.request = cpu_to_be16(0x8300);
 		err = taipan_send_command(priv, &cmd);
 		ver = be16_to_cpu(cmd.value0);
 		if (!err && (ver & 0xFF00) != 0)
@@ -172,7 +171,7 @@ static int taipan_read_fw_ver(struct taipan_private *priv)
 	/* FIXME: Ignore the error and return 0 until we find out
 	 *        why some mice fail to return a valid version number.
 	 */
-	return 0;
+	return 2;
 }
 
 static int taipan_do_commit(struct taipan_private *priv)
