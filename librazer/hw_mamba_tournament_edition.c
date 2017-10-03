@@ -40,7 +40,8 @@ static enum razer_mouse_res mamba_te_resolution_stages_list[] =
 	RAZER_MOUSE_RES_1800DPI,
 	RAZER_MOUSE_RES_3500DPI,
 	RAZER_MOUSE_RES_5600DPI,
-	RAZER_MOUSE_RES_10000DPI
+	RAZER_MOUSE_RES_10000DPI,
+	RAZER_MOUSE_RES_16000DPI
 };
 
 #define MAMBA_TE_DEVICE_NAME	"Mamba Tournament Edition"
