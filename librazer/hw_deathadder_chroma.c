@@ -191,7 +191,7 @@ static int deathadder_chroma_translate_frequency(enum razer_mouse_freq freq)
 	switch (freq) {
 	case RAZER_MOUSE_FREQ_UNKNOWN:
 		freq = RAZER_MOUSE_FREQ_500HZ;
-
+		/* fall through */
 	case RAZER_MOUSE_FREQ_125HZ:
 	case RAZER_MOUSE_FREQ_500HZ:
 	case RAZER_MOUSE_FREQ_1000HZ:
