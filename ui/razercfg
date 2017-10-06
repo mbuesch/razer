@@ -313,6 +313,33 @@ class OpSetFreq(Operation):
 			raise RazerEx("Failed to set frequency to %d Hz (%s)" %\
 					(freq, Razer.strerror(error)))
 
+class OpChangeMapping(Operation):
+	def __init__(self, param):
+		self.param = param
+
+	def run(self, idstr):
+		curProf = getRazer().getActiveProfile(idstr)
+		curMap = getRazer().getDpiMapping(idstr, curProf)
+		supRes = getRazer().getSupportedRes(idstr)
+		values = self.param.split('x')
+		supported = False
+		for value in values:
+			for res in supRes:
+				if int(value) == res:
+					supported = True
+					break
+			if not supported:
+				raise RazerEx("Invalid parameter to --mapping option")
+
+		if len(values) == 1:
+			getRazer().changeDpiMapping(idstr, curMap, 0, int(values[0])) # Set x-axis
+			getRazer().changeDpiMapping(idstr, curMap, 1, int(values[0])) # Set y-axis
+		elif len(values) == 2:
+			getRazer().changeDpiMapping(idstr, curMap, 0, int(values[0])) # Set x-axis
+			getRazer().changeDpiMapping(idstr, curMap, 1, int(values[1])) # Set y-axis
+		else:
+			raise RazerEx("Invalid parameter to --mapping option")
+
 class OpFlashFw(Operation):
 	def __init__(self, filename):
 		self.filename = filename
@@ -387,6 +414,7 @@ def usage():
 	print("-R|--getres                         Prints the resolutions")
 	print("-f|--freq [PROF:]FREQ               Changes the scan frequency")
 	print("-F|--getfreq                        Prints the frequencies")
+	print("-n|--mapping [PROF:]RES[xRES]       Changes the resolution of the currently used mapping")
 	print("-L|--leds                           List the device supported LED identifiers")
 	print("-l|--setled [PROF:]LED:(on|off)     Toggle the LED with the identifier \"LED\"")
 	print("                                    Use the special identifier \"all\"")
@@ -416,11 +444,12 @@ def parse_args():
 
 	try:
 		(opts, args) = getopt.getopt(sys.argv[1:],
-			"hvBsKd:r:Rf:FLl:VS:X:c:p:Pm:",
+			"hvBsKd:r:Rf:Fn:Ll:VS:X:c:p:Pm:",
 			[ "help", "version", "background",
 			  "scan", "reconfigure", "device=", "res=",
-			  "getres", "freq=", "getfreq", "leds", "setled=",
-			  "fwver", "config=", "sleep=", "flashfw=",
+			  "getres", "freq=", "getfreq", "mapping=",
+			  "leds", "setled=", "fwver",
+			  "config=", "sleep=", "flashfw=",
 			  "setledcolor=", "setledmode=",
 			  "profile=", "getprofile", ])
 	except getopt.GetoptError:
@@ -489,6 +518,11 @@ def parse_args():
 			if not currentDevOps:
 				currentDevOps = DevOps(findDevice())
 			currentDevOps.add(OpGetFreq())
+			continue
+		if o in ("-n", "--mapping"):
+			if not currentDevOps:
+				currentDevOps = DevOps(findDevice())
+			currentDevOps.add(OpChangeMapping(v))
 			continue
 		if o in ("-L", "--leds"):
 			if not currentDevOps:
