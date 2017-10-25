@@ -3,7 +3,7 @@ Upstream-Name: razercfg
 Source: https://bues.ch/h/razercfg
 
 Files: *
-Copyright: 2008-2016 Michael Buesch <m@bues.ch>
+Copyright: 2008-2017 Michael Buesch <m@bues.ch>
 License: GPL-2+
  This package is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
