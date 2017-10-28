@@ -4,6 +4,25 @@ Source: https://bues.ch/h/razercfg
 
 Files: *
 Copyright: 2008-2017 Michael Buesch <m@bues.ch>
+           2012 Guillermo Ramos <0xwille@gmail.com>
+           2013 Tibor Peluch <messani@gmail.com>
+           2014 Benoit Pierre <benoit.pierre@gmail.com>
+           2014 Christian Inci <chris.pcguy.inci@gmail.com>
+           2014 perfect7gentleman <perfect007gentleman@gmail.com>
+           2014 polyzen <polycitizen@gmail.com>
+           2014 Ryan Mulcahy <mulchy81@gmail.com>
+           2014 Tony Crisci <tony@dubstepdish.com>
+           2014 Torstein Husebø <torstein@huseboe.net>
+           2015 Corentin Jabot <corentinjabot@gmail.com>
+           2015 Greg Larmore <larmoreg@gmail.com>
+           2015 Konrad Zemek <konrad.zemek@gmail.com>
+           2016 Jan Stümmel <info@janstuemmel.de>
+           2016 Luca Weiss <luca@z3ntu.xyz>
+           2016 Markus Törnqvist <mjt@nysv.org>
+           2016 Vicc <wanghaoan.victor@gmail.com>
+           2017 Barthelemy Delemotte <barthelemy.delemotte@gmail.com>
+           2017 Marcus Weinhold <marcus@weinhold.org>
+           2017 Luca Boccassi <bluca@debian.org>
 License: GPL-2+
  This package is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
