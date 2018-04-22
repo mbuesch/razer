@@ -50,10 +50,10 @@ enum lachesis_phys_button {
 	LACHESIS_PHYSBUT_LEFT = 0x01,	/* Left button */
 	LACHESIS_PHYSBUT_RIGHT,		/* Right button */
 	LACHESIS_PHYSBUT_MIDDLE,	/* Middle button */
-	LACHESIS_PHYSBUT_LFRONT,	/* Left side, front button */
-	LACHESIS_PHYSBUT_LREAR,		/* Left side, rear button */
 	LACHESIS_PHYSBUT_RFRONT,	/* Right side, front button */
 	LACHESIS_PHYSBUT_RREAR,		/* Right side, rear button */
+	LACHESIS_PHYSBUT_LFRONT,	/* Left side, front button */
+	LACHESIS_PHYSBUT_LREAR,		/* Left side, rear button */
 	LACHESIS_PHYSBUT_TFRONT,	/* Top side, front button */
 	LACHESIS_PHYSBUT_TREAR,		/* Top side, rear button */
 	LACHESIS_PHYSBUT_SCROLLUP,	/* Scroll wheel up */
