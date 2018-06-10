@@ -2,7 +2,7 @@
 #
 #   Razer device QT configuration tool
 #
-#   Copyright (C) 2007-2016 Michael Buesch <m@bues.ch>
+#   Copyright (C) 2007-2018 Michael Buesch <m@bues.ch>
 #
 #   This program is free software; you can redistribute it and/or
 #   modify it under the terms of the GNU General Public License
@@ -16,8 +16,9 @@
 
 import sys
 import traceback
-from PySide.QtCore import *
-from PySide.QtGui import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
 
 import pyrazer
 from pyrazer import ui

@@ -19,8 +19,8 @@ Dependencies
 * libusb 1.0: [http://libusb.org/](http://libusb.org/)   
 Debian Linux: `apt-get install libusb-1.0-0-dev`
 
-* PySide (for the graphical qrazercfg tool only): [https://wiki.qt.io/PySide](https://wiki.qt.io/PySide)  
-Debian Linux: `apt-get install python3-pyside`
+* PyQt5 (for the graphical qrazercfg tool only): [https://riverbankcomputing.com/software/pyqt/download5/](https://riverbankcomputing.com/software/pyqt/download5/)
+Debian Linux: `apt-get install python3-pyqt5`
 
 * cmake 2.4 or later (for building only): [https://cmake.org/](https://cmake.org/)  
 Debian Linux: `apt-get install cmake`

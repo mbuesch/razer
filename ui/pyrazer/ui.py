@@ -1,6 +1,6 @@
 #   Razer device QT configuration tool
 #
-#   Copyright (C) 2007-2016 Michael Buesch <m@bues.ch>
+#   Copyright (C) 2007-2018 Michael Buesch <m@bues.ch>
 #
 #   This program is free software; you can redistribute it and/or
 #   modify it under the terms of the GNU General Public License
@@ -13,8 +13,10 @@
 #   GNU General Public License for more details.
 
 import sys
-from PySide.QtCore import *
-from PySide.QtGui import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
+Signal = pyqtSignal
 from functools import partial
 from pyrazer import *
 
@@ -116,10 +118,10 @@ class ButtonConfDialog(QDialog):
 
 		h = QHBoxLayout()
 		self.applyButton = QPushButton(self.tr("Apply"), self)
-		self.connect(self.applyButton, SIGNAL("clicked()"), self.apply)
+		self.applyButton.clicked.connect(self.apply)
 		h.addWidget(self.applyButton)
 		self.cancelButton = QPushButton(self.tr("Cancel"), self)
-		self.connect(self.cancelButton, SIGNAL("clicked()"), self.cancel)
+		self.cancelButton.clicked.connect(self.cancel)
 		h.addWidget(self.cancelButton)
 		self.layout().addLayout(h)
 
@@ -156,8 +158,7 @@ class OneLedConfig(QWidget):
 			for mode in led.supported_modes:
 				self.modeComBox.addItem(mode.toString(), mode.val)
 
-			self.connect(self.modeComBox, SIGNAL("currentIndexChanged(int)"),
-					self.modeChanged)
+			self.modeComBox.currentIndexChanged.connect(self.modeChanged)
 
 			index = self.modeComBox.findData(led.mode.val)
 			if index >= 0:
@@ -168,11 +169,9 @@ class OneLedConfig(QWidget):
 			self.colorPb = QPushButton(self.tr("change color..."), self)
 			self.layout().addWidget(self.colorPb, 0, 2)
 
-			self.connect(self.colorPb, SIGNAL("released()"),
-				     self.colorChangePressed)
+			self.colorPb.released.connect(self.colorChangePressed)
 
-		self.connect(self.stateCb, SIGNAL("stateChanged(int)"),
-			     self.toggled)
+		self.stateCb.stateChanged.connect(self.toggled)
 
 	def toggled(self, state):
 		self.led.state = bool(state)
@@ -232,7 +231,7 @@ class MouseProfileWidget(QWidget):
 		yoff = 0
 
 		self.profileActive = QRadioButton(self.tr("Profile active"), self)
-		self.connect(self.profileActive, SIGNAL("toggled(bool)"), self.activeChanged)
+		self.profileActive.toggled.connect(self.activeChanged)
 		self.layout().addWidget(self.profileActive, yoff, 0)
 		yoff += 1
 
@@ -248,12 +247,12 @@ class MouseProfileWidget(QWidget):
 			axisName = axis[1] + " " if axis[1] else ""
 			self.layout().addWidget(QLabel(self.tr("%sScan resolution:" % axisName), self), yoff, 0)
 			resSel = WrappedComboBox(self)
-			self.connect(resSel, SIGNAL("currentIndexChanged(int)"), self.resChanged)
+			resSel.currentIndexChanged.connect(self.resChanged)
 			self.layout().addWidget(resSel, yoff, 1)
 			self.resSel.append(resSel)
 			yoff += 1
 		self.resIndependent = QCheckBox(self.tr("Independent resolutions"), self)
-		self.connect(self.resIndependent, SIGNAL("stateChanged(int)"), self.resIndependentChanged)
+		self.resIndependent.stateChanged.connect(self.resIndependentChanged)
 		self.layout().addWidget(self.resIndependent, yoff, 1)
 		yoff += 1
 		if len(axes) <= 1:
@@ -262,13 +261,13 @@ class MouseProfileWidget(QWidget):
 		funcs = razer.getSupportedButtonFunctions(self.mouseWidget.mouse)
 		if funcs:
 			self.buttonConf = QPushButton(self.tr("Configure buttons"), self)
-			self.connect(self.buttonConf, SIGNAL("clicked(bool)"), self.showButtonConf)
+			self.buttonConf.clicked.connect(self.showButtonConf)
 			self.layout().addWidget(self.buttonConf, yoff, 0, 1, 2)
 			yoff += 1
 
 		if minfo & Razer.MOUSEINFOFLG_PROFNAMEMUTABLE:
 			self.buttonName = QPushButton(self.tr("Change profile name"), self)
-			self.connect(self.buttonName, SIGNAL("clicked(bool)"), self.nameChange)
+			self.buttonName.clicked.connect(self.nameChange)
 			self.layout().addWidget(self.buttonName, yoff, 0, 1, 2)
 			yoff += 1
 
@@ -425,8 +424,7 @@ class OneDpiMapping(QWidget):
 			index = self.mappingSel.findData(thisRes)
 			if index >= 0:
 				self.mappingSel.setCurrentIndex(index)
-			self.connect(self.mappingSel, SIGNAL("currentIndexChanged(int)"),
-				     changeSlots[dimIdx])
+			self.mappingSel.currentIndexChanged.connect(changeSlots[dimIdx])
 			self.mappingSel.setEnabled(dpimapping.mutable)
 			self.layout().addWidget(self.mappingSel)
 		self.layout().addStretch()
@@ -494,7 +492,7 @@ class MouseScanFreqWidget(QWidget):
 		self.freqSel = WrappedComboBox(self)
 		self.layout().addWidget(self.freqSel, 0, 1)
 
-		self.connect(self.freqSel, SIGNAL("currentIndexChanged(int)"), self.freqChanged)
+		self.freqSel.currentIndexChanged.connect(self.freqChanged)
 
 	def freqChanged(self, index):
 		if self.mouseWidget.recurseProtect or index <= 0:
@@ -527,7 +525,7 @@ class MouseWidget(QWidget):
 		self.setLayout(QVBoxLayout(self))
 
 		self.mousesel = WrappedComboBox(self)
-		self.connect(self.mousesel, SIGNAL("currentIndexChanged(int)"), self.mouseChanged)
+		self.mousesel.currentIndexChanged.connect(self.mouseChanged)
 		self.layout().addWidget(self.mousesel)
 		self.layout().addSpacing(15)
 
@@ -682,7 +680,7 @@ class MainWindow(QMainWindow):
 		QMessageBox.information(self, self.tr("About"),
 					self.tr("Razer device configuration tool\n"
 						"Version %s\n"
-						"Copyright (c) 2007-2016 Michael Buesch"
+						"Copyright (c) 2007-2018 Michael Buesch et al."
 						% RAZER_VERSION))
 
 	def showEvent(self, ev):
