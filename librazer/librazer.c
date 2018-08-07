@@ -1187,9 +1187,9 @@ void razer_generic_usb_gen_idstr(struct libusb_device *udev,
 				 const char *serial,
 				 char *idstr_buf)
 {
-	char devid[64];
+	char devid[96];
 	char serial_buf[64];
-	char buspos[512];
+	char buspos[16];
 	char c;
 	size_t i;
 	unsigned int serial_index = 0;
