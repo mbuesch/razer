@@ -5,8 +5,8 @@ cmake_minimum_required(VERSION 2.4)
 if (COMMAND cmake_policy)
 	# Libraries linked via full path no longer produce linker search paths.
 	cmake_policy(SET CMP0003 NEW)
-	# Preprocessor definition values are not escaped automatically.
-	cmake_policy(SET CMP0005 OLD)
+	# Preprocessor definition values shall be escaped automatically.
+	cmake_policy(SET CMP0005 NEW)
 endif (COMMAND cmake_policy)
 
 include("${razer_SOURCE_DIR}/scripts/cmake.global")
