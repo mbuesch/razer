@@ -1,3 +1,6 @@
+This fork provides support for Razer deathadder 1800 edition and Korea PC bang edition
+=======================================================================================
+
 Razer device configuration tool
 ===============================
 
