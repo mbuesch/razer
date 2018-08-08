@@ -2,9 +2,8 @@ Source: razercfg
 Maintainer: Michael Büsch <m@bues.ch>
 Section: misc
 Priority: optional
-Build-Depends: debhelper (>= 9),
+Build-Depends: debhelper (>= 10),
  cmake,
- dh-systemd,
  libusb-1.0-0-dev,
  pkg-config,
  python3-dev,
