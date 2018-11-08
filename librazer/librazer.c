@@ -1,7 +1,7 @@
 /*
  *   Razer device access library
  *
- *   Copyright (C) 2007-2011 Michael Buesch <m@bues.ch>
+ *   Copyright (C) 2007-2018 Michael Buesch <m@bues.ch>
  *
  *   This program is free software; you can redistribute it and/or
  *   modify it under the terms of the GNU General Public License
@@ -105,11 +105,13 @@ static const struct razer_mouse_base_ops razer_lachesis_base_ops = {
 	.release		= razer_lachesis_release,
 };
 
+#if 0
 static const struct razer_mouse_base_ops razer_lachesis5k6_base_ops = {
 	.type			= RAZER_MOUSETYPE_LACHESIS,
 	.init			= razer_lachesis5k6_init,
 	.release		= razer_lachesis5k6_release,
 };
+#endif
 
 static const struct razer_mouse_base_ops razer_copperhead_base_ops = {
 	.type			= RAZER_MOUSETYPE_COPPERHEAD,
@@ -166,7 +168,7 @@ static const struct razer_usb_device razer_usbdev_table[] = {
 //	USB_MOUSE(0x04B4, 0xE006, &razer_deathadder_base_ops), /* cypress bootloader */
 	USB_MOUSE(0x1532, 0x0003, &razer_krait_base_ops),
 	USB_MOUSE(0x1532, 0x000C, &razer_lachesis_base_ops), /* classic */
-	USB_MOUSE(0x1532, 0x001E, &razer_lachesis5k6_base_ops), /* 5600 DPI */
+//	USB_MOUSE(0x1532, 0x001E, &razer_lachesis5k6_base_ops), /* 5600 DPI */
 	USB_MOUSE(0x1532, RAZER_NAGA_PID_CLASSIC, &razer_naga_base_ops),
 	USB_MOUSE(0x1532, RAZER_NAGA_PID_EPIC, &razer_naga_base_ops),
 	USB_MOUSE(0x1532, RAZER_NAGA_PID_2012, &razer_naga_base_ops),
