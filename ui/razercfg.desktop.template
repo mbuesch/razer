@@ -4,3 +4,4 @@ Categories=Application;System;
 Name=Razer Configuration
 Exec=@CMAKE_INSTALL_PREFIX@/bin/qrazercfg
 Icon=@CMAKE_INSTALL_PREFIX@/share/icons/hicolor/scalable/apps/razercfg.svg
+Comment=Graphical Razer device configuration tool
