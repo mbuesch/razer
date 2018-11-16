@@ -54,5 +54,9 @@ if(SYSTEMD_UNIT_DIR)
 					WORLD_READ)
 endif(SYSTEMD_UNIT_DIR)
 
+install(FILES ${CMAKE_BINARY_DIR}/tmpfile.conf
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/tmpfiles.d
+	RENAME razerd.conf)
+
 add_subdirectory(razerd)
 add_subdirectory(ui)
