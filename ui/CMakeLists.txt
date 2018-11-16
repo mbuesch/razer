@@ -39,26 +39,14 @@ install(PROGRAMS razer-gamewrapper
 configure_file(razercfg.desktop.template razercfg.desktop)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/razercfg.desktop
-	DESTINATION ${CMAKE_INSTALL_PREFIX}/share/applications/
-	PERMISSIONS OWNER_READ OWNER_WRITE
-		    GROUP_READ
-		    WORLD_READ)
+	DESTINATION ${CMAKE_INSTALL_PREFIX}/share/applications)
 
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/icons/razercfg-icon.svg
-	DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/scalable/apps/
-	RENAME razercfg.svg
-	PERMISSIONS OWNER_READ OWNER_WRITE
-		    GROUP_READ
-		    WORLD_READ)
+	DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/scalable/apps
+	RENAME razercfg.svg)
 
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/icons/razercfg-alt.svg
-	DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/scalable/apps/
-	PERMISSIONS OWNER_READ OWNER_WRITE
-		    GROUP_READ
-		    WORLD_READ)
+	DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/scalable/apps)
 
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/icons/razercfg-snake.svg
-	DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/scalable/apps/
-	PERMISSIONS OWNER_READ OWNER_WRITE
-		    GROUP_READ
-		    WORLD_READ)
+	DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/scalable/apps)

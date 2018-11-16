@@ -29,16 +29,13 @@ configure_file("udev.rules.template" "udev.rules")
 if(UDEV_DIR)
 	install(FILES ${CMAKE_BINARY_DIR}/udev.rules
 		DESTINATION ${UDEV_DIR}/rules.d
-		RENAME 80-razer.rules
-		PERMISSIONS OWNER_READ OWNER_WRITE
-			    GROUP_READ
-			    WORLD_READ)
+		RENAME 80-razer.rules)
 endif(UDEV_DIR)
 
 configure_file("pm-hook.sh.template" "pm-hook.sh" @ONLY)
 
 install(FILES ${CMAKE_BINARY_DIR}/pm-hook.sh
-	DESTINATION /etc/pm/sleep.d/
+	DESTINATION /etc/pm/sleep.d
 	RENAME 50-razer
 	PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
 		    GROUP_READ GROUP_EXECUTE
@@ -48,10 +45,7 @@ configure_file("razerd.service.template" "razerd.service")
 
 if(SYSTEMD_UNIT_DIR)
 	install(FILES ${CMAKE_BINARY_DIR}/razerd.service
-		DESTINATION ${SYSTEMD_UNIT_DIR}
-		PERMISSIONS OWNER_READ OWNER_WRITE
-					GROUP_READ
-					WORLD_READ)
+		DESTINATION ${SYSTEMD_UNIT_DIR})
 endif(SYSTEMD_UNIT_DIR)
 
 install(FILES ${CMAKE_BINARY_DIR}/tmpfile.conf
