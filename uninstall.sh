@@ -2,7 +2,7 @@
 #
 #   razercfg uninstaller
 #
-#   Copyright (C) 2014-2016 Michael Buesch <m@bues.ch>
+#   Copyright (C) 2014-2019 Michael Buesch <m@bues.ch>
 #
 #   This program is free software; you can redistribute it and/or
 #   modify it under the terms of the GNU General Public License
@@ -49,6 +49,7 @@ uninstall_prefix()
 		 /bin/qrazercfg\
 		 /bin/qrazercfg-applet\
 		 /bin/razer-gamewrapper\
+		 /lib/tmpfiles.d/razerd.conf\
 		 /sbin/razerd /bin/razerd\
 		 /share/applications/razercfg.desktop; do
 
