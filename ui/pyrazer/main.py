@@ -196,8 +196,8 @@ class RazerDpiMapping(object):
 		self.mutable = mutable
 
 class Razer(object):
-	SOCKET_PATH	= "/var/run/razerd/socket"
-	PRIVSOCKET_PATH	= "/var/run/razerd/socket.privileged"
+	SOCKET_PATH	= "/run/razerd/socket"
+	PRIVSOCKET_PATH	= "/run/razerd/socket.privileged"
 
 	INTERFACE_REVISION = 6
 

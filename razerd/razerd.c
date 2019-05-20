@@ -78,10 +78,10 @@ struct commandline_args {
 };
 
 
-#define VAR_RUN			"/var/run"
-#define VAR_RUN_RAZERD		VAR_RUN "/razerd"
-#define SOCKPATH		VAR_RUN_RAZERD "/socket"
-#define PRIV_SOCKPATH		VAR_RUN_RAZERD "/socket.privileged"
+#define RUNDIR			"/run"
+#define RUNDIR_RAZERD		RUNDIR "/razerd"
+#define SOCKPATH		RUNDIR_RAZERD "/socket"
+#define PRIV_SOCKPATH		RUNDIR_RAZERD "/socket.privileged"
 
 #define INTERFACE_REVISION	6
 
@@ -454,7 +454,7 @@ static void cleanup_var_run(void)
 	privsock = -1;
 
 	remove_pidfile();
-	rmdir(VAR_RUN_RAZERD);
+	rmdir(RUNDIR_RAZERD);
 }
 
 static int create_socket(const char *path, unsigned int perm,
@@ -510,11 +510,11 @@ static int setup_var_run(void)
 {
 	int err;
 
-	/* Create /var/run subdirectory. */
-	err = mkdir(VAR_RUN_RAZERD, 0755);
+	/* Create /run subdirectory. */
+	err = mkdir(RUNDIR_RAZERD, 0755);
 	if (err && errno != EEXIST) {
 		logerr("Failed to create directory %s: %s\n",
-		       VAR_RUN_RAZERD, strerror(errno));
+		       RUNDIR_RAZERD, strerror(errno));
 		return err;
 	}
 
@@ -543,7 +543,7 @@ err_remove_ctlsock:
 
 err_remove_pidfile:
 	remove_pidfile();
-	rmdir(VAR_RUN_RAZERD);
+	rmdir(RUNDIR_RAZERD);
 
 	return -1;
 }
