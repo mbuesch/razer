@@ -220,6 +220,6 @@ concurrency.
 License
 -------
 
-Copyright (c) 2007-2016 Michael Büsch, et al.
+Copyright (c) 2007-2019 Michael Büsch, et al.
 
 See the COPYING file for license information.
