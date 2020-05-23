@@ -702,6 +702,7 @@ static void disconnect_client(struct client **client_list, struct client *client
 		logdebug("Privileged client disconnected (fd=%d)\n", client->fd);
 	else
 		logdebug("Client disconnected (fd=%d)\n", client->fd);
+	close(client->fd);
 	free_client(client);
 }
 
