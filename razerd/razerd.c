@@ -2068,6 +2068,7 @@ static int mainloop(void)
 {
 	struct client *client;
 	int err;
+	int errcount = 0;
 	fd_set wait_fdset;
 
 	loginfo("Razer device service daemon\n");
@@ -2093,7 +2094,15 @@ static int mainloop(void)
 			FD_SET(client->fd, &wait_fdset);
 		for (client = privileged_clients; client; client = client->next)
 			FD_SET(client->fd, &wait_fdset);
-		select(FD_SETSIZE, &wait_fdset, NULL, NULL, NULL);
+		err = select(FD_SETSIZE, &wait_fdset, NULL, NULL, NULL);
+		if (err <= 0) { /* error or no fd ready. */
+			if (errcount >= 3)
+				razer_msleep(10);
+			else
+				errcount++;
+			continue;
+		}
+		errcount = 0;
 
 		check_control_socket(privsock, &privileged_clients);
 		check_privileged_connections();
