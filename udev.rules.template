@@ -4,4 +4,4 @@
 # It will pick up new devices and forward information to the applications.
 
 ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="1532", RUN+="@CMAKE_INSTALL_PREFIX@/bin/razercfg -B -S1 -s"
-ACTION=="remove", SUBSYSTEM=="usb", RUN+="@CMAKE_INSTALL_PREFIX@/bin/razercfg -B -S1 -s"
+ACTION=="remove", SUBSYSTEM=="usb", ENV{PRODUCT}=="1532/*", RUN+="@CMAKE_INSTALL_PREFIX@/bin/razercfg -B -S1 -s"
