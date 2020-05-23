@@ -664,7 +664,7 @@ static void client_list_del(struct client **base, struct client *del_entry)
 		i->next = del_entry->next;
 }
 
-static void check_control_socket(int socket_fd, struct client **client_list)
+static int check_control_socket(int socket_fd, struct client **client_list)
 {
 	socklen_t socklen;
 	struct client *client;
@@ -674,25 +674,27 @@ static void check_control_socket(int socket_fd, struct client **client_list)
 	socklen = sizeof(remoteaddr);
 	fd = accept(socket_fd, (struct sockaddr *)&remoteaddr, &socklen);
 	if (fd == -1)
-		return;
+		return -1;
 	/* Connected */
 	err = fcntl(fd, F_SETFL, O_NONBLOCK);
 	if (err) {
 		logerr("Failed to set O_NONBLOCK on client: %s\n",
 		       strerror(errno));
 		close(fd);
-		return;
+		return -1;
 	}
 	client = new_client(&remoteaddr, socklen, fd);
 	if (!client) {
 		close(fd);
-		return;
+		return -1;
 	}
 	client_list_add(client_list, client);
 	if (client_list == &privileged_clients)
 		logdebug("Privileged client connected (fd=%d)\n", fd);
 	else
 		logdebug("Client connected (fd=%d)\n", fd);
+
+	return 0;
 }
 
 static void disconnect_client(struct client **client_list, struct client *client)
@@ -1994,17 +1996,20 @@ static void handle_received_privileged_command(struct client *client,
 	}
 }
 
-static void check_client_connections(void)
+static int check_client_connections(void)
 {
 	char command[COMMAND_MAX_SIZE + 1] = { 0, };
 	int nr;
 	struct client *client, *next;
+	int ret = 0;
 
 	for (client = clients; client; ) {
 		next = client->next;
 		nr = recv(client->fd, command, COMMAND_MAX_SIZE, 0);
-		if (nr < 0)
+		if (nr < 0) {
+			ret = -1;
 			goto next_client;
+		}
 		if (nr == 0) {
 			disconnect_client(&clients, client);
 			goto next_client;
@@ -2013,19 +2018,24 @@ static void check_client_connections(void)
   next_client:
 		client = next;
 	}
+
+	return ret;
 }
 
-static void check_privileged_connections(void)
+static int check_privileged_connections(void)
 {
 	char command[COMMAND_MAX_SIZE + 1] = { 0, };
 	int nr;
 	struct client *client, *next;
+	int ret = 0;
 
 	for (client = privileged_clients; client; ) {
 		next = client->next;
 		nr = recv(client->fd, command, COMMAND_MAX_SIZE, 0);
-		if (nr < 0)
+		if (nr < 0) {
+			ret = -1;
 			goto next_client;
+		}
 		if (nr == 0) {
 			disconnect_client(&privileged_clients, client);
 			goto next_client;
@@ -2034,6 +2044,8 @@ static void check_privileged_connections(void)
   next_client:
 		client = next;
 	}
+
+	return ret;
 }
 
 static void broadcast_notification(unsigned int notifyId, size_t size)
@@ -2095,20 +2107,24 @@ static int mainloop(void)
 		for (client = privileged_clients; client; client = client->next)
 			FD_SET(client->fd, &wait_fdset);
 		err = select(FD_SETSIZE, &wait_fdset, NULL, NULL, NULL);
-		if (err <= 0) { /* error or no fd ready. */
+		if (err == 0) /* no fd ready */
+			err = -1;
+		if (err > 0) {
+			err = 0;
+
+			err |= check_control_socket(privsock, &privileged_clients);
+			err |= check_privileged_connections();
+
+			err |= check_control_socket(ctlsock, &clients);
+			err |= check_client_connections();
+		}
+		if (err) {
 			if (errcount >= 3)
 				razer_msleep(10);
 			else
 				errcount++;
-			continue;
-		}
-		errcount = 0;
-
-		check_control_socket(privsock, &privileged_clients);
-		check_privileged_connections();
-
-		check_control_socket(ctlsock, &clients);
-		check_client_connections();
+		} else
+			errcount = 0;
 	}
 
 	return 1;
