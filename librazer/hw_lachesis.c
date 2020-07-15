@@ -50,10 +50,10 @@ enum lachesis_phys_button {
 	LACHESIS_PHYSBUT_LEFT = 0x01,	/* Left button */
 	LACHESIS_PHYSBUT_RIGHT,		/* Right button */
 	LACHESIS_PHYSBUT_MIDDLE,	/* Middle button */
-	LACHESIS_PHYSBUT_LFRONT,	/* Left side, front button */
-	LACHESIS_PHYSBUT_LREAR,		/* Left side, rear button */
 	LACHESIS_PHYSBUT_RFRONT,	/* Right side, front button */
 	LACHESIS_PHYSBUT_RREAR,		/* Right side, rear button */
+	LACHESIS_PHYSBUT_LFRONT,	/* Left side, front button */
+	LACHESIS_PHYSBUT_LREAR,		/* Left side, rear button */
 	LACHESIS_PHYSBUT_TFRONT,	/* Top side, front button */
 	LACHESIS_PHYSBUT_TREAR,		/* Top side, rear button */
 	LACHESIS_PHYSBUT_SCROLLUP,	/* Scroll wheel up */
@@ -143,8 +143,8 @@ static struct razer_button_function lachesis_button_functions[] = {
 	BUTTONFUNC_LEFT,
 	BUTTONFUNC_RIGHT,
 	BUTTONFUNC_MIDDLE,
-	BUTTONFUNC_PROFDOWN,
-	BUTTONFUNC_PROFUP,
+	{ .id = 0x1A, "Profile switch up" },
+	{ .id = 0x1B, "Profile switch down" },
 	BUTTONFUNC_DPIUP,
 	BUTTONFUNC_DPIDOWN,
 	BUTTONFUNC_DPI1,
@@ -152,8 +152,8 @@ static struct razer_button_function lachesis_button_functions[] = {
 	BUTTONFUNC_DPI3,
 	BUTTONFUNC_DPI4,
 	BUTTONFUNC_DPI5,
-	BUTTONFUNC_WIN5,
-	BUTTONFUNC_WIN4,
+	{ .id = 0xA, "Windows button 4" },
+	{ .id = 0xB, "Windows button 5" },
 	BUTTONFUNC_SCROLLUP,
 	BUTTONFUNC_SCROLLDWN,
 };
