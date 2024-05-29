@@ -276,11 +276,11 @@ class OpSetRes(Operation):
 			(profile, values) = self.parseProfileValueStr(self.param, idstr)
 			resolutions = []
 			for arg in values[0].split(','):
-				m = re.match('^\d+$', arg)
+				m = re.match(r'^\d+$', arg)
 				if m is not None:
 					resolutions.append((None, int(arg)))
 					continue
-				m = re.match('^(\d+)x(\d+)$', arg)
+				m = re.match(r'^(\d+)x(\d+)$', arg)
 				if m is not None:
 					resolutions.append((0, int(m.group(1))))
 					resolutions.append((1, int(m.group(2))))
