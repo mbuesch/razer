@@ -22,7 +22,7 @@ Debian Linux: `apt-get install libusb-1.0-0-dev`
 * PyQt5 (for the graphical qrazercfg tool only): [https://riverbankcomputing.com/software/pyqt/download5/](https://riverbankcomputing.com/software/pyqt/download5/)
 Debian Linux: `apt-get install python3-pyqt5`
 
-* cmake 2.4 or later (for building only): [https://cmake.org/](https://cmake.org/)  
+* cmake 3.5 or later (for building only): [https://cmake.org/](https://cmake.org/)  
 Debian Linux: `apt-get install cmake`
 
 Note that almost all distributions ship prebuilt packages of the
@@ -91,7 +91,7 @@ ln -s /etc/init.d/razerd /etc/rc6.d/K01razerd
 
 The `make install` step installed the udev script to
 <pre>
-$(pkg-config --variable=udevdir udev)/rules.d/80-razer.rules
+/etc/udev/rules.d/80-razer.rules
 </pre>
 This should work on most distributions.
 
@@ -220,6 +220,6 @@ concurrency.
 License
 -------
 
-Copyright (c) 2007-2020 Michael Büsch, et al.
+Copyright (c) 2007-2024 Michael Büsch, et al.
 
 See the COPYING file for license information.
