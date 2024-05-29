@@ -25,11 +25,9 @@ add_subdirectory(librazer)
 
 configure_file("udev.rules.template" "udev.rules")
 
-if(UDEV_DIR)
-	install(FILES ${CMAKE_BINARY_DIR}/udev.rules
-		DESTINATION ${UDEV_DIR}/rules.d
-		RENAME 80-razer.rules)
-endif(UDEV_DIR)
+install(FILES ${CMAKE_BINARY_DIR}/udev.rules
+	DESTINATION /etc/udev/rules.d
+	RENAME 80-razer.rules)
 
 configure_file("pm-hook.sh.template" "pm-hook.sh" @ONLY)
 
@@ -42,11 +40,9 @@ install(FILES ${CMAKE_BINARY_DIR}/pm-hook.sh
 
 configure_file("razerd.service.template" "razerd.service")
 
-if(SYSTEMD_UNIT_DIR)
-	install(FILES ${CMAKE_BINARY_DIR}/razerd.service
-		DESTINATION ${SYSTEMD_UNIT_DIR})
-endif(SYSTEMD_UNIT_DIR)
-
+install(FILES ${CMAKE_BINARY_DIR}/razerd.service
+	DESTINATION /usr/lib/systemd/system)
+	
 install(FILES ${CMAKE_SOURCE_DIR}/tmpfile.conf
 	DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/tmpfiles.d
 	RENAME razerd.conf)

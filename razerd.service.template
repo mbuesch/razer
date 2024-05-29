@@ -7,4 +7,4 @@ After=local-fs.target
 ExecStart=@CMAKE_INSTALL_PREFIX@/bin/razerd -f
 
 [Install]
-Alias=multi-user.target.wants/razerd.service
+WantedBy=multi-user.target
