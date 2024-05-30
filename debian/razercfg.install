@@ -1,8 +1,0 @@
-razer.conf /etc
-etc/pm/sleep.d/50-razer /etc/pm/sleep.d
-lib/systemd/system/razerd.service lib/systemd/system
-lib/udev/rules.d/80-razer.rules lib/udev/rules.d
-usr/lib/python3*/site-packages/* usr/lib/python3/dist-packages
-usr/bin/razerd /usr/bin
-usr/bin/razercfg /usr/bin
-usr/bin/razer-gamewrapper /usr/bin
