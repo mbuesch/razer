@@ -798,30 +798,38 @@ static int send_utf16_string(struct client *client, const razer_utf16_t *str)
 
 static int recv_bulk(struct client *client, char *buf, unsigned int len)
 {
-	unsigned int next_len, i;
+	unsigned int next_len, i, got;
 	int nr;
 
-//FIXME timeout
 	for (i = 0; i < len; i += BULK_CHUNK_SIZE) {
 		next_len = BULK_CHUNK_SIZE;
 		if (i + next_len > len)
 			next_len = len - i;
-		while (1) {
-			nr = recv(client->fd, buf + i, next_len, 0);
+
+		got = 0;
+		while (got < next_len) {
+			nr = recv(client->fd, buf + i + got, next_len - got, 0);
 			if (nr < 0) {
-				if (errno == EAGAIN ||
-				    errno == EINTR) {
+				if (errno == EAGAIN || errno == EINTR) {
 					razer_msleep(1);
 					continue;
 				}
+				send_u32(client, ERR_PAYLOAD);
+				return -1;
 			}
-			if (nr > 0)
-				break;
+			if (nr == 0) {
+				/* Peer closed connection unexpectedly. */
+				send_u32(client, ERR_PAYLOAD);
+				return -1;
+			}
+			got += (unsigned int)nr;
 		}
-		if (nr < 0 || (unsigned int)nr != next_len) {
+
+		if (got != next_len) {
 			send_u32(client, ERR_PAYLOAD);
 			return -1;
 		}
+
 		send_u32(client, ERR_NONE);
 	}
 
@@ -2082,6 +2090,7 @@ static int mainloop(void)
 	int err;
 	int errcount = 0;
 	fd_set wait_fdset;
+	int maxfd;
 
 	loginfo("Razer device service daemon\n");
 
@@ -2100,13 +2109,54 @@ static int mainloop(void)
 
 	while (1) {
 		FD_ZERO(&wait_fdset);
-		FD_SET(privsock, &wait_fdset);
-		FD_SET(ctlsock, &wait_fdset);
-		for (client = clients; client; client = client->next)
-			FD_SET(client->fd, &wait_fdset);
-		for (client = privileged_clients; client; client = client->next)
-			FD_SET(client->fd, &wait_fdset);
-		err = select(FD_SETSIZE, &wait_fdset, NULL, NULL, NULL);
+
+		/* Build fdset while tracking maximum fd. Skip and log fds >= FD_SETSIZE. */
+		maxfd = -1;
+		if (privsock >= 0) {
+			if (privsock < FD_SETSIZE) {
+				FD_SET(privsock, &wait_fdset);
+				maxfd = max(maxfd, privsock);
+			} else {
+				logerr("privsock fd %d >= FD_SETSIZE (%d), skipping\n", privsock, FD_SETSIZE);
+			}
+		}
+		if (ctlsock >= 0) {
+			if (ctlsock < FD_SETSIZE) {
+				FD_SET(ctlsock, &wait_fdset);
+				maxfd = max(maxfd, ctlsock);
+			} else {
+				logerr("ctlsock fd %d >= FD_SETSIZE (%d), skipping\n", ctlsock, FD_SETSIZE);
+			}
+		}
+
+		for (client = clients; client; client = client->next) {
+			if (client->fd >= 0) {
+				if (client->fd < FD_SETSIZE) {
+					FD_SET(client->fd, &wait_fdset);
+					maxfd = max(maxfd, client->fd);
+				} else {
+					logerr("Client fd %d >= FD_SETSIZE (%d), skipping\n", client->fd, FD_SETSIZE);
+				}
+			}
+		}
+		for (client = privileged_clients; client; client = client->next) {
+			if (client->fd >= 0) {
+				if (client->fd < FD_SETSIZE) {
+					FD_SET(client->fd, &wait_fdset);
+					maxfd = max(maxfd, client->fd);
+				} else {
+					logerr("Privileged client fd %d >= FD_SETSIZE (%d), skipping\n", client->fd, FD_SETSIZE);
+				}
+			}
+		}
+
+		if (maxfd < 0) {
+			/* No valid fds to wait on. Avoid busy-looping. */
+			razer_msleep(100);
+			continue;
+		}
+
+		err = select(maxfd + 1, &wait_fdset, NULL, NULL, NULL);
 		if (err == 0) /* no fd ready */
 			err = -1;
 		if (err > 0) {
