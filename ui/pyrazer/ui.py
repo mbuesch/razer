@@ -738,9 +738,9 @@ class RazerApplet(QSystemTrayIcon):
 		self.mainwnd.hidden.connect(self.__mainwndHidden)
 
 	def __handleActivate(self, reason):
-		if reason in {QSystemTrayIcon.Trigger,
-			      QSystemTrayIcon.DoubleClick,
-			      QSystemTrayIcon.MiddleClick}:
+		if reason in {QSystemTrayIcon.ActivationReason.Trigger,
+			      QSystemTrayIcon.ActivationReason.DoubleClick,
+			      QSystemTrayIcon.ActivationReason.MiddleClick}:
 			self.contextMenu().popup(QCursor.pos())
 
 	def __contextAboutToShow(self):
