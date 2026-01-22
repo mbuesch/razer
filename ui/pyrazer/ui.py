@@ -150,7 +150,7 @@ class OneLedConfig(QWidget):
 
 		self.stateCb = QCheckBox(led.name + " LED", self)
 		self.layout().addWidget(self.stateCb, 0, 0)
-		self.stateCb.setCheckState(Qt.Checked if led.state else Qt.Unchecked)
+		self.stateCb.setCheckState(Qt.CheckState.Checked if led.state else Qt.CheckState.Unchecked)
 
 		if led.supported_modes:
 			self.modeComBox = WrappedComboBox(self)
@@ -319,9 +319,9 @@ class MouseProfileWidget(QWidget):
 				resSel.setCurrentIndex(index)
 		independent = bool([x for x in axisMappings if x != axisMappings[0]])
 		if independent:
-			self.resIndependent.setCheckState(Qt.Checked)
+			self.resIndependent.setCheckState(Qt.CheckState.Checked)
 		else:
-			self.resIndependent.setCheckState(Qt.Unchecked)
+			self.resIndependent.setCheckState(Qt.CheckState.Unchecked)
 		self.resIndependentChanged(self.resIndependent.checkState())
 
 		# Profile selection
@@ -353,7 +353,7 @@ class MouseProfileWidget(QWidget):
 	def resChanged(self, unused=None):
 		if self.mouseWidget.recurseProtect:
 			return
-		if self.resIndependent.checkState() == Qt.Checked:
+		if self.resIndependent.checkState() == Qt.CheckState.Checked:
 			axisId = 0
 			for resSel in self.resSel:
 				index = resSel.currentIndex()
@@ -371,7 +371,7 @@ class MouseProfileWidget(QWidget):
 				self.mouseWidget.recurseProtect -= 1
 
 	def resIndependentChanged(self, newState):
-		if newState == Qt.Checked:
+		if newState == Qt.CheckState.Checked:
 			for resSel in self.resSel[1:]:
 				resSel.setEnabled(True)
 		else:
