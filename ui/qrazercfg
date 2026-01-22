@@ -16,9 +16,9 @@
 
 import sys
 import traceback
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
+from PyQt6.QtCore import *
+from PyQt6.QtGui import *
+from PyQt6.QtWidgets import *
 
 import pyrazer
 from pyrazer import ui
@@ -34,7 +34,7 @@ def main():
 	try:
 		mainwnd = ui.MainWindow()
 		mainwnd.show()
-		return app.exec_()
+		return app.exec()
 	except pyrazer.RazerEx as e:
 		QMessageBox.critical(None,
 			"qrazercfg - Fatal exception",

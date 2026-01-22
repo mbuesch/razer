@@ -13,9 +13,9 @@
 #   GNU General Public License for more details.
 
 import sys
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
+from PyQt6.QtCore import *
+from PyQt6.QtGui import *
+from PyQt6.QtWidgets import *
 Signal = pyqtSignal
 from functools import partial
 from pyrazer import *
@@ -381,7 +381,7 @@ class MouseProfileWidget(QWidget):
 
 	def showButtonConf(self, checked):
 		bconf = ButtonConfDialog(self)
-		bconf.exec_()
+		bconf.exec()
 
 	def nameChange(self, unused):
 		name = razer.getProfileName(self.mouseWidget.mouse, self.profileId)
