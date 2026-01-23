@@ -322,7 +322,7 @@ class MouseProfileWidget(QWidget):
 			self.resIndependent.setCheckState(Qt.CheckState.Checked)
 		else:
 			self.resIndependent.setCheckState(Qt.CheckState.Unchecked)
-		self.resIndependentChanged(self.resIndependent.checkState())
+		self.resIndependentChanged()
 
 		# Profile selection
 		activeProf = razer.getActiveProfile(self.mouseWidget.mouse)
@@ -370,8 +370,8 @@ class MouseProfileWidget(QWidget):
 				resSel.setCurrentIndex(index)
 				self.mouseWidget.recurseProtect -= 1
 
-	def resIndependentChanged(self, newState):
-		if newState == Qt.CheckState.Checked:
+	def resIndependentChanged(self, _=None):
+		if self.resIndependent.checkState() == Qt.CheckState.Checked:
 			for resSel in self.resSel[1:]:
 				resSel.setEnabled(True)
 		else:
