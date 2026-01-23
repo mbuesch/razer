@@ -387,7 +387,7 @@ class MouseProfileWidget(QWidget):
 		name = razer.getProfileName(self.mouseWidget.mouse, self.profileId)
 		(newName, ok) = QInputDialog.getText(self, self.tr("New profile name"),
 						     self.tr("New profile name:"),
-						     QLineEdit.Normal,
+						     QLineEdit.EchoMode.Normal,
 						     name)
 		if not ok:
 			return
